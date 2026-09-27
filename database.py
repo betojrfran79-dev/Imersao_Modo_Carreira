@@ -64,9 +64,10 @@ def sanitize_date_str(date_str, fallback_year="2026"):
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "career_vault.db")
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 30000")
     return conn
 
 def init_db():
@@ -82,7 +83,7 @@ def init_db():
         current_team_id INTEGER NOT NULL DEFAULT 0,
         current_team_name TEXT NOT NULL DEFAULT '',
         avatar_url TEXT DEFAULT '',
-        weekly_wage REAL DEFAULT 17000.0,
+        weekly_wage REAL DEFAULT 0.0,
         total_salary_earned REAL DEFAULT 0.0,
         currency_symbol TEXT DEFAULT '$',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -650,13 +651,13 @@ def get_or_create_active_save(save_id="carreira_ativa", manager_name="Técnico",
     if not row:
         cur.execute("""
         INSERT INTO saves (id, name, manager_name, current_team_id, current_team_name, weekly_wage, total_salary_earned)
-        VALUES (?, ?, ?, ?, ?, 17000.0, 0.0)
+        VALUES (?, ?, ?, ?, ?, 0.0, 0.0)
         """, (save_id, f"Carreira com {team_name}", manager_name, team_id, team_name))
         
         if team_id > 0:
             cur.execute("""
             INSERT INTO manager_clubs (save_id, team_id, team_name, start_date, weekly_wage, total_earned_at_club, is_current)
-            VALUES (?, ?, ?, ?, 17000.0, 0.0, 1)
+            VALUES (?, ?, ?, ?, 0.0, 0.0, 1)
             """, (save_id, team_id, team_name, datetime.date.today().strftime("%d/%m/%Y")))
         conn.commit()
     conn.close()
@@ -1343,7 +1344,7 @@ def sync_full_career(save_id, full_data, purge_previous=False):
     incoming_manager_name = full_data.get("manager_name", "").strip()
     team_id = int(full_data.get("team_id", 0))
     team_name = full_data.get("team_name", "Clube")
-    weekly_wage = float(full_data.get("weekly_wage", 17000.0))
+    weekly_wage = float(full_data.get("weekly_wage", 0.0))
     raw_season = full_data.get("season_year", "")
     start_date = full_data.get("start_date", "21/06/2026")
     season_year = format_brazilian_season(raw_season, start_date)
@@ -1701,15 +1702,40 @@ def get_manager_career_stats(save_id):
     Aproveitamento (%) = (Vitórias * 3 + Empates * 1) / (Total de Jogos * 3) * 100
     E soma o salário acumulado e lista as competições disputadas.
     """
-    recalculate_competition_status_and_trophies(save_id)
-    
     conn = get_db()
     cur = conn.cursor()
 
     cur.execute("SELECT * FROM saves WHERE id = ?", (save_id,))
     save_row = cur.fetchone()
-    weekly_wage = float(save_row["weekly_wage"]) if save_row and "weekly_wage" in save_row.keys() and save_row["weekly_wage"] else 17000.0
-    total_salary_earned = float(save_row["total_salary_earned"]) if save_row and "total_salary_earned" in save_row.keys() and save_row["total_salary_earned"] else 1938000.0
+    if not save_row:
+        conn.close()
+        return {
+            "manager_name": "Técnico",
+            "current_team_name": "Aguardando Sincronização",
+            "current_team_id": 0,
+            "currency_symbol": "$",
+            "avatar_url": "",
+            "total_games": 0,
+            "wins": 0,
+            "draws": 0,
+            "losses": 0,
+            "goals_for": 0,
+            "goals_against": 0,
+            "goal_diff": 0,
+            "points_earned": 0,
+            "aproveitamento_pct": 0.0,
+            "weekly_wage": 0.0,
+            "total_salary_earned": 0.0,
+            "clubs_coached": [],
+            "awards": [],
+            "competitions": [],
+            "trophies_count": 0
+        }
+
+    recalculate_competition_status_and_trophies(save_id)
+
+    weekly_wage = float(save_row["weekly_wage"]) if save_row and "weekly_wage" in save_row.keys() and save_row["weekly_wage"] else 0.0
+    total_salary_earned = float(save_row["total_salary_earned"]) if save_row and "total_salary_earned" in save_row.keys() and save_row["total_salary_earned"] else 0.0
 
     cur.execute("""
     SELECT 

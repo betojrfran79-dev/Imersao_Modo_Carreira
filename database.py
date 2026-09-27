@@ -557,6 +557,38 @@ def init_db():
     conn.commit()
     conn.close()
 
+def purge_all_mock_data(save_id=None):
+    """
+    Exclui completamente todos os dados de todas as tabelas do banco de dados,
+    zerando o save para que um novo save possa ser iniciado do absoluto zero.
+    Também remove arquivos locais de sincronização automática.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+    tables = [row[0] for row in cursor.fetchall()]
+    for t in tables:
+        try:
+            cursor.execute(f"DELETE FROM {t}")
+        except Exception as e:
+            print(f"Aviso ao limpar tabela {t}: {e}")
+    conn.commit()
+    conn.close()
+
+    # Re-executa init_db para garantir integridade e migrações
+    init_db()
+
+    # Apagar arquivos de backup e sync locais da pasta para não recarregar dados antigos
+    for fname in ["FC_CAREER_VAULT_BACKUP.json", "dados_carreira_sync.json"]:
+        fpath = os.path.join(BASE_DIR, fname)
+        if os.path.exists(fpath):
+            try:
+                os.remove(fpath)
+            except Exception as e:
+                print(f"Aviso ao remover {fname}: {e}")
+
+    return True
+
 def _safe_int(val, default=0):
     if val is None:
         return default

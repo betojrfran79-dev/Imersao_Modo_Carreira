@@ -13,7 +13,7 @@ echo.
 echo [1/3] Verificando ambiente Python...
 if exist "%~dp0python_runtime\python.exe" (
     echo       [OK] Python Portatil Embutido pronto para uso!
-    echo       (Nao e necessario instalar Python no seu computador).
+    echo       Nao e necessario instalar Python no seu computador.
 ) else (
     python --version >nul 2>&1
     if %ERRORLEVEL% EQU 0 (
@@ -25,22 +25,29 @@ if exist "%~dp0python_runtime\python.exe" (
 )
 echo.
 
-:: 2. Verificar Git (necessario para receber atualizacoes automaticas)
+:: 2. Verificar Git - necessario para receber atualizacoes automaticas
 echo [2/3] Verificando instalacao do Git...
 git --version >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
-    echo       Git detectado com sucesso! (Atualizacoes automaticas ativadas)
+    echo       [OK] Git detectado com sucesso! Atualizacoes automaticas ativadas.
 ) else (
     echo       [AVISO] Git nao detectado.
-    echo       Para que o app receba suas atualizacoes automaticamente via GitHub,
-    echo       recomendamos instalar o Git:
-    echo       winget install Git.Git -e
+    echo       Para receber atualizacoes automaticas via GitHub, instale o Git.
 )
 echo.
 
 :: 3. Criar Atalho na Area de Trabalho
 echo [3/3] Criando icone oficial na Area de Trabalho...
-cscript //nologo create_shortcut.vbs
+cscript //nologo create_shortcut.vbs "%~dp0" >nul 2>&1
+
+:: Fallback resiliente via PowerShell caso VBScript esteja bloqueado no Windows
+if not exist "%USERPROFILE%\Desktop\Imersao Modo Carreira - EA FC.lnk" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $d = [Environment]::GetFolderPath('Desktop'); $s = $ws.CreateShortcut($d + '\Imersao Modo Carreira - EA FC.lnk'); $s.TargetPath = '%~dp0INICIAR_VAULT.bat'; $s.WorkingDirectory = '%~dp0'; $s.IconLocation = '%~dp0siga_logo.ico,0'; $s.Description = 'Imersao Modo Carreira - EA FC'; $s.Save()" >nul 2>&1
+)
+if not exist "%~dp0Imersao Modo Carreira - EA FC.lnk" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $s = $ws.CreateShortcut('%~dp0Imersao Modo Carreira - EA FC.lnk'); $s.TargetPath = '%~dp0INICIAR_VAULT.bat'; $s.WorkingDirectory = '%~dp0'; $s.IconLocation = '%~dp0siga_logo.ico,0'; $s.Description = 'Imersao Modo Carreira - EA FC'; $s.Save()" >nul 2>&1
+)
+echo       [OK] Atalho criado com sucesso!
 echo.
 
 echo ==============================================================================

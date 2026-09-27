@@ -2507,9 +2507,11 @@ function initPurgeButton() {
       const data = await res.json();
       if (res.ok) {
         showToast("🗑️ Banco de dados limpo com sucesso!", "success");
-        await refreshAllData();
+        setTimeout(() => {
+          window.location.reload();
+        }, 700);
       } else {
-        showToast("Erro ao limpar banco", "error");
+        showToast(data.message || data.error || "Erro ao limpar banco", "error");
       }
     } catch (err) {
       showToast("Erro na conexão ao limpar banco", "error");

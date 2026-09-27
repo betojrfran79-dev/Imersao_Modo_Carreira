@@ -22,8 +22,7 @@ if exist "%TARGET_DIR%" (
     git pull origin main
 ) else (
     echo [2/3] Baixando versao mais recente do aplicativo...
-    :: OBS: Altere 'SEU_USUARIO' abaixo para o seu usuario do GitHub antes de enviar ao colega
-    git clone https://github.com/SEU_USUARIO/imersao-modo-carreira.git "%TARGET_DIR%"
+    git clone https://github.com/betojrfran79-dev/Imersao_Modo_Carreira.git "%TARGET_DIR%"
     cd /d "%TARGET_DIR%"
 )
 

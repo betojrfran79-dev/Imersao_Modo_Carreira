@@ -1,0 +1,2 @@
+# Este projeto utiliza apenas a biblioteca padrão do Python.
+# Este arquivo é mantido vazio para o instalador do Render/Railway prosseguir com sucesso.

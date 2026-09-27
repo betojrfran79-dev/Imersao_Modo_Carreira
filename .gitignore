@@ -1,0 +1,32 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+!python_runtime/*.pyd
+
+
+# Vídeos e gravações pesadas de tela
+*.mp4
+*.avi
+*.mkv
+
+# Pastas de testes e rascunhos temporários
+scratch/
+_archive_v1/
+*.log
+
+# Caches de imagens e uploads locais
+uploads/dds_cache/
+assets/generated/
+assets/uploads/
+
+# Bancos de dados locais (cada usuário tem o seu save exclusivo)
+career_vault.db
+database.db
+
+# Configurações locais e chaves secretas
+.env
+*.lnk
+.DS_Store
+Thumbs.db
+

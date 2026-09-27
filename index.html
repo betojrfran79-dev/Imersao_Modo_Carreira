@@ -1,0 +1,2834 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Imersão Modo Carreira - EA FC</title>
+  
+  <!-- Google Fonts: Plus Jakarta Sans & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Favicon / App Icon -->
+  <link rel="icon" type="image/x-icon" href="/siga_logo.ico">
+  <link rel="shortcut icon" type="image/x-icon" href="/siga_logo.ico">
+  
+  <!-- Main CSS -->
+  <link rel="stylesheet" href="style.css?v=4.0">
+</head>
+<body>
+
+  <!-- Top Navigation & Club Bar -->
+  <header class="top-nav">
+    <div class="nav-brand">
+      <div class="brand-badge">EA FC</div>
+      <div class="brand-title">
+        <span class="brand-main">IMERSÃO MODO CARREIRA</span>
+        <span class="brand-sub">EA SPORTS FC • STATS & IMMERSION ENGINE</span>
+      </div>
+    </div>
+
+    <!-- Active Club & Manager Status -->
+    <div class="club-status-card" id="topClubCard">
+      <img id="topClubCrest" class="top-crest" src="" alt="Escudo">
+      <div class="top-club-info">
+        <div class="top-club-name" id="topClubName">Carregando...</div>
+        <div class="top-manager-meta">
+          <span class="top-mgr" id="topManagerName">Técnico: Roberto</span>
+          <span class="meta-dot">•</span>
+          <span class="top-season" id="topSeasonActive">Temp: 2025/2026</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Status & Quick Actions -->
+    <div class="nav-actions">
+      <button class="btn-setup-guide" id="btnOpenSetupGuide" title="Guia de Instalação, Pastas, Scripts Lua e Chave de IA">
+        <i data-lucide="compass"></i>
+        <span>Guia & Setup</span>
+      </button>
+      <button class="btn-setup-package" id="btnDownloadSetupZip" title="Baixar Pacote de Instalação Completo com Script Lua (.ZIP)">
+        <i data-lucide="download"></i>
+        <span>Baixar Setup (.ZIP)</span>
+      </button>
+      <div class="live-pill" id="liveStatusPill">
+        <span class="live-dot"></span>
+        <span class="live-text">Live Editor Conectado</span>
+      </div>
+      <input type="file" id="directJsonFileInput" accept=".json" style="display: none;">
+      <button class="btn-primary" id="btnUploadJsonDirect" title="Carregar arquivo JSON da Carreira">
+        <i data-lucide="file-up"></i> Carregar JSON da Carreira
+      </button>
+      <button class="btn-secondary" id="btnManualSync" title="Sincronizar direto com a pasta do Desktop">
+        <i data-lucide="refresh-cw"></i> Sincronizar
+      </button>
+      <button class="btn-secondary" id="btnExportCareerBackup" title="Baixar Backup Completo da Carreira (.JSON)">
+        <i data-lucide="download"></i> Baixar Backup
+      </button>
+    </div>
+  </header>
+
+  <!-- Main App Layout with Tabs Navigation -->
+  <div class="app-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar-nav">
+      <nav class="nav-menu">
+        <button class="nav-item nav-item-setup active" data-tab="setup">
+          <i data-lucide="compass"></i>
+          <span>Guia de Início & Setup</span>
+          <span class="setup-badge-tag">PASSO A PASSO</span>
+        </button>
+        <button class="nav-item" data-tab="dashboard">
+          <i data-lucide="layout-dashboard"></i>
+          <span>Painel do Momento</span>
+        </button>
+        <button class="nav-item" data-tab="manager">
+          <i data-lucide="user-check"></i>
+          <span>Carreira do Técnico</span>
+        </button>
+        <button class="nav-item" data-tab="seasons">
+          <i data-lucide="calendar"></i>
+          <span>Histórico de Temporadas</span>
+        </button>
+        <button class="nav-item" data-tab="calendar">
+          <i data-lucide="calendar-days"></i>
+          <span>Calendário & Jogos</span>
+        </button>
+        <button class="nav-item" data-tab="squad">
+          <i data-lucide="users"></i>
+          <span>Elenco & Atletas</span>
+        </button>
+        <button class="nav-item" data-tab="transfers">
+          <i data-lucide="arrow-left-right"></i>
+          <span>Transferências & Mercado</span>
+        </button>
+        <button class="nav-item" data-tab="scout">
+          <i data-lucide="binoculars"></i>
+          <span>Equipe de Scout</span>
+        </button>
+        <button class="nav-item" data-tab="finances">
+          <i data-lucide="wallet"></i>
+          <span>Finanças do Clube</span>
+        </button>
+        <button class="nav-item" data-tab="halloffame">
+          <i data-lucide="trophy"></i>
+          <span>Hall da Fama Eterno</span>
+        </button>
+        <button class="nav-item" data-tab="h2h">
+          <i data-lucide="swords"></i>
+          <span>Raio-X de Duelos (H2H)</span>
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <i data-lucide="settings"></i>
+          <span>Configurações</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Mini-Summary Card -->
+      <div class="sidebar-footer-card">
+        <div class="sfc-label">APROVEITAMENTO GERAL</div>
+        <div class="sfc-value" id="sideAproveitamentoVal">0.0%</div>
+        <div class="sfc-sub" id="sideRecordText">0V - 0E - 0D</div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+
+      <!-- ======================================================== -->
+      <!-- ABA 0: GUIA DE INÍCIO RÁPIDO & SETUP WIZARD (ONBOARDING) -->
+      <!-- ======================================================== -->
+      <section class="tab-pane active" id="pane-setup">
+        
+        <!-- Setup Hero Header -->
+        <div class="setup-hero">
+          <div class="setup-hero-badge">
+            <i data-lucide="sparkles"></i>
+            <span>GUIA DE CONFIGURAÇÃO RÁPIDA • EA FC 25 / EA FC 26</span>
+          </div>
+          <h1 class="setup-hero-title">Como Conectar o Imersão Modo Carreira ao seu Jogo</h1>
+          <p class="setup-hero-subtitle">
+            Siga os passos simples abaixo para sincronizar o seu save do Modo Carreira e ativar todas as funções de IA, Scout, Finanças e Estatísticas. Tudo foi pensado para funcionar em poucos cliques!
+          </p>
+
+          <!-- Live System Diagnostic Bar -->
+          <div class="setup-diagnostic-bar">
+            <div class="diag-item" id="diagFolderItem">
+              <div class="diag-icon"><i data-lucide="folder"></i></div>
+              <div class="diag-text">
+                <span class="diag-label">PASTA DE DADOS</span>
+                <span class="diag-status status-checking" id="diagFolderStatus">Verificando...</span>
+              </div>
+            </div>
+            <div class="diag-item" id="diagLuaItem">
+              <div class="diag-icon"><i data-lucide="file-code"></i></div>
+              <div class="diag-text">
+                <span class="diag-label">SCRIPTS LUA</span>
+                <span class="diag-status status-checking" id="diagLuaStatus">Verificando...</span>
+              </div>
+            </div>
+            <div class="diag-item" id="diagAiItem">
+              <div class="diag-icon"><i data-lucide="bot"></i></div>
+              <div class="diag-text">
+                <span class="diag-label">INTELIGÊNCIA ARTIFICIAL</span>
+                <span class="diag-status status-checking" id="diagAiStatus">Verificando...</span>
+              </div>
+            </div>
+            <div class="diag-item" id="diagSaveItem">
+              <div class="diag-icon"><i data-lucide="database"></i></div>
+              <div class="diag-text">
+                <span class="diag-label">DADOS DO SAVE</span>
+                <span class="diag-status status-checking" id="diagSaveStatus">Verificando...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Setup Step-by-Step Grid -->
+        <div class="setup-steps-grid">
+
+          <!-- PASSO 1: CONFIGURAR PASTA DE EXTRAÇÃO -->
+          <div class="setup-card step-card">
+            <div class="step-header">
+              <div class="step-number">1</div>
+              <div class="step-title-group">
+                <h3 class="step-title">Pasta de Extração de Dados no seu PC</h3>
+                <p class="step-desc">O aplicativo lê os dados da sua carreira gerados pelo Live Editor diretamente desta pasta no seu computador.</p>
+              </div>
+            </div>
+            
+            <div class="step-body">
+              <div class="setup-info-box">
+                <div class="info-icon"><i data-lucide="info"></i></div>
+                <div class="info-content">
+                  <strong>Onde os arquivos ficam salvos:</strong>
+                  <p>O Live Editor salva planilhas e relatórios como <code>jogadores_contratos.csv</code> e <code>SCOUT_LIVE_DATABASE.json</code> nesta pasta.</p>
+                </div>
+              </div>
+
+              <div class="path-display-group">
+                <label class="input-label">Caminho da Pasta no seu Computador:</label>
+                <div class="path-input-wrap">
+                  <input type="text" id="setupFolderPathInput" class="path-input" readonly value="C:\Users\Roberto\Desktop\Imersão_Carreira_FC">
+                  <button class="btn-copy-path" id="btnCopyFolderPath" title="Copiar Caminho">
+                    <i data-lucide="copy"></i> Copiar
+                  </button>
+                </div>
+              </div>
+
+              <div class="step-actions">
+                <button class="btn-primary" id="btnPrepareDesktopFolder">
+                  <i data-lucide="folder-plus"></i> Criar Pasta & Colocar Scripts no Desktop
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASSO 2: ONDE SALVAR O SCRIPT LUA NO LIVE EDITOR (PATCH FCM) -->
+          <div class="setup-card step-card">
+            <div class="step-header">
+              <div class="step-number">2</div>
+              <div class="step-title-group">
+                <h3 class="step-title">Onde Colocar o Script Lua no Live Editor (Patch FCM / EA SPORTS FC)</h3>
+                <p class="step-desc">No Patch do FC Mania (FCM), a pasta do Live Editor fica localizada <strong>dentro da pasta do seu jogo EA SPORTS FC</strong>. Você só precisa de <strong>um único script</strong>: o <code>EXTRAIR_DADOS_CARREIRA.lua</code>.</p>
+              </div>
+            </div>
+
+            <div class="step-body">
+              <div class="folder-tree-box">
+                <div class="tree-header"><i data-lucide="folder-tree"></i> Estrutura de Pastas no Patch FCM (EA FC 24, FC 25, FC 26, FC 27+):</div>
+                <pre class="tree-content">📁 C:\Program Files\EA Games\EA SPORTS FC\ (ou C:\Arquivos de Programas\EA Games\EA SPORTS FC\)
+  └── 📁 Live Editor\  (Pasta do Live Editor integrada ao FCM)
+        └── 📁 lua\
+              └── 📁 scripts\
+                    └── 📄 <span class="highlight-file">EXTRAIR_DADOS_CARREIRA.lua</span>  (Script Mestre Único)</pre>
+              </div>
+
+              <div class="path-display-group">
+                <label class="input-label">Caminho Padrão do Live Editor no Patch FCM:</label>
+                <div class="path-input-wrap">
+                  <input type="text" id="setupLiveEditorPathInput" class="path-input" readonly value="C:\Program Files\EA Games\EA SPORTS FC\Live Editor\lua\scripts">
+                  <button class="btn-copy-path" id="btnCopyLiveEditorPath" title="Copiar Caminho do Live Editor">
+                    <i data-lucide="copy"></i> Copiar
+                  </button>
+                </div>
+              </div>
+
+              <div class="setup-info-box">
+                <div class="info-icon"><i data-lucide="sparkles"></i></div>
+                <div class="info-content">
+                  <strong>O que este script único faz automaticamente:</strong>
+                  <p>Gera a planilha <code>jogadores_contratos.csv</code> (com todos os 25.000 jogadores, contratos, clubes e atributos para o Scout), atualiza seu elenco, finanças, histórico de transferências, classificação e calendário em tempo real!</p>
+                </div>
+              </div>
+
+              <div class="step-actions">
+                <button class="btn-primary" id="btnDownloadSetupZipStep">
+                  <i data-lucide="download"></i> Baixar Pacote de Instalação (.ZIP)
+                </button>
+                <button class="btn-secondary" id="btnDownloadLuaScriptDirect">
+                  <i data-lucide="file-code"></i> Baixar Script Lua (.lua)
+                </button>
+                <button class="btn-secondary" id="btnCopyLuaScriptsToDesktop">
+                  <i data-lucide="folder-plus"></i> Criar & Copiar para Desktop
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASSO 3: COMO EXTRAIR OS DADOS DENTRO DO JOGO -->
+          <div class="setup-card step-card">
+            <div class="step-header">
+              <div class="step-number">3</div>
+              <div class="step-title-group">
+                <h3 class="step-title">Como Extrair os Dados Dentro do Jogo (1 Clique)</h3>
+                <p class="step-desc">A extração é 100% segura, rápida e não altera nada no seu save da carreira.</p>
+              </div>
+            </div>
+
+            <div class="step-body">
+              <div class="ingame-steps-grid">
+                <div class="ig-step">
+                  <div class="ig-badge">Passo A</div>
+                  <div class="ig-icon"><i data-lucide="play-circle"></i></div>
+                  <h4>Inicie o Jogo</h4>
+                  <p>Abra o EA FC pelo launcher do Live Editor e carregue seu <strong>Modo Carreira</strong>.</p>
+                </div>
+
+                <div class="ig-step">
+                  <div class="ig-badge">Passo B</div>
+                  <div class="ig-icon"><i data-lucide="keyboard"></i></div>
+                  <h4>Aperte F9</h4>
+                  <p>Pressione a tecla <strong>F9</strong> no seu teclado para abrir o menu flutuante do Live Editor.</p>
+                </div>
+
+                <div class="ig-step">
+                  <div class="ig-badge">Passo C</div>
+                  <div class="ig-icon"><i data-lucide="code"></i></div>
+                  <h4>Aba Lua Scripts</h4>
+                  <p>Vá na aba <strong>Lua Scripts</strong> e selecione <code>EXTRAIR_DADOS_CARREIRA.lua</code>.</p>
+                </div>
+
+                <div class="ig-step highlight-step">
+                  <div class="ig-badge">Passo D</div>
+                  <div class="ig-icon"><i data-lucide="zap"></i></div>
+                  <h4>Clique em Run Script</h4>
+                  <p>Clique em <strong>Run Script</strong>. Em menos de 2 segundos, os dados da carreira são extraídos!</p>
+                </div>
+              </div>
+
+              <div class="setup-pro-tip">
+                <div class="tip-badge">💡 DICA PRO: AUTORUN AUTOMÁTICO</div>
+                <p>No menu de Lua Scripts do Live Editor, você pode marcar a caixinha <strong>Autorun</strong> ao lado de <code>EXTRAIR_DADOS_CARREIRA.lua</code>. Assim, ele extrairá os dados automaticamente sempre que você avançar o calendário ou terminar um jogo!</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- PASSO 4: CHAVE DE INTELIGÊNCIA ARTIFICIAL (GOOGLE GEMINI) -->
+          <div class="setup-card step-card">
+            <div class="step-header">
+              <div class="step-number">4</div>
+              <div class="step-title-group">
+                <h3 class="step-title">Chave de IA Gratuita (Google Gemini)</h3>
+                <p class="step-desc">A IA é usada para ler prints de Finanças por visão computacional, criar notícias dos jogos e permitir buscas de scout por voz.</p>
+              </div>
+            </div>
+
+            <div class="step-body">
+              <div class="ai-guide-steps">
+                <div class="ai-step-item">
+                  <div class="ai-step-num">1</div>
+                  <div class="ai-step-text">
+                    <strong>Pegue sua chave no Google AI Studio (100% gratuita):</strong>
+                    <p>Acesse o site oficial do Google e clique no botão azul <em>"Create API Key"</em>.</p>
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="btn-external-link">
+                      <i data-lucide="external-link"></i> Abrir Google AI Studio (aistudio.google.com)
+                    </a>
+                  </div>
+                </div>
+
+                <div class="ai-step-item">
+                  <div class="ai-step-num">2</div>
+                  <div class="ai-step-text">
+                    <strong>Cole sua chave de API abaixo:</strong>
+                    <div class="key-input-group">
+                      <input type="password" id="setupGeminiKeyInput" class="key-input" placeholder="Cole sua chave aqui (ex: AIzaSyD...)" autocomplete="off">
+                      <button class="btn-primary" id="btnSaveSetupGeminiKey">
+                        <i data-lucide="save"></i> Salvar & Validar Chave
+                      </button>
+                    </div>
+                    <div class="key-status-msg" id="setupGeminiStatusMsg">
+                      <span class="status-indicator">⚪ Nenhuma chave configurada ainda.</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="ai-features-preview">
+                <div class="af-item"><i data-lucide="check-circle-2"></i> Leitura por visão computacional dos prints de Finanças do EA FC</div>
+                <div class="af-item"><i data-lucide="check-circle-2"></i> Scout Inteligente por voz e linguagem natural</div>
+                <div class="af-item"><i data-lucide="check-circle-2"></i> Análise de partidas, coletivas de imprensa e relatórios táticos</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Setup Final Confirmation & Access CTA -->
+        <div class="setup-footer-cta">
+          <div class="setup-cta-left">
+            <label class="remember-setup-check">
+              <input type="checkbox" id="checkDontShowSetupAgain" checked>
+              <span>Abrir direto no Painel da Carreira nas próximas vezes (você sempre pode reabrir este guia pelo botão do topo)</span>
+            </label>
+          </div>
+          <div class="setup-cta-right">
+            <button class="btn-cta-launch" id="btnFinishSetupAndGo">
+              <span>Tudo Pronto! Entrar no Painel da Carreira</span>
+              <i data-lucide="arrow-right"></i>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 1: DASHBOARD GERAL / PAINEL DO MOMENTO               -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-dashboard">
+        
+        <!-- Welcome Hero & Overview Stats -->
+        <div class="dashboard-hero">
+          <div class="hero-left">
+            <h1 class="hero-title">Painel do Momento</h1>
+            <p class="hero-subtitle">Visão geral do clube, última partida, destaques do elenco e aproveitamento contínuo.</p>
+          </div>
+          
+          <div class="hero-metrics-grid">
+            <div class="metric-card">
+              <div class="mc-icon"><i data-lucide="award"></i></div>
+              <div class="mc-content">
+                <span class="mc-label">TÍTULOS</span>
+                <span class="mc-val" id="dashTrophiesVal">0</span>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="mc-icon"><i data-lucide="shield-check"></i></div>
+              <div class="mc-content">
+                <span class="mc-label">JOGOS DISPUTADOS</span>
+                <span class="mc-val" id="dashTotalGamesVal">0</span>
+              </div>
+            </div>
+            <div class="metric-card highlight">
+              <div class="mc-icon"><i data-lucide="percent"></i></div>
+              <div class="mc-content">
+                <span class="mc-label">APROVEITAMENTO (3/1/0)</span>
+                <span class="mc-val" id="dashAproveitamentoVal">0.0%</span>
+              </div>
+            </div>
+            <div class="metric-card">
+              <div class="mc-icon"><i data-lucide="flame"></i></div>
+              <div class="mc-content">
+                <span class="mc-label">GOLS MARCADOS</span>
+                <span class="mc-val" id="dashGoalsForVal">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layout Grid: Última Partida & Próximo Confronto -->
+        <div class="dash-grid-2">
+          
+          <!-- Última Partida Jogada -->
+          <div class="glass-card match-card-main">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="history"></i> Última Partida Disputada</div>
+              <span class="badge-tag" id="lastMatchComp">Competição</span>
+            </div>
+            
+            <div class="match-scoreboard" id="lastMatchBoard">
+              <div class="team-side home">
+                <img id="lmHomeCrest" class="match-crest" src="" alt="Mandante">
+                <span class="match-team-name" id="lmHomeName">Mandante</span>
+              </div>
+              
+              <div class="score-center">
+                <span class="score-num" id="lmHomeScore">0</span>
+                <span class="score-divider">x</span>
+                <span class="score-num" id="lmAwayScore">0</span>
+                <span class="score-date" id="lmDate">00/00/0000</span>
+              </div>
+
+              <div class="team-side away">
+                <img id="lmAwayCrest" class="match-crest" src="" alt="Visitante">
+                <span class="match-team-name" id="lmAwayName">Visitante</span>
+              </div>
+            </div>
+
+            <!-- Craque da Partida (se houver) -->
+            <div class="match-details-row" id="lmMatchDetailsRow" style="display: none;">
+              <div class="motm-col" id="lmMotmContainer">
+                <div class="detail-label"><i data-lucide="star"></i> Craque do Jogo (MOTM)</div>
+                <div class="motm-player-box">
+                  <img id="lmMotmFace" class="motm-face" src="" alt="MOTM">
+                  <div class="motm-text">
+                    <span class="motm-name" id="lmMotmName">—</span>
+                    <span class="motm-badge">Melhor em Campo</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Próximo Confronto / Matchday Preview -->
+          <div class="glass-card next-match-card-main" id="dashNextMatchCard">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="swords"></i> Próximo Confronto (Agenda)</div>
+              <div class="nm-tags" style="display: flex; gap: 0.5rem; align-items: center;">
+                <span class="badge-tag live-badge" id="nmCountdownBadge">Em Breve</span>
+                <span class="badge-tag" id="nmCompTag">Campeonato</span>
+              </div>
+            </div>
+            
+            <div class="match-scoreboard next-match-board" id="nextMatchBoard">
+              <div class="team-side home">
+                <img id="nmHomeCrest" class="match-crest" src="" onerror="this.src='/assets/default_crest.png'" alt="Mandante">
+                <span class="match-team-name" id="nmHomeName">Mandante</span>
+                <span class="team-mando-badge home" id="nmHomeMando">CASA</span>
+              </div>
+              
+              <div class="score-center versus-center">
+                <div class="vs-circle">VS</div>
+                <span class="next-match-date" id="nmDate">--/--/----</span>
+                <span class="next-match-time" id="nmTime"><i data-lucide="clock" style="width: 12px; height: 12px; display: inline-block;"></i> 16:00</span>
+              </div>
+
+              <div class="team-side away">
+                <img id="nmAwayCrest" class="match-crest" src="" onerror="this.src='/assets/default_crest.png'" alt="Visitante">
+                <span class="match-team-name" id="nmAwayName">Visitante</span>
+                <span class="team-mando-badge away" id="nmAwayMando">FORA</span>
+              </div>
+            </div>
+
+            <div class="next-match-actions">
+              <button class="btn-action-h2h" id="btnNextMatchH2H" title="Ver Raio-X Histórico contra este adversário">
+                <i data-lucide="swords"></i> Raio-X do Duelo (H2H)
+              </button>
+              <button class="btn-action-cal" id="btnNextMatchFullCal" title="Abrir Calendário Completo da Temporada">
+                <i data-lucide="calendar-days"></i> Ver Calendário Completo
+              </button>
+            </div>
+          </div>
+
+
+
+          <!-- Destaques do Elenco na Temporada Atual -->
+          <div class="glass-card dash-full-width-card" style="grid-column: 1 / -1; margin-top: 0.5rem;">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="trending-up"></i> Destaques do Elenco (Temporada Atual)</div>
+            </div>
+            <div class="season-leaders-list" id="dashLeadersList">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 2: CARREIRA DO TÉCNICO                               -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-manager">
+        <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h2>Ficha Profissional do Técnico</h2>
+            <p>Aproveitamento contínuo (Vitória = 3 pts, Empate = 1 pt), salário acumulado, competições e galeria de títulos.</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button class="btn-secondary" id="btnOpenAddTrophyModal" title="Adicionar Troféu ou Título à Sala de Troféus" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+              <i data-lucide="trophy"></i> + Registrar Conquista
+            </button>
+            <button class="btn-secondary" id="btnOpenEditManager" title="Alterar Nome e Detalhes do Treinador">
+              <i data-lucide="edit-3"></i> Editar Treinador
+            </button>
+          </div>
+        </div>
+
+        <div class="manager-overview-grid">
+          
+          <!-- Card de Perfil do Técnico & Salário -->
+          <div class="glass-card manager-profile-card">
+            <div class="mp-top">
+              <div class="mp-avatar-wrap" id="mgrAvatarContainer" title="Clique para alterar a foto do treinador">
+                <img class="mp-avatar" id="mgrProfileAvatar" src="" onerror="this.src='https://cdn.sofifa.net/players/notfound_0_120.png'" alt="Técnico">
+                <div class="mp-avatar-overlay">
+                  <i data-lucide="camera"></i>
+                  <span>Trocar Foto</span>
+                </div>
+                <span class="mp-status-dot" title="Técnico Ativo"></span>
+              </div>
+              <input type="file" id="managerPhotoUploadInput" accept="image/*" style="display: none;">
+              <div class="mp-info">
+                <h3 class="mp-name" id="mgrProfileName">Técnico</h3>
+                <span class="mp-role">Treinador Principal</span>
+                <div class="mp-tags">
+                  <span class="badge-tag gold" id="mgrTrophiesCountTag">🏆 0 Títulos</span>
+                  <span class="badge-tag blue" id="mgrYearsTag">Carreira Ativa</span>
+                </div>
+                <button class="btn-secondary btn-xs" id="btnTriggerPhotoUpload" style="margin-top: 0.5rem; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 0.75rem;">
+                  <i data-lucide="camera"></i> Alterar Imagem
+                </button>
+              </div>
+            </div>
+
+            <!-- Card Financeiro de Salário do Técnico -->
+            <div class="mgr-salary-box">
+              <div class="msb-item">
+                <span class="msb-lbl"><i data-lucide="coins"></i> Salário Semanal</span>
+                <span class="msb-val" id="mgrWeeklyWageVal">R$ 212.500</span>
+              </div>
+              <div class="msb-divider"></div>
+              <div class="msb-item">
+                <span class="msb-lbl"><i data-lucide="banknote"></i> Salário Total Acumulado</span>
+                <span class="msb-val highlight" id="mgrTotalSalaryVal">R$ 22.400.000</span>
+              </div>
+            </div>
+
+            <div class="mp-stat-bars">
+              <div class="stat-bar-group">
+                <div class="sb-label">
+                  <span>Aproveitamento da Carreira</span>
+                  <b id="mgrAprovBarVal">0.0%</b>
+                </div>
+                <div class="sb-track">
+                  <div class="sb-fill gold" id="mgrAprovBarFill" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Números Totais -->
+            <div class="mp-summary-stats">
+              <div class="mps-box">
+                <span class="mps-n" id="mgrV">0</span>
+                <span class="mps-t">Vitórias</span>
+              </div>
+              <div class="mps-box">
+                <span class="mps-n" id="mgrE">0</span>
+                <span class="mps-t">Empates</span>
+              </div>
+              <div class="mps-box">
+                <span class="mps-n" id="mgrD">0</span>
+                <span class="mps-t">Derrotas</span>
+              </div>
+              <div class="mps-box">
+                <span class="mps-n" id="mgrPts">0</span>
+                <span class="mps-t">Pontos Conquistados</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Galeria de Títulos e Prêmios do Técnico -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="trophy"></i> Sala de Troféus & Conquistas</div>
+            </div>
+            <div class="awards-list" id="mgrAwardsList">
+              <!-- Renderizado dinamicamente -->
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Competições Disputadas pelo Técnico na Carreira -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+          <div class="card-header">
+            <div class="ch-title"><i data-lucide="medal"></i> Competições Disputadas & Desempenho Final</div>
+          </div>
+          <div class="table-responsive">
+            <table class="vault-table" id="mgrCompetitionsTable">
+              <thead>
+                <tr>
+                  <th>Temporada</th>
+                  <th>Competição</th>
+                  <th>Clube</th>
+                  <th>Colocação Final</th>
+                  <th class="text-center">Jogos</th>
+                  <th class="text-center">V</th>
+                  <th class="text-center">E</th>
+                  <th class="text-center">D</th>
+                  <th class="text-center">GP</th>
+                  <th class="text-center">GC</th>
+                  <th class="text-center">Aproveitamento</th>
+                  <th class="text-center" style="width: 100px;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="mgrCompetitionsBody">
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Histórico de Clubes Treinados -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+          <div class="card-header">
+            <div class="ch-title"><i data-lucide="briefcase"></i> Trajetória de Clubes na Carreira</div>
+          </div>
+          <div class="clubs-timeline" id="mgrClubsTimeline">
+            <!-- Renderizado dinamicamente -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 3: HISTÓRICO DE TEMPORADAS                           -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-seasons">
+        <div class="pane-header">
+          <div>
+            <h2>Histórico de Temporadas</h2>
+            <p>Selecione um ano para revisitar os resultados, competições disputadas com colocações e elenco da época.</p>
+          </div>
+          
+          <!-- Seletor de Temporadas -->
+          <div class="season-selector-bar" id="seasonsButtonsBar">
+            <!-- Botões das temporadas inseridos via JS -->
+          </div>
+        </div>
+
+        <!-- Resumo das Competições da Temporada Selecionada -->
+        <div class="glass-card" style="margin-bottom: 1.5rem;">
+          <div class="card-header">
+            <div class="ch-title"><i data-lucide="award"></i> Competições Disputadas na Temporada (<span id="curSeasonCompTitle">2024/2025</span>)</div>
+          </div>
+          <div class="season-comps-grid" id="seasonCompsGrid">
+            <!-- Cards de competições com posições finais -->
+          </div>
+        </div>
+
+        <div class="season-view-grid">
+          
+          <!-- Tabela de Estatísticas do Elenco na Temporada -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="users"></i> Desempenho do Elenco (<span id="curSeasonTitle">2024/2025</span>)</div>
+            </div>
+            <div class="table-responsive">
+              <table class="vault-table" id="seasonSquadTable">
+                <thead>
+                  <tr>
+                    <th class="sortable-th" data-sort="player_name"><span>Atleta</span><span class="sort-icon"></span></th>
+                    <th class="sortable-th text-center" data-sort="position"><span>Pos</span><span class="sort-icon"></span></th>
+                    <th class="sortable-th text-center" data-sort="overall_rating"><span>OVR</span><span class="sort-icon"></span></th>
+                    <th class="sortable-th text-center" data-sort="appearances"><span>Jogos</span><span class="sort-icon"></span></th>
+                    <th class="sortable-th text-center" data-sort="goals"><span>Gols</span><span class="sort-icon"></span></th>
+                    <th class="sortable-th text-center" data-sort="assists"><span>Assist</span><span class="sort-icon"></span></th>
+                    <th class="sortable-th text-center" data-sort="avg_rating"><span>Nota Média</span><span class="sort-icon"></span></th>
+                    <th class="sortable-th text-center" data-sort="motms"><span>MOTM</span><span class="sort-icon"></span></th>
+                    <th class="sortable-th text-center" data-sort="yellow_cards"><span>Cartões</span><span class="sort-icon"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="seasonSquadBody">
+                  <!-- Linhas da tabela -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Jogos Realizados na Temporada -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="calendar"></i> Partidas da Temporada</div>
+            </div>
+            <div class="matches-scroll-list" id="seasonMatchesList">
+              <!-- Partidas da temporada -->
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA DEDICADA: CALENDÁRIO & JOGOS DA TEMPORADA            -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-calendar">
+        <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h2><i data-lucide="calendar-days" style="color: #60a5fa; margin-right: 0.5rem; display: inline-block; vertical-align: middle;"></i> Calendário Oficial da Carreira</h2>
+            <p>Agenda completa de partidas agendadas, confrontos futuros, mandos de campo e histórico de jogos da temporada ativa.</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <div class="season-badge-chip" id="calActiveSeasonPill">Temporada: 2027</div>
+            <button class="btn-secondary" id="btnRefreshCalendar" title="Recarregar Calendário">
+              <i data-lucide="refresh-cw"></i> Atualizar Agenda
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtros e Tabs do Calendário -->
+        <div class="calendar-filters-bar glass-card">
+          <div class="cal-filter-group">
+            <span class="filter-label"><i data-lucide="filter"></i> Filtrar por Competição:</span>
+            <div class="comp-filter-chips" id="calCompFilterChips">
+              <button class="filter-chip active" data-comp="TODAS">Todas as Competições</button>
+            </div>
+          </div>
+          <div class="cal-status-tabs">
+            <button class="cal-tab-btn active" data-status="UPCOMING" id="calTabUpcoming">
+              <i data-lucide="clock"></i> Próximos Jogos (<span id="calCountUpcoming">0</span>)
+            </button>
+            <button class="cal-tab-btn" data-status="COMPLETED" id="calTabCompleted">
+              <i data-lucide="check-circle-2"></i> Jogos Concluídos (<span id="calCountCompleted">0</span>)
+            </button>
+            <button class="cal-tab-btn" data-status="ALL" id="calTabAll">
+              <i data-lucide="list"></i> Todas as Partidas (<span id="calCountAll">0</span>)
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid de Partidas do Calendário -->
+        <div class="calendar-matches-grid" id="calMatchesGrid">
+          <!-- Renderizado dinamicamente via JavaScript -->
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 4: ELENCO & ATLETAS (COM OVR, POT, VALOR & FILTROS)  -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-squad">
+        <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h2>Elenco e Atributos dos Atletas</h2>
+            <p>Overall, Potencial, Valor de Mercado e estatísticas acumuladas da carreira ou filtradas por temporada.</p>
+          </div>
+
+          <!-- Filtros de Período / Temporada e Competição -->
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <div class="squad-filter-box">
+              <label for="squadSeasonFilter"><i data-lucide="calendar"></i> Período:</label>
+              <select id="squadSeasonFilter" class="vault-select">
+                <option value="GERAL" selected>⭐ Acumulado Geral (Carreira)</option>
+                <option value="2027">Temporada 2027 (Atual)</option>
+                <option value="2026">Temporada 2026</option>
+              </select>
+            </div>
+            <div class="squad-filter-box">
+              <label for="squadCompFilter"><i data-lucide="filter"></i> Competição:</label>
+              <select id="squadCompFilter" class="vault-select">
+                <option value="TODAS">Todas as Competições (Geral)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="table-responsive">
+            <table class="vault-table hoverable" id="allSquadTable">
+              <thead>
+                <tr>
+                  <th class="sortable-th" data-sort="player_name"><span>Jogador</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="position"><span>Posição</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="overall_rating"><span>OVR</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="potential"><span>POT</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th" data-sort="market_value"><span>Valor de Mercado</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="appearances"><span>Jogos</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="goals"><span>Gols</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="assists"><span>Assistências</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="yellow_cards"><span>Cartões</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="avg_rating"><span>Nota Média</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th text-center" data-sort="motms"><span>MOTMs</span><span class="sort-icon"></span></th>
+                  <th class="text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="allSquadBody">
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 5: TRANSFERÊNCIAS & MERCADO                          -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-transfers">
+        <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h2>Transferências & Movimentações de Mercado</h2>
+            <p>Histórico completo de compras, vendas, empréstimos e promoções da base com balanço financeiro.</p>
+          </div>
+
+          <!-- Filtros de Temporada e Tipo de Transferência + Botão de Ação -->
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <div class="squad-filter-box">
+              <label for="transferSeasonFilter"><i data-lucide="calendar"></i> Temporada:</label>
+              <select id="transferSeasonFilter" class="vault-select">
+                <option value="GERAL" selected>⭐ Todas as Temporadas (Geral)</option>
+              </select>
+            </div>
+            <div class="transfer-filter-box">
+              <label for="transferTypeFilter"><i data-lucide="filter"></i> Tipo:</label>
+              <select id="transferTypeFilter" class="vault-select">
+                <option value="ALL">Todas as Movimentações</option>
+                <option value="BUY">Apenas Compras (Chegadas)</option>
+                <option value="SALE">Apenas Vendas (Saídas)</option>
+                <option value="LOAN">Apenas Empréstimos</option>
+                <option value="FREE">Pré-contrato / Agente Livre</option>
+                <option value="YOUTH">Promoções da Base</option>
+              </select>
+            </div>
+            <button class="btn-primary" id="btnOpenAddTransferModal" style="display: inline-flex; align-items: center; gap: 0.4rem; height: 38px;">
+              <i data-lucide="plus-circle"></i> Registrar Transferência
+            </button>
+          </div>
+        </div>
+
+        <!-- Cards de Balanço de Transferências -->
+        <div class="hero-metrics-grid" style="margin-bottom: 1.5rem;">
+          <div class="metric-card">
+            <div class="mc-icon red-icon"><i data-lucide="arrow-down-right"></i></div>
+            <div class="mc-content">
+              <span class="mc-label">INVESTIDO EM COMPRAS</span>
+              <span class="mc-val text-danger" id="transfersSpentVal">R$ 0,00</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="mc-icon green-icon"><i data-lucide="arrow-up-right"></i></div>
+            <div class="mc-content">
+              <span class="mc-label">ARRECADADO EM VENDAS</span>
+              <span class="mc-val text-success" id="transfersReceivedVal">R$ 0,00</span>
+            </div>
+          </div>
+          <div class="metric-card highlight">
+            <div class="mc-icon"><i data-lucide="scale"></i></div>
+            <div class="mc-content">
+              <span class="mc-label">SALDO LÍQUIDO DE MERCADO</span>
+              <span class="mc-val" id="transfersNetBalanceVal">R$ 0,00</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="table-responsive">
+            <table class="vault-table" id="transfersTable">
+              <thead>
+                <tr>
+                  <th class="sortable-th" data-sort="player_name"><span>Atleta</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th" data-sort="transfer_type"><span>Tipo</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th" data-sort="from_team_name"><span>Origem</span><span class="sort-icon"></span></th>
+                  <th style="width: 40px; text-align: center;"></th>
+                  <th class="sortable-th" data-sort="to_team_name"><span>Destino</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th" data-sort="fee"><span>Valor da Negociação</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th" data-sort="transfer_date"><span>Data</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th" data-sort="season_year"><span>Temporada</span><span class="sort-icon"></span></th>
+                  <th style="width: 60px; text-align: center;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="transfersBody">
+                <!-- Preenchido via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 6: FINANÇAS & VALUATION DO CLUBE                     -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-finances">
+        <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h2>Finanças do Clube & Valuation</h2>
+            <p>Demonstrativo de resultados do clube (Receitas, Despesas, Lucro/Prejuízo) e valor de mercado institucional.</p>
+          </div>
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <div class="squad-filter-box">
+              <label for="financesSeasonFilter"><i data-lucide="calendar"></i> Temporada:</label>
+              <select id="financesSeasonFilter" class="vault-select">
+                <option value="2027" selected>Temporada 2027 (Atual)</option>
+                <option value="2026">Temporada 2026</option>
+                <option value="GERAL">⭐ Consolidado Geral (Todas)</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <input type="file" id="financesPrintFileInput" accept="image/*" multiple style="display: none;">
+              <button class="btn-secondary btn-sm" id="btnScanFinancesAi" title="Ler até 3 Prints de Finanças com IA (Visão Geral/Valuation, Receitas, Despesas)" style="background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #c084fc;">
+                <i data-lucide="sparkles"></i> Ler Prints (IA)
+              </button>
+              <button class="btn-secondary btn-sm" id="btnEditFinancesManual" title="Editar Finanças Manualmente">
+                <i data-lucide="pencil"></i> Editar Finanças
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Valuation e Orçamentos Hero Grid -->
+        <div class="hero-metrics-grid" style="margin-bottom: 1.5rem;">
+          <div class="metric-card highlight">
+            <div class="mc-icon"><i data-lucide="building-2"></i></div>
+            <div class="mc-content">
+              <span class="mc-label">VALUATION DO CLUBE</span>
+              <span class="mc-val" id="finClubValuation">R$ 3,85 Bi</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="mc-icon blue-icon"><i data-lucide="badge-dollar-sign"></i></div>
+            <div class="mc-content">
+              <span class="mc-label">VERBA PARA TRANSFERÊNCIAS</span>
+              <span class="mc-val" id="finTransferBudget">R$ 180 Mi</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <div class="mc-icon yellow-icon"><i data-lucide="users-round"></i></div>
+            <div class="mc-content">
+              <span class="mc-label">ORÇAMENTO SALARIAL / MÊS</span>
+              <span class="mc-val" id="finWageBudget">R$ 32 Mi</span>
+            </div>
+          </div>
+          <div class="metric-card" id="finNetProfitCard">
+            <div class="mc-icon green-icon"><i data-lucide="trending-up"></i></div>
+            <div class="mc-content">
+              <span class="mc-label">LUCRO LÍQUIDO APURADO</span>
+              <span class="mc-val text-success" id="finNetProfit">R$ 293 Mi</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- DRE: Receitas vs Despesas Discriminadas -->
+        <div class="dash-grid-2">
+          
+          <!-- Coluna de Receitas -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div class="ch-title text-success"><i data-lucide="arrow-down-left"></i> Receitas da Temporada</div>
+              <span class="badge-tag green" id="finTotalRevenueBadge">Total: R$ 728 Mi</span>
+            </div>
+            <div class="fin-breakdown-list" id="finRevenuesList">
+              <!-- Itens de receita -->
+            </div>
+          </div>
+
+          <!-- Coluna de Despesas -->
+          <div class="glass-card">
+            <div class="card-header">
+              <div class="ch-title text-danger"><i data-lucide="arrow-up-right"></i> Despesas da Temporada</div>
+              <span class="badge-tag red" id="finTotalExpensesBadge">Total: R$ 435 Mi</span>
+            </div>
+            <div class="fin-breakdown-list" id="finExpensesList">
+              <!-- Itens de despesa -->
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 7: HALL DA FAMA ETERNO (APOSENTADOS & PRÊMIOS)       -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-halloffame">
+        <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <h2>Hall da Fama Eterno</h2>
+            <p>Maiores recordistas da história do save, ídolos aposentados no clube e galeria de prêmios individuais.</p>
+          </div>
+          <button class="btn-secondary" id="btnOpenRetireModal" title="Registrar Jogador Aposentado com Honras" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
+            <i data-lucide="heart-handshake"></i> + Registrar Atleta Aposentado
+          </button>
+        </div>
+
+        <!-- Galeria de Prêmios Individuais de Jogadores -->
+        <div class="hof-category-section" style="margin-bottom: 2rem;">
+          <div class="hof-cat-title"><i data-lucide="sparkles"></i> Galeria de Prêmios Individuais de Jogadores</div>
+          <div class="player-awards-grid" id="hofPlayerAwardsGrid">
+            <!-- Cards de Prêmios (Bola de Ouro, Chuteira de Ouro, POTM, Luva de Ouro) -->
+          </div>
+        </div>
+
+        <!-- Pódios dos Maiores Artilheiros -->
+        <div class="hof-category-section">
+          <div class="hof-cat-title"><i data-lucide="flame"></i> Maiores Artilheiros de Todos os Tempos</div>
+          <div class="podium-grid" id="hofTopScorersGrid">
+            <!-- Cards de Artilheiros -->
+          </div>
+        </div>
+
+        <!-- Grid de Outros Recordes: Mais Jogos, Garçons e Paredões -->
+        <div class="dash-grid-3" style="margin-top: 2rem;">
+          <div class="glass-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="shield"></i> Mais Jogos na História</div>
+            </div>
+            <div class="rank-list" id="hofAppearancesList">
+              <!-- Lista de mais jogos -->
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="sparkles"></i> Maiores Garçons</div>
+            </div>
+            <div class="rank-list" id="hofAssistsList">
+              <!-- Lista de assistências -->
+            </div>
+          </div>
+
+          <div class="glass-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="hand-metal"></i> Paredões (Clean Sheets)</div>
+            </div>
+            <div class="rank-list" id="hofGoalkeepersList">
+              <!-- Lista de goleiros -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Seção: Ídolos Eternos Aposentados no Clube -->
+        <div class="glass-card" style="margin-top: 2rem;">
+          <div class="card-header">
+            <div class="ch-title"><i data-lucide="heart-handshake"></i> Ídolos que Penduraram as Chuteiras no Clube</div>
+          </div>
+          <div class="retired-legends-grid" id="hofRetiredLegendsGrid">
+            <!-- Cards de aposentados -->
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 8: RAIO-X DE DUELOS (HEAD-TO-HEAD)                   -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-h2h">
+        <div class="pane-header">
+          <div>
+            <h2>Raio-X de Confrontos Diretos (H2H)</h2>
+            <p>Retrospecto acumulado contra qualquer adversário que você já enfrentou no save.</p>
+          </div>
+
+          <!-- Seletor de Adversário -->
+          <div class="opponent-selector-wrap">
+            <label for="h2hSelect"><i data-lucide="shield"></i> Adversário:</label>
+            <select id="h2hSelect" class="vault-select">
+              <option value="">Selecione um adversário...</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Painel Central do Duelo -->
+        <div class="glass-card h2h-hero-card" id="h2hHeroCard">
+          <div class="h2h-clash-header">
+            <div class="h2h-team-box">
+              <img id="h2hMyCrest" class="h2h-crest-big" src="" alt="Meu Time">
+              <span class="h2h-team-title" id="h2hMyName">Meu Clube</span>
+            </div>
+
+            <div class="h2h-vs-badge">
+              <span>VS</span>
+              <small id="h2hTotalGamesCount">0 Jogos</small>
+            </div>
+
+            <div class="h2h-team-box">
+              <img id="h2hOppCrest" class="h2h-crest-big" src="" alt="Adversário">
+              <span class="h2h-team-title" id="h2hOppName">Adversário</span>
+            </div>
+          </div>
+
+          <!-- Placar Estatístico do Duelo -->
+          <div class="h2h-stats-row">
+            <div class="h2h-stat-pill green">
+              <span class="hsp-val" id="h2hWins">0</span>
+              <span class="hsp-lbl">Vitórias</span>
+            </div>
+            <div class="h2h-stat-pill yellow">
+              <span class="hsp-val" id="h2hDraws">0</span>
+              <span class="hsp-lbl">Empates</span>
+            </div>
+            <div class="h2h-stat-pill red">
+              <span class="hsp-val" id="h2hLosses">0</span>
+              <span class="hsp-lbl">Derrotas</span>
+            </div>
+            <div class="h2h-stat-pill blue">
+              <span class="hsp-val" id="h2hAprov">0.0%</span>
+              <span class="hsp-lbl">Aproveitamento</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Histórico de Partidas Contra o Rival -->
+        <div class="glass-card" style="margin-top: 1.5rem;">
+          <div class="card-header">
+            <div class="ch-title"><i data-lucide="history"></i> Todas as Partidas Contra este Adversário</div>
+          </div>
+          <div class="h2h-matches-list" id="h2hMatchesList">
+            <!-- Linha do tempo dos confrontos -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA SCOUT: EQUIPE DE SCOUT & INTELIGÊNCIA DE MERCADO     -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-scout">
+        
+        <!-- Header & Live Editor Bridge Status -->
+        <div class="scout-hero-header">
+          <div class="shh-left">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+              <span class="badge-tag gold" style="font-weight: 800; letter-spacing: 1px;"><i data-lucide="binoculars"></i> SCOUT HUB</span>
+              <div class="live-scout-pill" id="liveScoutPill">
+                <span class="live-dot" id="liveScoutDot"></span>
+                <span id="liveScoutStatusText">Verificando Live Editor...</span>
+              </div>
+            </div>
+            <h1 class="hero-title" style="margin-top: 6px;">Central de Olheiros & Equipe de Scout</h1>
+            <p class="hero-subtitle">Converse com os seus auxiliares técnicos para pesquisar atletas com atributos específicos em tempo real no Live Editor.</p>
+          </div>
+
+          <div class="shh-actions">
+            <button class="btn-primary" id="btnSyncScoutDesktop" title="Importar base de dados extraída pelo script SCOUT_PESQUISA_AO_VIVO.lua (F9)">
+              <i data-lucide="refresh-cw"></i> Sincronizar Live Editor (F9)
+            </button>
+            <button class="btn-secondary" id="btnOpenEditScoutModal" title="Defina o nome do seu responsável de scout">
+              <i data-lucide="user-cog"></i> Configurar Olheiro Chefe
+            </button>
+          </div>
+        </div>
+
+        <!-- Personas / Auxiliares Técnicos Selecionáveis -->
+        <div class="scout-personas-grid">
+          <div class="scout-persona-card active" data-persona="carlos" id="personaCardCarlos">
+            <div class="spc-avatar-wrap">
+              <img src="/assets/scout_carlos.png" alt="Olheiro Chefe" id="personaAvatarCarlos" class="spc-avatar">
+              <span class="spc-active-dot"></span>
+            </div>
+            <div class="spc-info">
+              <div class="spc-name" id="personaDisplayCarlosName">Carlos Mendes</div>
+              <div class="spc-title" id="personaDisplayCarlosRole">Chefe de Scout & Mercado</div>
+              <div class="spc-specialty"><i data-lucide="sparkles"></i> Mercado Nacional & Custo-Benefício</div>
+            </div>
+          </div>
+
+          <div class="scout-persona-card" data-persona="hugo" id="personaCardHugo">
+            <div class="spc-avatar-wrap">
+              <img src="/assets/scout_hugo.png" alt="Hugo Van Der Berg" class="spc-avatar">
+              <span class="spc-active-dot"></span>
+            </div>
+            <div class="spc-info">
+              <div class="spc-name">Hugo Van Der Berg</div>
+              <div class="spc-title">Analista Físico & Tático</div>
+              <div class="spc-specialty"><i data-lucide="zap"></i> Velocistas, Imposição & Jogo Aéreo</div>
+            </div>
+          </div>
+
+          <div class="scout-persona-card" data-persona="lucas" id="personaCardLucas">
+            <div class="spc-avatar-wrap">
+              <img src="/assets/scout_lucas.png" alt="Lucas Valença" class="spc-avatar">
+              <span class="spc-active-dot"></span>
+            </div>
+            <div class="spc-info">
+              <div class="spc-name">Lucas Valença</div>
+              <div class="spc-title">Caçador de Joias & Sub-21</div>
+              <div class="spc-specialty"><i data-lucide="award"></i> Wonderkids & Alto Potencial</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Layout Central: Chat & Resultados vs Painel Lateral -->
+        <div class="scout-layout-grid">
+          
+          <!-- Coluna Principal (Chat do Olheiro e Feed de Jogadores) -->
+          <div class="scout-main-feed">
+            
+            <!-- Chat Conversacional do Olheiro -->
+            <div class="glass-card scout-chat-box">
+              <div class="scout-chat-header">
+                <div class="sch-persona">
+                  <img src="/assets/scout_carlos.png" id="chatActiveAvatar" class="sch-avatar" alt="Avatar Olheiro">
+                  <div>
+                    <div class="sch-name" id="chatActiveName">Carlos Mendes</div>
+                    <div class="sch-status"><span class="live-dot mini"></span> Online • Pronto para buscar no save</div>
+                  </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <button type="button" class="btn-icon" id="btnToggleScoutTTS" title="Ativar/Desativar Voz do Olheiro (Leitura em Áudio)" style="color: var(--accent-gold); padding: 4px 6px; border-radius: 6px; background: rgba(255,255,255,0.05);">
+                    <i data-lucide="volume-2"></i>
+                  </button>
+                  <div class="sch-badge" id="chatActiveSpecialty">Mercado Nacional & Custo-Benefício</div>
+                </div>
+              </div>
+
+              <!-- Histórico de Mensagens -->
+              <div class="scout-chat-messages" id="scoutChatMessages">
+                <!-- Mensagem inicial do Olheiro gerada via JS -->
+              </div>
+
+              <!-- Atalhos de Busca Rápida / Sugestões -->
+              <div class="scout-quick-prompts">
+                <button type="button" class="quick-prompt-btn" onclick="sendScoutQuickPrompt('Preciso de um atacante rápido e com boa finalização até 20 milhões')">
+                  ⚡ Atacante Rápido & Finalizador
+                </button>
+                <button type="button" class="quick-prompt-btn" onclick="sendScoutQuickPrompt('Procure zagueiros altos e fortes no cabeceio')">
+                  🎯 Zagueiro Forte no Alto
+                </button>
+                <button type="button" class="quick-prompt-btn" onclick="sendScoutQuickPrompt('Quero um meia armador criativo com boa visão de jogo')">
+                  🪄 Meia Armador & Visão
+                </button>
+                <button type="button" class="quick-prompt-btn" onclick="sendScoutQuickPrompt('Mostre jovens promessas sub-21 com alto potencial')">
+                  ⭐ Joias Sub-21 (Wonderkids)
+                </button>
+                <button type="button" class="quick-prompt-btn" onclick="sendScoutQuickPrompt('Procure volantes marcadores com bom desarme e combate')">
+                  🛡️ Volante Marcador / Desarme
+                </button>
+                <button type="button" class="quick-prompt-btn" onclick="sendScoutQuickPrompt('Busque laterais velozes com bom cruzamento')">
+                  🏃 Laterais Rápidos
+                </button>
+              </div>
+
+              <!-- Formulário de Envio com Comando de Voz -->
+              <form class="scout-chat-input-row" id="formScoutChat">
+                <input type="text" id="inputScoutMessage" class="vault-input" placeholder="Converse com seu olheiro ou use a voz: ex: 'Atacante rápido até 15 milhões', 'Zagueiro forte'..." autocomplete="off">
+                <button type="button" class="btn-voice-scout" id="btnScoutVoiceInput" title="Falar por Comando de Voz (Microfone)">
+                  <i data-lucide="mic"></i>
+                </button>
+                <button type="submit" class="btn-primary" id="btnSendScoutChat">
+                  <i data-lucide="send"></i> Buscar
+                </button>
+              </form>
+            </div>
+
+            <!-- Feed de Relatório dos Atletas Encontrados -->
+            <div class="scout-results-section" id="scoutResultsSection">
+              <div class="flex-between scout-results-header" style="flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.85rem;">
+                <div class="srh-title">
+                  <i data-lucide="clipboard-list" style="color: var(--accent-gold);"></i> Relatório de Observação Técnica
+                  <span class="badge-tag blue" id="scoutResultsCountBadge">0 Atletas</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <div class="srh-source" id="scoutResultsSourceBadge">
+                    <span class="live-dot mini"></span> Live Editor
+                  </div>
+                  <!-- View Switcher Toggle (Tabela Compacta / Cards) -->
+                  <div class="scout-view-switcher" id="scoutViewSwitcher">
+                    <button type="button" class="view-switch-btn active" id="btnScoutViewTable" title="Visualização em Lista / Linhas (Tabela Compacta)" onclick="setScoutViewMode('table')">
+                      <i data-lucide="table"></i> Lista
+                    </button>
+                    <button type="button" class="view-switch-btn" id="btnScoutViewCards" title="Visualização em Cards" onclick="setScoutViewMode('cards')">
+                      <i data-lucide="layout-grid"></i> Cards
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Container de Resultados: Tabela Compacta (Padrão) -->
+              <div id="scoutTableWrap" class="glass-card scout-table-card" style="padding: 0; overflow: hidden; border-radius: var(--radius-md);">
+                <div class="table-responsive">
+                  <table class="vault-table hoverable" id="scoutPlayersTable">
+                    <thead>
+                      <tr>
+                        <th><span>Atleta</span></th>
+                        <th><span>Clube</span></th>
+                        <th class="text-center"><span>Posição</span></th>
+                        <th class="text-center"><span>Idade</span></th>
+                        <th class="text-center"><span>OVR</span></th>
+                        <th class="text-center"><span>POT</span></th>
+                        <th class="text-center" title="Ritmo / Aceleração"><span>RIT</span></th>
+                        <th class="text-center" title="Finalização"><span>FIN</span></th>
+                        <th class="text-center" title="Passe"><span>PAS</span></th>
+                        <th class="text-center" title="Drible / Condução"><span>DRI</span></th>
+                        <th class="text-center" title="Defesa / Combate"><span>DEF</span></th>
+                        <th class="text-center" title="Físico / Força"><span>FIS</span></th>
+                        <th><span>Status de Mercado</span></th>
+                        <th class="text-center" style="min-width: 140px;"><span>Ações</span></th>
+                      </tr>
+                    </thead>
+                    <tbody id="scoutPlayersTableBody">
+                      <!-- Linhas compactas renderizadas via JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- Grid de Cards de Jogadores (Modo alternativo) -->
+              <div class="scout-cards-grid" id="scoutCardsGrid" style="display: none;">
+                <!-- Inserido dinamicamente via JS -->
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Coluna Lateral: Filtros Rápidos Manuais & Lista de Observação -->
+          <div class="scout-sidebar-panels">
+            
+            <!-- Painel de Filtros Manuais Rápidos -->
+            <div class="glass-card scout-filters-card">
+              <div class="card-header flex-between">
+                <div class="ch-title"><i data-lucide="sliders-horizontal"></i> Filtros Manuais</div>
+                <button type="button" class="btn-secondary btn-xs" id="btnResetScoutFilters">Limpar</button>
+              </div>
+
+              <form id="formManualScoutFilter" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.85rem;">
+                <div class="form-group">
+                  <label for="filterScoutGender">Categoria:</label>
+                  <select id="filterScoutGender" class="vault-select">
+                    <option value="0" selected>👨 Futebol Masculino</option>
+                    <option value="1">👩 Futebol Feminino</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="filterScoutName">Nome do Jogador:</label>
+                  <input type="text" id="filterScoutName" class="vault-input" placeholder="Ex: Haaland, Pedro, Vini Jr...">
+                </div>
+
+                <div class="form-group">
+                  <label for="filterScoutPos">Posição / Setor:</label>
+                  <select id="filterScoutPos" class="vault-select">
+                    <option value="">Todas as Posições</option>
+                    <option value="ST,CF">⚽ Atacantes / Centroavantes (ST/CF)</option>
+                    <option value="LW,RW,LM,RM">⚡ Pontas & Extremos (PE/PD/ME/MD)</option>
+                    <option value="ST,CF,LW,RW,LM,RM">🔥 Setor Ofensivo / Ataque Geral</option>
+                    <option value="CAM,CM">🪄 Meias Armadores & Centrais (MEI/MC)</option>
+                    <option value="CDM,CM">🛡️ Volantes de Marcação (VOL/MC)</option>
+                    <option value="CAM,CM,CDM,LM,RM">🧭 Meio-Campo Completo</option>
+                    <option value="CB">🧱 Zagueiros Centrais (ZAG)</option>
+                    <option value="LB,RB,LWB,RWB">🏃 Laterais & Alas (LE/LD)</option>
+                    <option value="GK">🧤 Goleiros (GOL)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="filterScoutNationality">Nacionalidade:</label>
+                  <select id="filterScoutNationality" class="vault-select">
+                    <option value="">Todas as Nacionalidades 🌐</option>
+                    <option value="54">Brasil 🇧🇷</option>
+                    <option value="52">Argentina 🇦🇷</option>
+                    <option value="38">Portugal 🇵🇹</option>
+                    <option value="45">Espanha 🇪🇸</option>
+                    <option value="18">França 🇫🇷</option>
+                    <option value="21">Alemanha 🇩🇪</option>
+                    <option value="27">Itália 🇮🇹</option>
+                    <option value="14">Inglaterra 🏴󠁧󠁢󠁥󠁮󠁧󠁿</option>
+                    <option value="60">Uruguai 🇺🇾</option>
+                    <option value="56">Colômbia 🇨🇴</option>
+                    <option value="55">Chile 🇨🇱</option>
+                    <option value="34">Holanda 🇳🇱</option>
+                    <option value="7">Bélgica 🇧🇪</option>
+                    <option value="10">Croácia 🇭🇷</option>
+                    <option value="58">Paraguai 🇵🇾</option>
+                    <option value="57">Equador 🇪🇨</option>
+                    <option value="59">Peru 🇵🇪</option>
+                    <option value="61">Venezuela 🇻🇪</option>
+                    <option value="83">México 🇲🇽</option>
+                    <option value="95">Estados Unidos 🇺🇸</option>
+                    <option value="133">Nigéria 🇳🇬</option>
+                    <option value="136">Senegal 🇸🇳</option>
+                    <option value="129">Marrocos 🇲🇦</option>
+                    <option value="163">Japão 🇯🇵</option>
+                    <option value="167">Coreia do Sul 🇰🇷</option>
+                    <option value="36">Noruega 🇳🇴</option>
+                    <option value="46">Suécia 🇸🇪</option>
+                    <option value="13">Dinamarca 🇩🇰</option>
+                    <option value="37">Polônia 🇵🇱</option>
+                    <option value="48">Turquia 🇹🇷</option>
+                  </select>
+                </div>
+
+                <!-- Faixa de Overall (Mín e Máx) -->
+                <div class="form-group">
+                  <label>Faixa de Overall (OVR):</label>
+                  <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <input type="number" id="filterScoutMinOvr" class="vault-input" placeholder="Mín (ex: 65)" min="40" max="99">
+                    <input type="number" id="filterScoutMaxOvr" class="vault-input" placeholder="Máx (ex: 75)" min="40" max="99">
+                  </div>
+                </div>
+
+                <!-- Faixa de Potencial (Mín e Máx) -->
+                <div class="form-group">
+                  <label>Faixa de Potencial (POT):</label>
+                  <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <input type="number" id="filterScoutMinPot" class="vault-input" placeholder="Mín (ex: 75)" min="40" max="99">
+                    <input type="number" id="filterScoutMaxPot" class="vault-input" placeholder="Máx (ex: 90)" min="40" max="99">
+                  </div>
+                </div>
+
+                <!-- Faixa de Idade (Mín e Máx) -->
+                <div class="form-group">
+                  <label>Faixa de Idade (Anos):</label>
+                  <div class="form-row" style="grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <input type="number" id="filterScoutMinAge" class="vault-input" placeholder="Mín (ex: 17)" min="16" max="45">
+                    <input type="number" id="filterScoutMaxAge" class="vault-input" placeholder="Máx (ex: 32)" min="16" max="45">
+                  </div>
+                </div>
+
+                <!-- Acordeão / Bloco de Atributos Específicos -->
+                <details class="scout-attrs-details" style="background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 6px 10px;">
+                  <summary style="cursor: pointer; font-weight: 700; font-size: 0.82rem; color: var(--accent-gold); display: flex; align-items: center; justify-content: space-between;">
+                    <span><i data-lucide="sliders" style="width: 14px; height: 14px; vertical-align: middle;"></i> Atributos Específicos (Faixas Min/Máx)</span>
+                    <span style="font-size: 0.72rem; color: var(--text-dim);">Expandir</span>
+                  </summary>
+                  <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.06);">
+                    
+                    <div class="attr-range-row">
+                      <span class="arr-label">⚡ Velocidade (RIT):</span>
+                      <div class="arr-inputs">
+                        <input type="number" id="filterScoutMinPace" class="vault-input arr-input" placeholder="Mín" min="30" max="99">
+                        <input type="number" id="filterScoutMaxPace" class="vault-input arr-input" placeholder="Máx" min="30" max="99">
+                      </div>
+                    </div>
+
+                    <div class="attr-range-row">
+                      <span class="arr-label">⚽ Finalização (FIN):</span>
+                      <div class="arr-inputs">
+                        <input type="number" id="filterScoutMinFinishing" class="vault-input arr-input" placeholder="Mín" min="30" max="99">
+                        <input type="number" id="filterScoutMaxFinishing" class="vault-input arr-input" placeholder="Máx" min="30" max="99">
+                      </div>
+                    </div>
+
+                    <div class="attr-range-row">
+                      <span class="arr-label">🎯 Passe (PAS):</span>
+                      <div class="arr-inputs">
+                        <input type="number" id="filterScoutMinPassing" class="vault-input arr-input" placeholder="Mín" min="30" max="99">
+                        <input type="number" id="filterScoutMaxPassing" class="vault-input arr-input" placeholder="Máx" min="30" max="99">
+                      </div>
+                    </div>
+
+                    <div class="attr-range-row">
+                      <span class="arr-label">🪄 Drible (DRI):</span>
+                      <div class="arr-inputs">
+                        <input type="number" id="filterScoutMinDribbling" class="vault-input arr-input" placeholder="Mín" min="30" max="99">
+                        <input type="number" id="filterScoutMaxDribbling" class="vault-input arr-input" placeholder="Máx" min="30" max="99">
+                      </div>
+                    </div>
+
+                    <div class="attr-range-row">
+                      <span class="arr-label">🛡️ Defesa (DEF):</span>
+                      <div class="arr-inputs">
+                        <input type="number" id="filterScoutMinDefending" class="vault-input arr-input" placeholder="Mín" min="30" max="99">
+                        <input type="number" id="filterScoutMaxDefending" class="vault-input arr-input" placeholder="Máx" min="30" max="99">
+                      </div>
+                    </div>
+
+                    <div class="attr-range-row">
+                      <span class="arr-label">💪 Força / Físico (FIS):</span>
+                      <div class="arr-inputs">
+                        <input type="number" id="filterScoutMinStrength" class="vault-input arr-input" placeholder="Mín" min="30" max="99">
+                        <input type="number" id="filterScoutMaxStrength" class="vault-input arr-input" placeholder="Máx" min="30" max="99">
+                      </div>
+                    </div>
+
+                    <div class="attr-range-row">
+                      <span class="arr-label">🦘 Cabeceio / Aéreo:</span>
+                      <div class="arr-inputs">
+                        <input type="number" id="filterScoutMinHeading" class="vault-input arr-input" placeholder="Mín" min="30" max="99">
+                        <input type="number" id="filterScoutMaxHeading" class="vault-input arr-input" placeholder="Máx" min="30" max="99">
+                      </div>
+                    </div>
+
+                  </div>
+                </details>
+
+                <div class="form-group">
+                  <label for="filterScoutMaxPrice">Orçamento Máximo (R$ / $):</label>
+                  <input type="number" id="filterScoutMaxPrice" class="vault-input" placeholder="Ex: 15000000" step="500000">
+                </div>
+
+                <div class="form-group">
+                  <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: #fff;">
+                    <input type="checkbox" id="filterScoutWonderkid"> ⭐ Apenas Jovens Promessas (Sub-22)
+                  </label>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 0.5rem;">
+                  <button type="button" class="btn-primary" id="btnSearchScoutManual" style="width: 100%;" onclick="executeManualScoutSearch()">
+                    <i data-lucide="search"></i> Buscar Atletas no Mercado
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Painel: Lista de Observação (Shortlist) -->
+            <div class="glass-card scout-shortlist-card" style="margin-top: 1rem;">
+              <div class="card-header flex-between">
+                <div class="ch-title" style="font-size: 1rem;">
+                  <i data-lucide="star" style="color: var(--accent-gold);"></i> Lista de Observação
+                </div>
+                <span class="badge-tag gold" id="shortlistCountBadge">0 Salvos</span>
+              </div>
+
+              <div class="shortlist-items-container" id="shortlistItemsContainer" style="max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-top: 0.75rem;">
+                <!-- Lista de jogadores salvos gerada via JS -->
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA 9: CONFIGURAÇÕES & STATUS                           -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-settings">
+        <div class="pane-header">
+          <div>
+            <h2>Configurações & Conexão</h2>
+            <p>Gerencie integrações, scripts de Live Editor e dados locais.</p>
+          </div>
+        </div>
+
+        <div class="glass-card settings-box">
+          <div class="setting-item">
+            <div>
+              <h3>Ponte do Live Editor</h3>
+              <p>O Live Editor sincroniza diretamente com o endereço local <code>http://localhost:8000/api/sync/match</code>.</p>
+            </div>
+            <span class="badge-tag green">Ativo na Porta 8000</span>
+          </div>
+
+          <div class="setting-item">
+            <div>
+              <h3>Script Lua do Live Editor</h3>
+              <p>Arquivo localizado em: <code>lua/career_vault_sync.lua</code>. Pode ser executado manualmente ou configurado no autorun do Live Editor.</p>
+            </div>
+            <button class="btn-secondary" onclick="alert('Script pronto em lua/career_vault_sync.lua')">Ver Caminho</button>
+          </div>
+
+          <div class="setting-item">
+            <div style="flex: 1; max-width: 100%;">
+              <h3>Chave de IA (Google Gemini / AI Studio)</h3>
+              <p>Salva permanentemente no arquivo <code>.env</code> e no seu navegador para geração contínua de crônicas e análises táticas.</p>
+              <div style="display: flex; gap: 0.5rem; margin-top: 0.6rem; align-items: center;">
+                <input type="password" id="userGeminiKey" class="vault-input" placeholder="Cole sua chave Gemini aqui..." style="flex: 1;">
+                <button type="button" class="btn-secondary" id="btnToggleKeyVisibility" title="Mostrar/Ocultar" style="padding: 0.6rem 0.8rem; cursor: pointer;">
+                  <i data-lucide="eye" id="eyeIcon"></i>
+                </button>
+                <button type="button" class="btn-primary" id="btnSaveApiKey" style="padding: 0.6rem 1.2rem; font-weight: 600; cursor: pointer; white-space: nowrap;">
+                  <i data-lucide="save"></i> Salvar Chave
+                </button>
+              </div>
+              <small id="keyStatusHint" style="display: block; margin-top: 0.4rem; color: #10b981; font-weight: 600;"></small>
+            </div>
+          </div>
+
+          <div class="setting-item danger-zone">
+            <div>
+              <h3 style="color: #ef4444;"><i data-lucide="trash-2"></i> Limpar Banco de Dados</h3>
+              <p>Exclui todos os dados antigos ou fictícios e zera o banco de dados local para você carregar seu arquivo JSON limpo.</p>
+            </div>
+            <button class="btn-danger" id="btnPurgeMockData" style="background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #ef4444; padding: 0.6rem 1.2rem; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              <i data-lucide="trash-2"></i> Limpar Banco de Dados
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- ======================================================== -->
+  <!-- 1. MODAL: HISTÓRICO DO JOGADOR DO CLUBE NO SAVE (CARREIRA) -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="playerModal">
+    <div class="modal-card player-career-modal" style="max-width: 860px; width: 95%; max-height: 90vh; overflow-y: auto;">
+      <button class="modal-close-btn" id="modalCloseBtn">&times;</button>
+      
+      <!-- Cabeçalho Principal do Jogador -->
+      <div class="psm-header">
+        <div class="psm-avatar-container">
+          <img id="pmFace" class="psm-face" src="" onerror="this.src='/assets/heads/notfound.png'" alt="Foto Jogador">
+          <span class="pm-youth-tag" id="pmYouthBadge" style="display: none;">JOIA DA BASE</span>
+        </div>
+
+        <div class="psm-identity">
+          <div class="psm-title-row">
+            <h2 class="psm-name" id="pmName">Nome do Jogador</h2>
+            <span class="psm-id-tag" id="pmIdTag">ID #0</span>
+          </div>
+          <div class="psm-fullname" id="pmFullName">Nome Completo do Atleta</div>
+
+          <div class="psm-badges-row">
+            <span class="badge-tag" id="pmPosition">ATA</span>
+            <div id="pmSecPositions" style="display: inline-flex; gap: 4px;"></div>
+            <span class="badge-ovr" id="pmOvrBadge">OVR 83</span>
+            <span class="badge-pot" id="pmPotBadge">POT 88</span>
+            <div class="psm-club-chip">
+              <img id="pmClubCrest" src="" class="psm-crest-mini" onerror="this.src='/assets/default_crest.png'" alt="">
+              <span id="pmTeam">Clube Atual</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumo Geral da Carreira no Clube do Usuário -->
+      <div class="psm-career-section" style="margin-top: 1.25rem;">
+        <div class="psm-section-label"><i data-lucide="award"></i> Estatísticas da Carreira no Clube</div>
+        
+        <!-- Totais Acumulados -->
+        <div class="pm-career-stats-row">
+          <div class="pm-stat-box">
+            <span class="pms-v" id="pmTotApps">0</span>
+            <span class="pms-l">Jogos Disputados</span>
+          </div>
+          <div class="pm-stat-box highlight">
+            <span class="pms-v" id="pmTotGoals">0</span>
+            <span class="pms-l">Gols Marcados</span>
+          </div>
+          <div class="pm-stat-box">
+            <span class="pms-v" id="pmTotAssists">0</span>
+            <span class="pms-l">Assistências</span>
+          </div>
+          <div class="pm-stat-box">
+            <span class="pms-v" id="pmTotAvg">0.0</span>
+            <span class="pms-l">Nota Média</span>
+          </div>
+          <div class="pm-stat-box">
+            <span class="pms-v" id="pmTotMotm">0</span>
+            <span class="pms-l">Prêmios MOTM</span>
+          </div>
+          <div class="pm-stat-box" id="pmCleanSheetsBox">
+            <span class="pms-v" id="pmTotCleanSheets">0</span>
+            <span class="pms-l">Jogos sem Levar Gol</span>
+          </div>
+        </div>
+
+        <!-- Prêmios Conquistados pelo Atleta no Save -->
+        <div class="pm-awards-section" id="pmAwardsSection" style="display: none; margin-top: 1.25rem;">
+          <h4 style="display: flex; align-items: center; gap: 0.5rem; color: #fbbf24; margin-bottom: 0.75rem;"><i data-lucide="trophy"></i> Prêmios & Distinções Individuais</h4>
+          <div class="pm-awards-list" id="pmAwardsList"></div>
+        </div>
+
+        <!-- Tabela Histórica Linha a Linha -->
+        <div class="pm-table-section" style="margin-top: 1.25rem;">
+          <div class="psm-section-label"><i data-lucide="history"></i> Desempenho Temporada a Temporada</div>
+          <div class="table-responsive">
+            <table class="vault-table">
+              <thead>
+                <tr>
+                  <th>Temporada</th>
+                  <th>Competição</th>
+                  <th>Clube</th>
+                  <th class="text-center">Jogos</th>
+                  <th class="text-center">Gols</th>
+                  <th class="text-center">Assist</th>
+                  <th class="text-center">Nota</th>
+                  <th class="text-center">MOTMs</th>
+                  <th class="text-center">Cartões</th>
+                </tr>
+              </thead>
+              <tbody id="pmHistoryBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- 2. MODAL: FICHA TÉCNICA DO SCOUT (MERCADO & PESQUISA)     -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="scoutPlayerModal">
+    <div class="modal-card player-sheet-modal" style="max-width: 880px; width: 95%; max-height: 90vh; overflow-y: auto;">
+      <button class="modal-close-btn" id="scoutModalCloseBtn">&times;</button>
+      
+      <!-- Cabeçalho Principal do Jogador no Scout -->
+      <div class="psm-header">
+        <div class="psm-avatar-container">
+          <img id="spmFace" class="psm-face" src="" onerror="this.src='/assets/heads/notfound.png'" alt="Foto Jogador">
+        </div>
+
+        <div class="psm-identity">
+          <div class="psm-title-row">
+            <h2 class="psm-name" id="spmName">Nome do Jogador</h2>
+            <span class="psm-id-tag" id="spmIdTag">ID #0</span>
+          </div>
+          <div class="psm-fullname" id="spmFullName">Nome Completo do Atleta</div>
+
+          <div class="psm-badges-row">
+            <span class="badge-tag" id="spmPosition">ATA</span>
+            <div id="spmSecPositions" style="display: inline-flex; gap: 4px;"></div>
+            <span class="badge-ovr" id="spmOvrBadge">OVR 83</span>
+            <span class="badge-pot" id="spmPotBadge">POT 88</span>
+            <div class="psm-club-chip">
+              <img id="spmClubCrest" src="" class="psm-crest-mini" onerror="this.src='/assets/default_crest.png'" alt="">
+              <span id="spmTeam">Clube Atual</span>
+              <span class="psm-league-tag" id="spmLeague">Liga</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="psm-header-actions">
+          <div class="psm-market-box">
+            <div class="psm-val-main" id="spmMarketVal">Sob Consulta</div>
+            <div class="psm-wage-sub" id="spmWageVal">Salário: A Negociar</div>
+          </div>
+          <button type="button" class="btn-primary btn-sm" id="btnSpmShortlist">
+            <i data-lucide="star"></i> <span id="btnSpmShortlistText">Observar</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3 Colunas de Dados: Bio / Contrato / Físico -->
+      <div class="psm-meta-grid">
+        <!-- Coluna 1: Dados Biográficos & Seleção -->
+        <div class="psm-meta-card">
+          <div class="psm-mc-title"><i data-lucide="user"></i> Dados Pessoais</div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Idade:</span>
+            <span class="psm-val" id="spmAgeBirth">-</span>
+          </div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Nacionalidade:</span>
+            <span class="psm-val" id="spmNationality">-</span>
+          </div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Seleção Nacional:</span>
+            <span class="psm-val" id="spmNationTeam">Não Convocado</span>
+          </div>
+        </div>
+
+        <!-- Coluna 2: Vínculo & Contrato -->
+        <div class="psm-meta-card">
+          <div class="psm-mc-title"><i data-lucide="file-text"></i> Vínculo Contratual</div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Clube Atual:</span>
+            <span class="psm-val" id="spmClubDetail">-</span>
+          </div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Chegada ao Clube:</span>
+            <span class="psm-val" id="spmJoinDate">-</span>
+          </div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Fim do Contrato:</span>
+            <span class="psm-val font-bold text-gold" id="spmContractValid">-</span>
+          </div>
+        </div>
+
+        <!-- Coluna 3: Físico & Habilidades -->
+        <div class="psm-meta-card">
+          <div class="psm-mc-title"><i data-lucide="activity"></i> Perfil & Habilidades</div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Altura / Peso:</span>
+            <span class="psm-val" id="spmPhysicalInfo">-</span>
+          </div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Pé Preferido:</span>
+            <span class="psm-val" id="spmFoot">Destro</span>
+          </div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Fintas / Perna Ruim:</span>
+            <span class="psm-val" id="spmSkillsAndWeak">3⭐ / 3⭐</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 Atributos Principais (Ritmo, Finalização, Passe, Drible, Defesa, Físico) -->
+      <div class="psm-stats-hex-section">
+        <div class="psm-section-label"><i data-lucide="gauge"></i> Atributos Oficiais de Desempenho</div>
+        <div class="psm-stats-cards-grid">
+          <div class="psm-stat-card">
+            <span class="psc-lbl">RITMO</span>
+            <span class="psc-val" id="spmStatPace">0</span>
+            <div class="psc-bar"><div class="psc-fill" id="spmStatPaceBar" style="width: 0%;"></div></div>
+          </div>
+          <div class="psm-stat-card">
+            <span class="psc-lbl">FINALIZAÇÃO</span>
+            <span class="psc-val" id="spmStatShooting">0</span>
+            <div class="psc-bar"><div class="psc-fill" id="spmStatShootingBar" style="width: 0%;"></div></div>
+          </div>
+          <div class="psm-stat-card">
+            <span class="psc-lbl">PASSE</span>
+            <span class="psc-val" id="spmStatPassing">0</span>
+            <div class="psc-bar"><div class="psc-fill" id="spmStatPassingBar" style="width: 0%;"></div></div>
+          </div>
+          <div class="psm-stat-card">
+            <span class="psc-lbl">DRIBLE</span>
+            <span class="psc-val" id="spmStatDribbling">0</span>
+            <div class="psc-bar"><div class="psc-fill" id="spmStatDribblingBar" style="width: 0%;"></div></div>
+          </div>
+          <div class="psm-stat-card">
+            <span class="psc-lbl">DEFESA</span>
+            <span class="psc-val" id="spmStatDefending">0</span>
+            <div class="psc-bar"><div class="psc-fill" id="spmStatDefendingBar" style="width: 0%;"></div></div>
+          </div>
+          <div class="psm-stat-card">
+            <span class="psc-lbl">FÍSICO</span>
+            <span class="psc-val" id="spmStatPhysical">0</span>
+            <div class="psc-bar"><div class="psc-fill" id="spmStatPhysicalBar" style="width: 0%;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Estilos de Jogo (PlayStyles) -->
+      <div class="psm-playstyles-section" id="spmPlaystylesSection">
+        <div class="psm-section-label"><i data-lucide="sparkles"></i> Estilos de Jogo & Habilidades Especiais (PlayStyles)</div>
+        <div class="psm-playstyles-grid" id="spmPlaystylesGrid">
+          <!-- Inserido dinamicamente via JS -->
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: SINCRONIZAÇÃO E EXTRAÇÃO DO LIVE EDITOR           -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="syncModal">
+    <div class="modal-card sync-modal-card">
+      <button class="modal-close-btn" id="syncModalCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon"><i data-lucide="refresh-cw"></i></div>
+        <div>
+          <h2>Sincronização com o Jogo (Live Editor)</h2>
+          <p>Conecte os dados reais do seu save no EA Sports FC diretamente ao Vault.</p>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div class="sync-actions-grid">
+        <div class="sync-action-card highlight" id="btnSyncFromDesktop">
+          <div class="sac-icon"><i data-lucide="zap"></i></div>
+          <div class="sac-content">
+            <h4>Sincronizar do Desktop (1 Clique)</h4>
+            <p>Lê automaticamente o arquivo <code>FC_CAREER_VAULT_BACKUP.json</code> gerado na Área de Trabalho.</p>
+          </div>
+          <button class="btn-primary" style="margin-top: 0.75rem; width: 100%;">
+            <i data-lucide="refresh-cw"></i> Sincronizar Agora
+          </button>
+        </div>
+
+        <div class="sync-action-card" id="btnModalExportBackup">
+          <div class="sac-icon"><i data-lucide="download"></i></div>
+          <div class="sac-content">
+            <h4>Baixar Backup da Carreira (.JSON)</h4>
+            <p>Baixe todos os dados da carreira para guardar ou trocar de time com segurança.</p>
+          </div>
+          <button class="btn-secondary" style="margin-top: 0.75rem; width: 100%;">
+            <i data-lucide="download"></i> Baixar Arquivo JSON
+          </button>
+        </div>
+
+        <div class="sync-action-card">
+          <div class="sac-icon"><i data-lucide="file-up"></i></div>
+          <div class="sac-content">
+            <h4>Restaurar Carreira Salva</h4>
+            <p>Carregue qualquer arquivo JSON de backup para continuar ou rever uma carreira anterior.</p>
+          </div>
+          <input type="file" id="jsonFileInput" accept=".json" style="display: none;">
+          <button class="btn-secondary" id="btnTriggerFileInput" style="margin-top: 0.75rem; width: 100%;">
+            <i data-lucide="folder-open"></i> Escolher Arquivo...
+          </button>
+        </div>
+      </div>
+
+      <!-- Status Feedback Banner -->
+      <div class="sync-feedback-banner" id="syncFeedbackBanner" style="display: none;">
+        <span id="syncFeedbackText">Status da importação</span>
+      </div>
+
+      <!-- Guia Passo a Passo -->
+      <div class="sync-tutorial-box">
+        <h4><i data-lucide="help-circle"></i> Como Extrair no Jogo pelo Live Editor:</h4>
+        <ol>
+          <li>Abra o <b>EA Sports FC</b> através do <b>Live Editor</b> e carregue seu Modo Carreira.</li>
+          <li>No menu do Live Editor, acesse a aba <b>Lua Scripts</b>.</li>
+          <li>Selecione o script <code>EXTRAIR_DADOS_CARREIRA.lua</code> (ou <code>lua/career_vault_sync.lua</code>).</li>
+          <li>Pressione <b>F9</b> no teclado. Em menos de 1 segundo todos os atletas, jogos, técnico e classificações são extraídos!</li>
+          <li>Clique no botão <b>"Importar Agora"</b> acima se a sincronização automática via HTTP não tiver sido realizada.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EDITAR DADOS DO TREINADOR & SAVE                  -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="editManagerModal">
+    <div class="modal-card edit-manager-modal-card">
+      <button class="modal-close-btn" id="editManagerCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon"><i data-lucide="user-cog"></i></div>
+        <div>
+          <h2>Editar Perfil do Treinador</h2>
+          <p>Personalize o nome do seu técnico, clube atual, salário e moeda da carreira.</p>
+        </div>
+      </div>
+
+      <form id="editManagerForm" class="vault-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="inputMgrName">Nome do Treinador *</label>
+            <input type="text" id="inputMgrName" class="vault-input" placeholder="Ex: Abel Ferreira, Carlo Ancelotti, Seu Nome" required>
+          </div>
+          <div class="form-group">
+            <label for="inputTeamName">Clube Atual *</label>
+            <input type="text" id="inputTeamName" class="vault-input" placeholder="Ex: Flamengo, Palmeiras, Real Madrid" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="inputWeeklyWage">Salário Semanal (R$)</label>
+            <input type="number" id="inputWeeklyWage" class="vault-input" placeholder="Ex: 250000" step="1000">
+          </div>
+          <div class="form-group">
+            <label for="inputCurrency">Símbolo da Moeda</label>
+            <select id="inputCurrency" class="vault-select">
+              <option value="R$">Real (R$)</option>
+              <option value="€">Euro (€)</option>
+              <option value="£">Libra (£)</option>
+              <option value="$">Dólar ($)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelEditManager">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveManagerProfile">
+            <i data-lucide="check"></i> Salvar Alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Enquadramento & Zoom da Foto do Treinador -->
+  <div class="modal-overlay" id="mgrPhotoCropModal">
+    <div class="modal-card crop-modal">
+      <button class="modal-close-btn" id="cropModalCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon"><i data-lucide="camera"></i></div>
+        <div>
+          <h2>Enquadrar Foto do Treinador</h2>
+          <p>Arraste a imagem para centralizar o rosto e use o zoom para o encaixe perfeito.</p>
+        </div>
+      </div>
+
+      <div class="cropper-layout">
+        <!-- Área de Edição Interativa do Canvas -->
+        <div class="cropper-canvas-area">
+          <div class="cropper-viewport-wrap" id="cropViewportContainer">
+            <canvas id="cropCanvas" width="320" height="320"></canvas>
+            <div class="cropper-circle-mask"></div>
+            <div class="cropper-hint"><i data-lucide="move"></i> Arraste para mover</div>
+          </div>
+          
+          <!-- Controles de Zoom -->
+          <div class="cropper-controls">
+            <button type="button" class="btn-icon" id="btnCropZoomOut" title="Diminuir Zoom">
+              <i data-lucide="minus"></i>
+            </button>
+            <input type="range" id="cropZoomSlider" min="1" max="3.5" step="0.02" value="1" class="cropper-slider">
+            <button type="button" class="btn-icon" id="btnCropZoomIn" title="Aumentar Zoom">
+              <i data-lucide="plus"></i>
+            </button>
+            <button type="button" class="btn-secondary btn-xs" id="btnCropReset" style="margin-left: 8px;">
+              <i data-lucide="rotate-ccw"></i> Centralizar
+            </button>
+          </div>
+        </div>
+
+        <!-- Preview Lateral ao Vivo -->
+        <div class="cropper-preview-area">
+          <span class="preview-label">Pré-visualização</span>
+          <div class="cropper-preview-circle">
+            <canvas id="cropPreviewCanvas" width="100" height="100"></canvas>
+          </div>
+          <span class="preview-sub">Como aparecerá no perfil</span>
+        </div>
+      </div>
+
+      <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button type="button" class="btn-secondary" id="btnCancelCrop">Cancelar</button>
+        <button type="button" class="btn-primary" id="btnConfirmCrop">
+          <i data-lucide="check"></i> Confirmar & Salvar Foto
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EDITAR / CRIAR TABELA DE CLASSIFICAÇÃO            -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="standingsEditModal">
+    <div class="modal-card wide-modal">
+      <button class="modal-close-btn" id="standingsEditModalCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon"><i data-lucide="list-ordered"></i></div>
+        <div>
+          <h2>Editar Tabela de Classificação</h2>
+          <p>Ajuste posições, números, clubes ou clique no escudo para buscar e trocar o brasão.</p>
+        </div>
+      </div>
+
+      <div style="margin: 1rem 0;">
+        <label style="font-size: 0.85rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 0.35rem;">Nome da Competição / Grupo:</label>
+        <input type="text" id="editStandingsCompName" class="vault-input" placeholder="Ex: Cariocão (Grupo A) ou Brasileirão Série D">
+      </div>
+
+      <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+        <table class="vault-table" id="editStandingsTableGrid">
+          <thead>
+            <tr>
+              <th style="width: 45px;">Pos</th>
+              <th style="width: 50px;">Escudo</th>
+              <th>Clube</th>
+              <th style="width: 55px;" class="text-center">J</th>
+              <th style="width: 55px;" class="text-center">V</th>
+              <th style="width: 55px;" class="text-center">E</th>
+              <th style="width: 55px;" class="text-center">D</th>
+              <th style="width: 55px;" class="text-center">GP</th>
+              <th style="width: 55px;" class="text-center">GC</th>
+              <th style="width: 55px;" class="text-center">Pts</th>
+              <th style="width: 100px;">Forma</th>
+              <th style="width: 40px;"></th>
+            </tr>
+          </thead>
+          <tbody id="editStandingsTableBody">
+            <!-- Linhas dinâmicas editáveis -->
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <button type="button" class="btn-secondary" id="btnAddStandingRow">
+          <i data-lucide="plus"></i> Adicionar Clube
+        </button>
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelEditStandings">Cancelar</button>
+          <button type="button" class="btn-primary" id="btnSaveStandingsManual">
+            <i data-lucide="check"></i> Salvar Tabela
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: SELETOR E TROCA DE ESCUDO DO CLUBE                -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="crestPickerModal">
+    <div class="modal-card" style="max-width: 500px;">
+      <button class="modal-close-btn" id="crestPickerModalCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon"><i data-lucide="shield"></i></div>
+        <div>
+          <h2>Selecionar Escudo do Clube</h2>
+          <p>Busque no banco oficial de clubes ou faça upload de um brasão personalizado.</p>
+        </div>
+      </div>
+
+      <div style="margin: 1rem 0;">
+        <label style="font-size: 0.85rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 0.35rem;">Buscar no Banco de Clubes:</label>
+        <div style="display: flex; gap: 0.5rem;">
+          <input type="text" id="crestSearchInput" class="vault-input" placeholder="Digite o nome do time (ex: Portuguesa, Ypiranga)..." style="flex: 1;">
+          <button type="button" class="btn-secondary" id="btnExecCrestSearch">
+            <i data-lucide="search"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="crestSearchResults" class="crest-results-grid" style="max-height: 220px; overflow-y: auto; margin-bottom: 1rem;">
+        <!-- Lista de clubes encontrados -->
+      </div>
+
+      <div style="border-top: 1px solid rgba(255,255,255,0.1); padding-top: 1rem;">
+        <span style="font-size: 0.85rem; font-weight: 700; color: #94a3b8; display: block; margin-bottom: 0.5rem;">Ou Enviar Imagem do Seu PC:</span>
+        <input type="file" id="customCrestFileInput" accept="image/*" class="vault-input">
+      </div>
+
+      <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+        <button type="button" class="btn-secondary" id="btnCancelCrestPicker">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EDITAR FINANÇAS DO CLUBE                          -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="financesEditModal">
+    <div class="modal-card wide-modal">
+      <button class="modal-close-btn" id="financesEditModalCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon"><i data-lucide="badge-dollar-sign"></i></div>
+        <div>
+          <h2>Editar Finanças & Orçamentos</h2>
+          <p>Ajuste o valor do clube (Valuation), verbas e o demonstrativo de receitas e despesas.</p>
+        </div>
+      </div>
+
+      <form id="formEditFinances">
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #94a3b8; font-size: 0.85rem; margin-bottom: 0.35rem;">
+            <i data-lucide="calendar"></i> Temporada das Finanças a Editar:
+          </label>
+          <select id="modalFinSeasonSelect" class="vault-select" style="width: 100%;">
+            <option value="2027">Temporada 2027 (Atual)</option>
+            <option value="2026">Temporada 2026</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0;">
+          <div class="form-group">
+            <label>Valuation do Clube ($):</label>
+            <input type="number" id="inputFinValuation" class="vault-input" step="10000">
+          </div>
+          <div class="form-group">
+            <label>Verba de Transferências ($):</label>
+            <input type="number" id="inputFinTransferBudget" class="vault-input" step="10000">
+          </div>
+          <div class="form-group">
+            <label>Orçamento Salarial / Mês ($):</label>
+            <input type="number" id="inputFinWageBudget" class="vault-input" step="5000">
+          </div>
+        </div>
+
+        <h3 style="font-size: 0.95rem; color: #10b981; margin: 1rem 0 0.5rem;"><i data-lucide="arrow-down-left"></i> Receitas Detalhadas</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+          <div class="form-group"><label>Produtos ($):</label><input type="number" id="inputFinProductsRevenue" class="vault-input" placeholder="Ex: 1610000"></div>
+          <div class="form-group"><label>Transferências ($):</label><input type="number" id="inputFinTransfersRevenue" class="vault-input" placeholder="Ex: 5150000"></div>
+          <div class="form-group"><label>Ingressos ($):</label><input type="number" id="inputFinTicketsRevenue" class="vault-input" placeholder="Ex: 1410000"></div>
+          <div class="form-group"><label>Sócio Torcedor ($):</label><input type="number" id="inputFinMembersRevenue" class="vault-input" placeholder="Ex: 115800"></div>
+          <div class="form-group"><label>Prêmios em Dinheiro ($):</label><input type="number" id="inputFinPrizeMoney" class="vault-input" placeholder="Ex: 6740000"></div>
+        </div>
+
+        <h3 style="font-size: 0.95rem; color: #ef4444; margin: 1.25rem 0 0.5rem;"><i data-lucide="arrow-up-right"></i> Despesas Detalhadas</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem;">
+          <div class="form-group"><label>Salários de Atletas ($):</label><input type="number" id="inputFinPlayerWages" class="vault-input" placeholder="Ex: 2050000"></div>
+          <div class="form-group"><label>Transferências ($):</label><input type="number" id="inputFinTransferSpend" class="vault-input" placeholder="Ex: 2800000"></div>
+          <div class="form-group"><label>Custos de Viagens ($):</label><input type="number" id="inputFinTravelCosts" class="vault-input" placeholder="Ex: 811500"></div>
+          <div class="form-group"><label>Salários Auxiliares Téc ($):</label><input type="number" id="inputFinStaffWages" class="vault-input" placeholder="Ex: 682690"></div>
+          <div class="form-group"><label>Instalações da Base ($):</label><input type="number" id="inputFinYouthFacilities" class="vault-input" placeholder="Ex: 200000"></div>
+          <div class="form-group"><label>Manutenção Estádio ($):</label><input type="number" id="inputFinStadiumMaintenance" class="vault-input" placeholder="Ex: 43240"></div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelEditFinances">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveFinancesSubmit">
+            <i data-lucide="check"></i> Salvar Finanças
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: REORGANIZAR & GERENCIAR FASES DA COMPETIÇÃO        -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalManageStages">
+    <div class="modal-card wide-modal" style="max-width: 680px;">
+      <button class="modal-close-btn" id="modalManageStagesCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><i data-lucide="arrow-up-down"></i></div>
+        <div>
+          <h2 id="mmsModalTitle">Reorganizar Fases da Competição</h2>
+          <p>Altere a ordem das abas (mover para cima/baixo), renomeie fases ou exclua fases fantasmas.</p>
+        </div>
+      </div>
+
+      <div style="margin: 1.25rem 0;">
+        <div class="stage-manage-list-container" id="manageStagesList" style="display: flex; flex-direction: column; gap: 0.6rem; max-height: 380px; overflow-y: auto;">
+          <!-- Linhas de fases geradas via JS -->
+        </div>
+      </div>
+
+      <div class="flex-between" style="border-top: 1px solid rgba(255,255,255,0.08); padding-top: 1rem; margin-top: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+        <button type="button" class="btn-secondary btn-sm" id="btnAutoSortStagesChronological" title="Ordenar automaticamente por ordem cronológica (Grupos -> 32 avos -> 16 avos -> Oitavas -> Quartas -> Semis -> Final)">
+          <i data-lucide="sparkles"></i> Auto-Ordenar Cronológico
+        </button>
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelManageStages">Fechar</button>
+          <button type="button" class="btn-primary" id="btnSaveManageStagesSubmit">
+            <i data-lucide="check"></i> Salvar Alterações
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: CRIAR / EDITAR FASE DE MATA-MATA                   -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalKnockoutEditor">
+    <div class="modal-card wide-modal" style="max-width: 820px;">
+      <button class="modal-close-btn" id="modalKnockoutEditorCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(168, 85, 247, 0.15); color: #c084fc;"><i data-lucide="swords"></i></div>
+        <div>
+          <h2 id="koEditorTitle">Editor de Mata-Mata / Eliminatórias</h2>
+          <p>Cadastre ou ajuste confrontos únicos ou de ida e volta com cálculo automático de placar agregado.</p>
+        </div>
+      </div>
+
+      <form id="formKnockoutEditor">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 1rem 0;">
+          <div class="form-group">
+            <label>Competição:</label>
+            <input type="text" id="koInputCompName" class="vault-input" placeholder="Ex: Cariocão ou Brasileirão Série D" required>
+          </div>
+          <div class="form-group">
+            <label>Nome da Fase:</label>
+            <input type="text" id="koInputStageName" class="vault-input" placeholder="Ex: Quartas de final, 32 avos, Semifinal" required>
+          </div>
+          <div class="form-group">
+            <label>Formato do Duelo:</label>
+            <select id="koSelectFormat" class="vault-input">
+              <option value="SINGLE">Jogo Único (1 Partida)</option>
+              <option value="TWO_LEGGED" selected>Ida e Volta (2 Jogos + Agregado)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin: 1rem 0;">
+          <div class="flex-between" style="margin-bottom: 0.5rem;">
+            <label style="font-weight: 700; color: #94a3b8; font-size: 0.85rem;">Confrontos da Fase:</label>
+            <button type="button" class="btn-secondary btn-xs" id="btnAddKnockoutMatchRow">
+              <i data-lucide="plus"></i> Adicionar Confronto
+            </button>
+          </div>
+
+          <div id="koMatchesContainer" style="display: flex; flex-direction: column; gap: 0.85rem; max-height: 380px; overflow-y: auto;">
+            <!-- Linhas de confronto geradas via JS -->
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelKnockoutEditor">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveKnockoutSubmit">
+            <i data-lucide="check"></i> Salvar Fase de Mata-Mata
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: REGISTRAR CONQUISTA / TROFÉU DO TÉCNICO           -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalAddTrophy">
+    <div class="modal-card" style="max-width: 540px;">
+      <button class="modal-close-btn" id="modalAddTrophyCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;"><i data-lucide="trophy"></i></div>
+        <div>
+          <h2>Registrar Conquista / Troféu</h2>
+          <p>Adicione um título oficial, acesso de divisão ou prêmio individual à Sala de Troféus.</p>
+        </div>
+      </div>
+
+      <form id="formAddTrophy" class="vault-form" style="margin-top: 1rem;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="trophyInputTitle">Título da Conquista *</label>
+            <input type="text" id="trophyInputTitle" class="vault-input" placeholder="Ex: Campeão da Série D, Acesso à Série C" required>
+          </div>
+          <div class="form-group">
+            <label for="trophySelectType">Tipo de Prêmio</label>
+            <select id="trophySelectType" class="vault-select">
+              <option value="TROPHY" selected>🏆 Troféu de Campeão</option>
+              <option value="ACCESS">🚀 Acesso de Divisão</option>
+              <option value="INDIVIDUAL">🎖️ Treinador do Ano / Mês</option>
+              <option value="MEDAL">🥈 Vice-Campeonato / Honraria</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="trophyInputSeason">Temporada *</label>
+            <input type="text" id="trophyInputSeason" class="vault-input" placeholder="Ex: 2026 ou 2027" value="2026" required>
+          </div>
+          <div class="form-group">
+            <label for="trophyInputDate">Data da Conquista</label>
+            <input type="text" id="trophyInputDate" class="vault-input" placeholder="DD/MM/AAAA" value="17/10/2026">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="trophyInputTeam">Clube</label>
+          <input type="text" id="trophyInputTeam" class="vault-input" placeholder="Ex: Portuguesa-RJ" value="Portuguesa-RJ">
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelAddTrophy">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveTrophySubmit">
+            <i data-lucide="check"></i> Salvar na Sala de Troféus
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EDITAR CONQUISTA / TROFÉU                         -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalEditTrophy">
+    <div class="modal-card" style="max-width: 540px;">
+      <button class="modal-close-btn" id="modalEditTrophyCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;"><i data-lucide="trophy"></i></div>
+        <div>
+          <h2>Editar Conquista / Troféu</h2>
+          <p>Ajuste os detalhes da conquista ou a data oficial em que o título foi erguido.</p>
+        </div>
+      </div>
+
+      <form id="formEditTrophy" class="vault-form" style="margin-top: 1rem;">
+        <input type="hidden" id="editTrophyId" value="">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editTrophyTitle">Título da Conquista *</label>
+            <input type="text" id="editTrophyTitle" class="vault-input" placeholder="Ex: Campeão da Copa Sul-Sudeste" required>
+          </div>
+          <div class="form-group">
+            <label for="editTrophySelectType">Tipo de Prêmio</label>
+            <select id="editTrophySelectType" class="vault-select">
+              <option value="TROPHY">🏆 Troféu de Campeão</option>
+              <option value="ACCESS">🚀 Acesso de Divisão</option>
+              <option value="INDIVIDUAL">🎖️ Treinador do Ano / Mês</option>
+              <option value="MEDAL">🥈 Vice-Campeonato / Honraria</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editTrophySeason">Temporada *</label>
+            <input type="text" id="editTrophySeason" class="vault-input" placeholder="Ex: 2028" required>
+          </div>
+          <div class="form-group">
+            <label for="editTrophyDate">Data da Conquista *</label>
+            <input type="text" id="editTrophyDate" class="vault-input" placeholder="DD/MM/AAAA" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editTrophyTeam">Clube</label>
+          <input type="text" id="editTrophyTeam" class="vault-input" placeholder="Ex: Portuguesa-RJ">
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 0.75rem;">
+          <button type="button" class="btn-secondary text-danger" id="btnDeleteEditTrophy" style="display: inline-flex; align-items: center; gap: 4px; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.1);">
+            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Remover Conquista
+          </button>
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" id="btnCancelEditTrophy">Cancelar</button>
+            <button type="submit" class="btn-primary" id="btnSaveEditTrophySubmit">
+              <i data-lucide="check"></i> Salvar Alterações
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: EDITAR COMPETIÇÃO E DESEMPENHO FINAL DO TÉCNICO   -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalEditCompetition">
+    <div class="modal-card" style="max-width: 620px;">
+      <button class="modal-close-btn" id="modalEditCompetitionCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><i data-lucide="medal"></i></div>
+        <div>
+          <h2>Editar Desempenho na Competição</h2>
+          <p>Ajuste a colocação final, status e estatísticas do time no campeonato.</p>
+        </div>
+      </div>
+
+      <form id="formEditCompetition" class="vault-form" style="margin-top: 1rem;">
+        <input type="hidden" id="editCompId" value="0">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editCompSeason">Temporada *</label>
+            <input type="text" id="editCompSeason" class="vault-input" placeholder="Ex: 2027" required>
+          </div>
+          <div class="form-group">
+            <label for="editCompName">Nome da Competição *</label>
+            <input type="text" id="editCompName" class="vault-input" placeholder="Ex: Brasileirão Série C" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="editCompTeam">Clube</label>
+            <input type="text" id="editCompTeam" class="vault-input" placeholder="Ex: Portuguesa-RJ" value="Portuguesa-RJ" required>
+          </div>
+          <div class="form-group">
+            <label for="editCompStatus">Status da Competição *</label>
+            <select id="editCompStatus" class="vault-select">
+              <option value="EM_DISPUTA">⏳ Em Disputa</option>
+              <option value="CONCLUÍDO">🏁 Concluído</option>
+              <option value="CAMPEÃO">🏆 Campeão</option>
+              <option value="ELIMINADO">❌ Eliminado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="editCompFinalPosition">Colocação Final / Desempenho no Torneio *</label>
+          <input type="text" id="editCompFinalPosition" class="vault-input" placeholder="Ex: Campeão (1º), Eliminado nos 16 avos de final, 4º Lugar (Acesso)" required>
+          
+          <div style="margin-top: 10px;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-dim); margin-bottom: 6px;">
+              🏆 Posições em Ligas / Pontos Corridos:
+            </div>
+            <div class="comp-quick-presets" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;">
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Campeão (1º)', 'CAMPEÃO')">🏆 Campeão (1º)</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Vice-Campeão (2º)', 'CONCLUÍDO')">🥈 Vice (2º)</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('3º Lugar', 'CONCLUÍDO')">🥉 3º Lugar</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('4º Lugar (Acesso)', 'CONCLUÍDO')">🚀 4º Lugar (Acesso)</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Em Disputa', 'EM_DISPUTA')">⏳ Em Disputa</button>
+            </div>
+
+            <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-dim); margin-bottom: 6px;">
+              ⚔️ Fases de Mata-Mata / Copas (Copa do Brasil, Libertadores, etc.):
+            </div>
+            <div class="comp-quick-presets" style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Eliminado na Semifinal', 'ELIMINADO')">🏅 Semifinal</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Eliminado nas Quartas de final', 'ELIMINADO')">⚽ Quartas de final</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Eliminado nas Oitavas de final', 'ELIMINADO')">🛡️ Oitavas de final</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Eliminado nos 16 avos de final', 'ELIMINADO')">⚔️ 16 avos de final (3ª Fase)</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Eliminado nos 32 avos de final', 'ELIMINADO')">🥊 32 avos de final (2ª Fase)</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Eliminado nos 64 avos de final', 'ELIMINADO')">🚩 64 avos de final (1ª Fase)</button>
+              <button type="button" class="btn-secondary btn-xs" onclick="setCompPreset('Eliminado na Fase de Grupos', 'ELIMINADO')">📋 Fase de Grupos</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="form-group">
+            <label for="editCompGames">Jogos (J)</label>
+            <input type="number" id="editCompGames" class="vault-input" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label for="editCompWins">Vitórias (V)</label>
+            <input type="number" id="editCompWins" class="vault-input" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label for="editCompDraws">Empates (E)</label>
+            <input type="number" id="editCompDraws" class="vault-input" min="0" value="0">
+          </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: repeat(3, 1fr);">
+          <div class="form-group">
+            <label for="editCompLosses">Derrotas (D)</label>
+            <input type="number" id="editCompLosses" class="vault-input" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label for="editCompGF">Gols Pró (GP)</label>
+            <input type="number" id="editCompGF" class="vault-input" min="0" value="0">
+          </div>
+          <div class="form-group">
+            <label for="editCompGA">Gols Contra (GC)</label>
+            <input type="number" id="editCompGA" class="vault-input" min="0" value="0">
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+          <button type="button" class="btn-secondary text-danger" id="btnDeleteEditComp" style="display: inline-flex; align-items: center; gap: 4px; padding: 6px 12px; border-radius: 6px;">
+            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i> Excluir Registro
+          </button>
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" id="btnCancelEditComp">Cancelar</button>
+            <button type="submit" class="btn-primary" id="btnSaveEditCompSubmit">
+              <i data-lucide="check"></i> Salvar Desempenho
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: REGISTRAR JOGADOR APOSENTADO COM HONRAS (HALL)    -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalRetirePlayer">
+    <div class="modal-card" style="max-width: 620px;">
+      <button class="modal-close-btn" id="modalRetirePlayerCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;"><i data-lucide="heart-handshake"></i></div>
+        <div>
+          <h2>Registrar Atleta Aposentado</h2>
+          <p>Consagre um jogador que pendurou as chuteiras no clube no Hall da Fama Eterno.</p>
+        </div>
+      </div>
+
+      <form id="formRetirePlayer" class="vault-form" style="margin-top: 1rem;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="retireSelectPlayer">Selecionar Atleta do Elenco</label>
+            <select id="retireSelectPlayer" class="vault-select">
+              <option value="">-- Escolha um atleta ou digite abaixo --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="retireInputName">Nome do Atleta *</label>
+            <input type="text" id="retireInputName" class="vault-input" placeholder="Ex: Joãozinho" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="retireInputPosition">Posição</label>
+            <select id="retireInputPosition" class="vault-select">
+              <option value="GOL">GOL - Goleiro</option>
+              <option value="ZAG">ZAG - Zagueiro</option>
+              <option value="LE">LE - Lateral Esquerdo</option>
+              <option value="LD">LD - Lateral Direito</option>
+              <option value="VOL">VOL - Volante</option>
+              <option value="MC">MC - Meia Central</option>
+              <option value="MEI">MEI - Meia Atacante</option>
+              <option value="PE">PE - Ponta Esquerda</option>
+              <option value="PD">PD - Ponta Direita</option>
+              <option value="ATA" selected>ATA - Atacante / Centroavante</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="retireInputAge">Idade na Aposentadoria</label>
+            <input type="number" id="retireInputAge" class="vault-input" placeholder="Ex: 36" value="36" min="28" max="48">
+          </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="form-group">
+            <label for="retireInputApps">Jogos Totais</label>
+            <input type="number" id="retireInputApps" class="vault-input" placeholder="0" value="0">
+          </div>
+          <div class="form-group">
+            <label for="retireInputGoals">Gols Totais</label>
+            <input type="number" id="retireInputGoals" class="vault-input" placeholder="0" value="0">
+          </div>
+          <div class="form-group">
+            <label for="retireInputAssists">Assistências</label>
+            <input type="number" id="retireInputAssists" class="vault-input" placeholder="0" value="0">
+          </div>
+          <div class="form-group">
+            <label for="retireInputTrophies">Títulos</label>
+            <input type="number" id="retireInputTrophies" class="vault-input" placeholder="0" value="1">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="retireInputSeason">Temporada da Despedida</label>
+            <input type="text" id="retireInputSeason" class="vault-input" placeholder="Ex: 2026" value="2026">
+          </div>
+          <div class="form-group">
+            <label for="retireInputLegacy">Título de Legado / Honraria</label>
+            <input type="text" id="retireInputLegacy" class="vault-input" placeholder="Ex: Ídolo Eterno, Capitão Histórico" value="Ídolo Eterno">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="retireInputNotes">Homenagem / Nota de Despedida</label>
+          <textarea id="retireInputNotes" class="vault-input" rows="2" placeholder="Ex: Pendurou as chuteiras com honras após liderar o time ao título inédito.">Pendurou as chuteiras com honras após carreira vitoriosa no clube.</textarea>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelRetirePlayer">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveRetirePlayerSubmit">
+            <i data-lucide="check"></i> Imortalizar no Hall da Fama
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Registrar Transferência Manual -->
+  <div class="vault-modal" id="modalAddTransfer" style="display: none;">
+    <div class="modal-content glass-card" style="max-width: 600px; width: 92%;">
+      <div class="modal-header flex-between">
+        <div class="ch-title" style="font-size: 1.25rem;">
+          <i data-lucide="arrow-left-right" style="color: var(--gold);"></i> Registrar Movimentação de Mercado
+        </div>
+        <button class="modal-close" id="btnCloseAddTransferModal"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="formAddTransferSubmit" style="margin-top: 1rem;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="tfInputName">Nome do Atleta *</label>
+            <input type="text" id="tfInputName" class="vault-input" placeholder="Ex: Lucas Paquetá" required>
+          </div>
+          <div class="form-group">
+            <label for="tfInputType">Tipo de Movimentação *</label>
+            <select id="tfInputType" class="vault-select">
+              <option value="BUY" selected>🔵 Compra (Chegada)</option>
+              <option value="SALE">🟢 Venda (Saída)</option>
+              <option value="LOAN_IN">🔷 Empréstimo (Chegada)</option>
+              <option value="LOAN_OUT">🟡 Empréstimo (Saída)</option>
+              <option value="FREE">⚪ Pré-contrato / Livre / Saída</option>
+              <option value="YOUTH_PROMOTION">⭐ Joia da Base (Promoção)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="tfInputFrom">Clube de Origem *</label>
+            <input type="text" id="tfInputFrom" class="vault-input" placeholder="Ex: Flamengo" required>
+          </div>
+          <div class="form-group">
+            <label for="tfInputTo">Clube de Destino *</label>
+            <input type="text" id="tfInputTo" class="vault-input" placeholder="Ex: Portuguesa-RJ" required>
+          </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="form-group">
+            <label for="tfInputFee">Valor ($ / R$)</label>
+            <input type="number" id="tfInputFee" class="vault-input" placeholder="0" min="0" step="1000" value="0">
+          </div>
+          <div class="form-group">
+            <label for="tfInputDate">Data da Transferência</label>
+            <input type="text" id="tfInputDate" class="vault-input" placeholder="DD/MM/AAAA" value="01/01/2027">
+          </div>
+          <div class="form-group">
+            <label for="tfInputSeason">Temporada</label>
+            <input type="text" id="tfInputSeason" class="vault-input" placeholder="Ex: 2027" value="2027">
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelAddTransfer">Cancelar</button>
+          <button type="submit" class="btn-primary">
+            <i data-lucide="check"></i> Salvar Transferência
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Editar Valor da Negociação / Taxa de Transferência -->
+  <div class="vault-modal" id="modalEditTransferFee" style="display: none;">
+    <div class="modal-content glass-card" style="max-width: 480px; width: 92%;">
+      <div class="modal-header flex-between">
+        <div class="ch-title" style="font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="coins" style="color: var(--accent-gold);"></i> Ajustar Valor da Negociação
+        </div>
+        <button class="modal-close" id="btnCloseEditTransferFeeModal"><i data-lucide="x"></i></button>
+      </div>
+
+      <div style="margin-top: 1rem;">
+        <div class="transfer-edit-summary-card">
+          <div class="text-muted" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px;">Atleta</div>
+          <div id="editFeePlayerName" style="font-size: 1.15rem; font-weight: 800; color: #fff; margin-top: 2px;">Jogador</div>
+          <div id="editFeeTypeBadge" style="margin-top: 6px;"></div>
+        </div>
+
+        <form id="formEditTransferFeeSubmit" style="margin-top: 1rem;">
+          <input type="hidden" id="editFeeTransferId">
+          
+          <div class="form-group">
+            <label for="editFeeInput">Valor da Negociação (R$ ou $)</label>
+            <input type="number" id="editFeeInput" class="vault-input" placeholder="0" min="0" step="10000" style="font-size: 1.25rem; font-weight: 800; color: var(--accent-gold);" required>
+            <div id="editFeePreview" style="font-size: 0.85rem; color: var(--accent-gold); font-weight: 600; margin-top: 5px;">Formatado: R$ 0</div>
+          </div>
+
+          <!-- Botões de Atalho de Valores Rápidos -->
+          <div style="margin-top: 10px; margin-bottom: 12px;">
+            <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 6px;">Atalhos rápidos:</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              <button type="button" class="btn-quick-val" onclick="setQuickTransferFee(0)">R$ 0 (Livre)</button>
+              <button type="button" class="btn-quick-val" onclick="addQuickTransferFee(500000)">+500K</button>
+              <button type="button" class="btn-quick-val" onclick="addQuickTransferFee(1000000)">+1M</button>
+              <button type="button" class="btn-quick-val" onclick="addQuickTransferFee(5000000)">+5M</button>
+              <button type="button" class="btn-quick-val" onclick="addQuickTransferFee(10000000)">+10M</button>
+              <button type="button" class="btn-quick-val" onclick="addQuickTransferFee(25000000)">+25M</button>
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+            <button type="button" class="btn-secondary" id="btnCancelEditTransferFee">Cancelar</button>
+            <button type="submit" class="btn-primary" id="btnSaveEditTransferFee">
+              <i data-lucide="check"></i> Confirmar Valor
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Configurar Responsável pelo Scout / Olheiro Chefe -->
+  <div class="vault-modal" id="modalEditScoutSettings" style="display: none;">
+    <div class="modal-content glass-card" style="max-width: 520px; width: 92%;">
+      <div class="modal-header flex-between">
+        <div class="ch-title" style="font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="user-cog" style="color: var(--accent-gold);"></i> Configurar Responsável pelo Scout
+        </div>
+        <button class="modal-close" id="btnCloseEditScoutModal"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="formEditScoutSettingsSubmit" style="margin-top: 1rem;">
+        <div class="form-group">
+          <label for="inputScoutChiefName">Nome do Olheiro Chefe *</label>
+          <input type="text" id="inputScoutChiefName" class="vault-input" placeholder="Ex: Carlos Mendes, Seu Nome, Roberto Scout" value="Carlos Mendes" required>
+        </div>
+
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <label for="inputScoutChiefRole">Cargo / Função Especializada</label>
+          <input type="text" id="inputScoutChiefRole" class="vault-input" placeholder="Ex: Chefe de Scout & Mercado Sul-Americano" value="Chefe de Scout & Mercado">
+        </div>
+
+        <div class="form-group" style="margin-top: 0.75rem;">
+          <label>Avatar do Olheiro:</label>
+          <div class="scout-avatar-options-grid" style="display: flex; gap: 12px; margin-top: 6px;">
+            <label class="scout-avatar-option active">
+              <input type="radio" name="scoutAvatarRadio" value="/assets/scout_carlos.png" checked style="display: none;">
+              <img src="/assets/scout_carlos.png" alt="Avatar 1" class="sao-img">
+              <span>Carlos</span>
+            </label>
+            <label class="scout-avatar-option">
+              <input type="radio" name="scoutAvatarRadio" value="/assets/scout_hugo.png" style="display: none;">
+              <img src="/assets/scout_hugo.png" alt="Avatar 2" class="sao-img">
+              <span>Hugo</span>
+            </label>
+            <label class="scout-avatar-option">
+              <input type="radio" name="scoutAvatarRadio" value="/assets/scout_lucas.png" style="display: none;">
+              <img src="/assets/scout_lucas.png" alt="Avatar 3" class="sao-img">
+              <span>Lucas</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelEditScoutSettings">Cancelar</button>
+          <button type="submit" class="btn-primary">
+            <i data-lucide="check"></i> Salvar Olheiro
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="vault-toast-container" id="toastContainer"></div>
+
+  <!-- Main JavaScript Application -->
+  <script src="app.js?v=4.3"></script>
+</body>
+</html>
+

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180">
+  <defs>
+    <linearGradient id="bgGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111111" />
+      <stop offset="100%" stop-color="#2c3e50" />
+    </linearGradient>
+    <linearGradient id="goldGrad4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffe259" />
+      <stop offset="100%" stop-color="#ffa751" />
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="6" fill="url(#bgGrad4)" />
+  <polygon points="160,25 163,31 169,32 165,36 166,42 160,39 154,42 155,36 151,32 157,31" fill="url(#goldGrad4)" />
+  <text x="160" y="75" font-family="'Outfit', 'Inter', sans-serif" font-weight="900" font-size="24" fill="url(#goldGrad4)" text-anchor="middle" letter-spacing="3">THE BEST</text>
+  <text x="160" y="108" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="#ffffff" text-anchor="middle" letter-spacing="1">FIFA WORLD CUP DAILY</text>
+  <text x="160" y="135" font-family="'Inter', sans-serif" font-size="9" fill="#99aab5" text-anchor="middle">Acompanhe a corrida pelo topo do mundo</text>
+</svg>

@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" width="320" height="180">
+  <defs>
+    <linearGradient id="bgGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f0c20" />
+      <stop offset="100%" stop-color="#24243e" />
+    </linearGradient>
+    <linearGradient id="glowGrad1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ff007f" />
+      <stop offset="100%" stop-color="#7f00ff" />
+    </linearGradient>
+  </defs>
+  <rect width="320" height="180" rx="6" fill="url(#bgGrad1)" />
+  <path d="M-20 180 L80 80 L180 180 Z" fill="rgba(255, 0, 127, 0.08)" filter="blur(10px)" />
+  <path d="M120 -20 L220 80 L320 -20 Z" fill="rgba(127, 0, 255, 0.08)" filter="blur(10px)" />
+  <text x="160" y="75" font-family="'Outfit', 'Inter', sans-serif" font-weight="900" font-size="22" fill="#ffffff" text-anchor="middle" letter-spacing="1">JUST DO IT.</text>
+  <text x="160" y="105" font-family="'Inter', sans-serif" font-weight="700" font-size="12" fill="url(#glowGrad1)" text-anchor="middle" letter-spacing="4">APRIMORE SEU JOGO</text>
+  <rect x="110" y="125" width="100" height="2" fill="url(#glowGrad1)" />
+</svg>

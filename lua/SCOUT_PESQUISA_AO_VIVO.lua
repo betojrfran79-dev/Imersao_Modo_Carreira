@@ -12,10 +12,11 @@ require 'imports/services/enums'
 local MEMORY = require 'imports/core/memory'
 
 local userprofile = os.getenv('USERPROFILE') or "C:"
-local folder_name = "Imersão_Carreira_FC"
+local folder_name = "Imersao_Modo_Carreira"
 
 local primary_folder = string.format("%s\\Desktop\\%s", userprofile, folder_name)
 local onedrive_folder = string.format("%s\\OneDrive\\Desktop\\%s", userprofile, folder_name)
+local onedrive_pt_folder = string.format("%s\\OneDrive\\Área de Trabalho\\%s", userprofile, folder_name)
 local desktop_pt_folder = string.format("%s\\Área de Trabalho\\%s", userprofile, folder_name)
 
 pcall(function()
@@ -329,5 +330,5 @@ pcall(function()
     end
 end)
 
-local msg = string.format("Base de Scout Live Editor Atualizada com Sucesso!\n\n• Atletas Mapeados: %d\n• Temporada: %d\n• Arquivo: Desktop\\Imersão_Carreira_FC\\SCOUT_LIVE_DATABASE.json\n\nAgora você pode conversar com o seu Olheiro no app!", total_extracted, current_year)
+local msg = string.format("Base de Scout Live Editor Atualizada com Sucesso!\n\n• Atletas Mapeados: %d\n• Temporada: %d\n• Arquivo: Desktop\\Dados_Carreira_FC\\SCOUT_LIVE_DATABASE.json\n\nAgora você pode conversar com o seu Olheiro no app!", total_extracted, current_year)
 MessageBox("🎯 Imersão Modo Carreira - Scout Atualizado", msg)

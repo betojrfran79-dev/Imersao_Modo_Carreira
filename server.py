@@ -340,7 +340,7 @@ pause
         if not os.path.exists(desk):
             continue
             
-        tf = os.path.join(desk, "Imersão_Carreira_FC")
+        tf = os.path.join(desk, "Imersao_Modo_Carreira")
         try:
             os.makedirs(tf, exist_ok=True)
             dest_lua = os.path.join(tf, "EXTRAIR_DADOS_CARREIRA.lua")
@@ -358,23 +358,19 @@ pause
                 deployed_folders.append(tf)
             deployed_files.append(dest_lua)
         except Exception as e:
-            print(f"[Career Vault] Erro ao gravar em {tf}: {e}")
+            print(f"[Imersão Modo Carreira] Erro ao gravar em {tf}: {e}")
 
-        # Limpar e unificar pastas duplicadas/obsoletas no Desktop
+        # Migrar arquivos legados de pastas antigas se existirem
         try:
-            for item in os.listdir(desk):
-                item_path = os.path.join(desk, item)
-                if os.path.isdir(item_path):
-                    if item in ["Imersao_Carreira_FC", "Imersão_Carreira_FC_2"] or (("imers" in item.lower() or "carreira" in item.lower()) and item != "Imersão_Carreira_FC"):
-                        for sub in os.listdir(item_path):
-                            sub_p = os.path.join(item_path, sub)
+            for old_name in ["Imersão_Carreira_FC", "Imersao_Carreira_FC", "Imerso_Carreira_FC", "Imersǜo_Carreira_FC", "Dados_Carreira_FC"]:
+                old_path = os.path.join(desk, old_name)
+                if os.path.exists(old_path) and os.path.isdir(old_path) and old_path != tf:
+                    for sub in os.listdir(old_path):
+                        if sub.endswith((".json", ".csv", ".lua")):
+                            sub_p = os.path.join(old_path, sub)
                             dest_sub_p = os.path.join(tf, sub)
                             if not os.path.exists(dest_sub_p) and os.path.isfile(sub_p):
                                 shutil.copy2(sub_p, dest_sub_p)
-                        try:
-                            shutil.rmtree(item_path)
-                        except Exception:
-                            pass
         except Exception:
             pass
 
@@ -412,7 +408,7 @@ pause
 def open_in_windows_explorer(folder_path):
     if not folder_path:
         desks = get_all_user_desktop_dirs()
-        folder_path = os.path.join(desks[0], "Imersão_Carreira_FC") if desks else r"C:\Users\Roberto\Desktop\Imersão_Carreira_FC"
+        folder_path = os.path.join(desks[0], "Dados_Carreira_FC") if desks else r"C:\Users\Roberto\Desktop\Dados_Carreira_FC"
         
     try:
         norm_p = os.path.normpath(os.path.abspath(folder_path))
@@ -977,7 +973,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
 
                 return self.send_json(cal_data)
 
-            # 15. Importar Backup Automaticamente (Desktop\Imersão_Carreira_FC ou Workspace)
+            # 15. Importar Backup Automaticamente (Desktop\Dados_Carreira_FC ou Workspace)
             if path == "/api/sync/import_desktop":
                 uprof = os.environ.get("USERPROFILE", "C:\\Users\\Roberto")
                 search_roots = [
@@ -991,18 +987,49 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 found_dir = None
                 best_mtime = 0
 
+                known_folders = [
+                    "Imersao_Modo_Carreira",
+                    "Imersão_Modo_Carreira",
+                    "Imersao_Carreira_FC",
+                    "Imersão_Carreira_FC",
+                    "Dados_Carreira_FC"
+                ]
+
+                candidate_filenames = [
+                    "DADOS_CARREIRA.json",
+                    "IMERSAO_MODO_CARREIRA.json",
+                    "FC_CAREER_VAULT_BACKUP.json",
+                    "dados_carreira_sync.json"
+                ]
+
+                # 1. Procurar nas pastas conhecidas oficiais
+                for sroot in search_roots:
+                    if not os.path.exists(sroot):
+                        continue
+                    for kfolder in known_folders:
+                        cand_dir = os.path.join(sroot, kfolder)
+                        if os.path.exists(cand_dir) and os.path.isdir(cand_dir):
+                            for fname in candidate_filenames:
+                                cand = os.path.join(cand_dir, fname)
+                                if os.path.exists(cand):
+                                    mt = os.path.getmtime(cand)
+                                    if mt > best_mtime:
+                                        best_mtime = mt
+                                        target_file = cand
+                                        found_dir = cand_dir
+
+                # 2. Procurar em subpastas com nomes aproximados
                 for root in search_roots:
                     if not os.path.exists(root):
                         continue
-                    # 1. Procurar em subpastas de imersão/carreira
                     try:
                         for d in os.listdir(root):
                             full_d = os.path.join(root, d)
                             if os.path.isdir(full_d):
                                 d_lower = d.lower()
-                                if "imer" in d_lower or "carreira" in d_lower or "fc" in d_lower:
-                                    for tname in ["FC_CAREER_VAULT_BACKUP.json", "dados_carreira_sync.json"]:
-                                        cand = os.path.join(full_d, tname)
+                                if any(k in d_lower for k in ["imer", "modo", "carreira", "fc", "dado"]):
+                                    for fname in candidate_filenames:
+                                        cand = os.path.join(full_d, fname)
                                         if os.path.exists(cand):
                                             mt = os.path.getmtime(cand)
                                             if mt > best_mtime:
@@ -1011,9 +1038,10 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                                                 found_dir = full_d
                     except Exception:
                         pass
-                    # 2. Procurar diretamente na raiz
-                    for tname in ["FC_CAREER_VAULT_BACKUP.json", "dados_carreira_sync.json"]:
-                        cand = os.path.join(root, tname)
+
+                    # 3. Procurar diretamente na raiz
+                    for fname in candidate_filenames:
+                        cand = os.path.join(root, fname)
                         if os.path.exists(cand):
                             mt = os.path.getmtime(cand)
                             if mt > best_mtime:
@@ -1024,7 +1052,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 if not target_file:
                     return self.send_json({
                         "status": "not_found",
-                        "message": "Nenhum arquivo de backup recente encontrado na pasta Imersão_Carreira_FC da Área de Trabalho. Execute o script Lua no Live Editor (F9)."
+                        "message": "Nenhum arquivo de backup recente encontrado na pasta Imersao_Modo_Carreira da Área de Trabalho. Execute o script Lua no Live Editor (F9)."
                     }, 404)
                 
                 with open(target_file, "r", encoding="utf-8", errors="ignore") as f:
@@ -1062,22 +1090,25 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         except Exception as e:
                             print("Aviso ao ler PROXIMOS_JOGOS_CALENDARIO:", e)
 
-                    # Sincronizar Base Master de Scout se existir na pasta
+                    # Sincronizar Base Master de Scout em segundo plano para não travar a resposta da interface
                     scout_path = os.path.join(found_dir, "SCOUT_LIVE_DATABASE.json")
                     if os.path.exists(scout_path):
-                        try:
-                            with open(scout_path, "r", encoding="utf-8", errors="ignore") as sf:
-                                scout_data = json.load(sf)
-                                s_year = scout_data.get("season_year", payload.get("season_year", "2026"))
-                                s_players = scout_data.get("players", [])
-                                if s_players:
-                                    scout_count = database.sync_live_scout_players(save_id, s_players, s_year)
-                        except Exception as e:
-                            print("Aviso ao ler SCOUT_LIVE_DATABASE:", e)
+                        def _bg_scout_sync():
+                            try:
+                                with open(scout_path, "r", encoding="utf-8", errors="ignore") as sf:
+                                    scout_data = json.load(sf)
+                                    s_year = scout_data.get("season_year", payload.get("season_year", "2026"))
+                                    s_players = scout_data.get("players", [])
+                                    if s_players:
+                                        database.sync_live_scout_players(save_id, s_players, s_year)
+                            except Exception as e:
+                                print("Aviso ao ler SCOUT_LIVE_DATABASE:", e)
+                        threading.Thread(target=_bg_scout_sync, daemon=True).start()
+                        scout_count = 1
 
                 return self.send_json({
                     "status": "success",
-                    "message": "Dados reais do jogo importados com sucesso da pasta Imersão_Carreira_FC!",
+                    "message": "Dados reais do jogo importados com sucesso da pasta Dados_Carreira_FC!",
                     "file_path": target_file,
                     "manager_name": payload.get("manager_name", "Técnico"),
                     "team_name": payload.get("team_name", "Clube"),
@@ -1197,10 +1228,18 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             # ========================================================
             if path == "/api/setup/status":
                 uprof = os.environ.get("USERPROFILE", "C:\\Users\\Roberto")
-                desk_folder = os.path.join(uprof, "Desktop", "Imersão_Carreira_FC")
-                onedrive_desk = os.path.join(uprof, "OneDrive", "Desktop", "Imersão_Carreira_FC")
+                desk_folder = os.path.join(uprof, "Desktop", "Dados_Carreira_FC")
+                onedrive_desk = os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC")
+                legacy_desk = os.path.join(uprof, "Desktop", "Imersão_Carreira_FC")
                 
-                active_folder = desk_folder if os.path.exists(desk_folder) else (onedrive_desk if os.path.exists(onedrive_desk) else desk_folder)
+                if os.path.exists(desk_folder):
+                    active_folder = desk_folder
+                elif os.path.exists(onedrive_desk):
+                    active_folder = onedrive_desk
+                elif os.path.exists(legacy_desk):
+                    active_folder = legacy_desk
+                else:
+                    active_folder = desk_folder
                 folder_exists = os.path.exists(active_folder)
 
                 live_files = []
@@ -1262,7 +1301,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
 
 3. ONDE OS DADOS DA SUA CARREIRA FICAM GUARDADOS:
    O script cria e atualiza automaticamente a pasta na sua Área de Trabalho:
-   C:\\Users\\Roberto\\Desktop\\Imersão_Carreira_FC\\
+   C:\\Users\\Roberto\\Desktop\\Dados_Carreira_FC\\
 
    Lá são gerados:
    - jogadores_contratos.csv (Todos os 25.000 jogadores, contratos, atributos e elencos)
@@ -1400,7 +1439,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     fixs = payload.get("upcoming_matches") or payload.get("proximos_jogos") or []
                     database.save_calendar_fixtures(save_id, fixs, payload.get("season_year", "2028"))
                 if payload.get("scout_players"):
-                    database.sync_live_scout_players(save_id, payload.get("scout_players"), payload.get("season_year", "2026"))
+                    threading.Thread(target=database.sync_live_scout_players, args=(save_id, payload.get("scout_players"), payload.get("season_year", "2026")), daemon=True).start()
                 return self.send_json({
                     "status": "success",
                     "message": f"Backup da carreira '{payload.get('team_name', 'Clube')}' importado com sucesso!",
@@ -1653,7 +1692,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     try:
                         for d in os.listdir(root):
                             full_d = os.path.join(root, d)
-                            if os.path.isdir(full_d) and any(k in d.lower() for k in ["imer", "carreira", "fc"]):
+                            if os.path.isdir(full_d) and any(k in d.lower() for k in ["dado", "imer", "carreira", "fc"]):
                                 cand = os.path.join(full_d, "SCOUT_LIVE_DATABASE.json")
                                 if os.path.exists(cand):
                                     mt = os.path.getmtime(cand)
@@ -1672,7 +1711,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 if not target_file:
                     return self.send_json({
                         "status": "not_found",
-                        "message": "Nenhum arquivo SCOUT_LIVE_DATABASE.json encontrado na pasta Imersão_Carreira_FC da Área de Trabalho. Execute o script SCOUT_PESQUISA_AO_VIVO.lua no Live Editor (F9)."
+                        "message": "Nenhum arquivo SCOUT_LIVE_DATABASE.json encontrado na pasta Dados_Carreira_FC da Área de Trabalho. Execute o script SCOUT_PESQUISA_AO_VIVO.lua no Live Editor (F9)."
                     }, 404)
 
                 with open(target_file, "r", encoding="utf-8", errors="ignore") as f:
@@ -2405,9 +2444,17 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                 raw_path = payload.get("folder_path", "").strip() if payload else ""
                 
                 if not raw_path:
-                    desk_candidate = os.path.join(uprof, "Desktop", "Imersão_Carreira_FC")
-                    onedrive_candidate = os.path.join(uprof, "OneDrive", "Desktop", "Imersão_Carreira_FC")
-                    folder_to_open = onedrive_candidate if os.path.exists(onedrive_candidate) else desk_candidate
+                    desk_candidate = os.path.join(uprof, "Desktop", "Dados_Carreira_FC")
+                    onedrive_candidate = os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC")
+                    legacy_candidate = os.path.join(uprof, "Desktop", "Imersão_Carreira_FC")
+                    if os.path.exists(desk_candidate):
+                        folder_to_open = desk_candidate
+                    elif os.path.exists(onedrive_candidate):
+                        folder_to_open = onedrive_candidate
+                    elif os.path.exists(legacy_candidate):
+                        folder_to_open = legacy_candidate
+                    else:
+                        folder_to_open = desk_candidate
                 elif raw_path.lower() in ["lua", "scripts", "app"]:
                     folder_to_open = BASE_DIR
                 else:
@@ -2427,7 +2474,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
             if path == "/api/setup/prepare_desktop_folder":
                 try:
                     deployed_folders, deployed_files = deploy_scripts_to_all_desktops()
-                    primary_folder = deployed_folders[0] if deployed_folders else os.path.join(os.environ.get("USERPROFILE", r"C:\Users\Roberto"), "Desktop", "Imersão_Carreira_FC")
+                    primary_folder = deployed_folders[0] if deployed_folders else os.path.join(os.environ.get("USERPROFILE", r"C:\Users\Roberto"), "Desktop", "Dados_Carreira_FC")
                     opened = open_in_windows_explorer(primary_folder)
                     return self.send_json({
                         "status": "success",
@@ -2435,7 +2482,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                         "deployed_folders": deployed_folders,
                         "total_files_copied": len(deployed_files),
                         "opened": opened,
-                        "message": f"Sucesso! Script EXTRAIR_DADOS_CARREIRA.lua gravado nas pastas da Área de Trabalho ({len(deployed_folders)} pastas atualizadas)."
+                        "message": f"Sucesso! Pasta Dados_Carreira_FC preparada e script EXTRAIR_DADOS_CARREIRA.lua gravado ({len(deployed_folders)} pastas atualizadas)."
                     })
                 except Exception as err:
                     return self.send_json({"status": "error", "message": f"Erro ao preparar pasta: {err}"}, 500)

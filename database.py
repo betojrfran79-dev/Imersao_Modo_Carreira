@@ -64,10 +64,12 @@ def sanitize_date_str(date_str, fallback_year="2026"):
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "career_vault.db")
 
 def get_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    conn = sqlite3.connect(DB_PATH, timeout=60.0)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA busy_timeout = 60000")
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA busy_timeout = 30000")
     return conn
 
 def init_db():
@@ -3909,11 +3911,14 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
     if csv_path:
         search_paths.append(csv_path)
     search_paths.extend([
+        os.path.join(uprof, "Desktop", "Dados_Carreira_FC", "jogadores_contratos.csv"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC", "jogadores_contratos.csv"),
         os.path.join(uprof, "Desktop", "jogadores_contratos.csv"),
         os.path.join(uprof, "Desktop", "Imersão_Carreira_FC", "jogadores_contratos.csv"),
+        os.path.join(uprof, "Desktop", "Imersao_Carreira_FC", "jogadores_contratos.csv"),
         os.path.join(uprof, "OneDrive", "Desktop", "Imersão_Carreira_FC", "jogadores_contratos.csv"),
-        os.path.join(uprof, "OneDrive", "Área de Trabalho", "Imersão_Carreira_FC", "jogadores_contratos.csv"),
-        os.path.join(uprof, "Área de Trabalho", "Imersão_Carreira_FC", "jogadores_contratos.csv"),
+        os.path.join(uprof, "OneDrive", "Área de Trabalho", "Dados_Carreira_FC", "jogadores_contratos.csv"),
+        os.path.join(uprof, "Área de Trabalho", "Dados_Carreira_FC", "jogadores_contratos.csv"),
         os.path.join(BASE_DIR, "jogadores_contratos.csv")
     ])
 
@@ -3940,6 +3945,8 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
     # Carregar atributos reais extraídos pelo Live Editor da tabela players em memória (se disponível)
     live_attrs_map = {}
     json_search_paths = [
+        os.path.join(uprof, "Desktop", "Dados_Carreira_FC", "SCOUT_LIVE_DATABASE.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC", "SCOUT_LIVE_DATABASE.json"),
         os.path.join(uprof, "Desktop", "Imersão_Carreira_FC", "SCOUT_LIVE_DATABASE.json"),
         os.path.join(uprof, "OneDrive", "Desktop", "Imersão_Carreira_FC", "SCOUT_LIVE_DATABASE.json"),
         os.path.join(uprof, "Desktop", "SCOUT_LIVE_DATABASE.json"),
@@ -4653,11 +4660,6 @@ def search_live_scout_players(save_id, params):
     finally:
         conn.close()
 
-# Inicializar tabelas ao importar
+# Inicializar tabelas essenciais ao importar (rápido e seguro)
 init_db()
-recalibrate_and_clean_database()
-try:
-    sync_scout_from_contratos_csv()
-except Exception:
-    pass
 

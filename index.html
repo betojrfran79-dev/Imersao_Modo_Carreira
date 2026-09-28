@@ -198,7 +198,7 @@
               <div class="step-number">1</div>
               <div class="step-title-group">
                 <h3 class="step-title">Pasta de Extração de Dados no seu PC</h3>
-                <p class="step-desc">O aplicativo lê os dados da sua carreira gerados pelo Live Editor diretamente desta pasta no seu computador.</p>
+                <p class="step-desc">O aplicativo lê os dados da sua carreira gerados pelo Live Editor diretamente desta pasta dedicada na Área de Trabalho (separada dos arquivos do programa).</p>
               </div>
             </div>
             
@@ -206,15 +206,15 @@
               <div class="setup-info-box">
                 <div class="info-icon"><i data-lucide="info"></i></div>
                 <div class="info-content">
-                  <strong>Onde os arquivos ficam salvos:</strong>
-                  <p>O Live Editor salva planilhas e relatórios como <code>jogadores_contratos.csv</code> e <code>SCOUT_LIVE_DATABASE.json</code> nesta pasta.</p>
+                  <strong>Pasta exclusiva para dados do save:</strong>
+                  <p>O Live Editor salva planilhas e relatórios como <code>FC_CAREER_VAULT_BACKUP.json</code>, <code>jogadores_contratos.csv</code> e <code>SCOUT_LIVE_DATABASE.json</code> dentro de <code>Dados_Carreira_FC</code>.</p>
                 </div>
               </div>
 
               <div class="path-display-group">
-                <label class="input-label">Caminho da Pasta no seu Computador:</label>
+                <label class="input-label">Caminho da Pasta de Dados no seu Computador:</label>
                 <div class="path-input-wrap">
-                  <input type="text" id="setupFolderPathInput" class="path-input" readonly value="C:\Users\Roberto\Desktop\Imersão_Carreira_FC">
+                  <input type="text" id="setupFolderPathInput" class="path-input" readonly value="C:\Users\Roberto\Desktop\Dados_Carreira_FC">
                   <button class="btn-copy-path" id="btnCopyFolderPath" title="Copiar Caminho">
                     <i data-lucide="copy"></i> Copiar
                   </button>
@@ -223,7 +223,7 @@
 
               <div class="step-actions">
                 <button class="btn-primary" id="btnPrepareDesktopFolder">
-                  <i data-lucide="folder-plus"></i> Criar Pasta & Colocar Scripts no Desktop
+                  <i data-lucide="folder-plus"></i> Criar Pasta Dados_Carreira_FC & Colocar Scripts no Desktop
                 </button>
               </div>
             </div>
@@ -1898,7 +1898,7 @@
           <div class="sac-icon"><i data-lucide="zap"></i></div>
           <div class="sac-content">
             <h4>Sincronizar do Desktop (1 Clique)</h4>
-            <p>Lê automaticamente o arquivo <code>FC_CAREER_VAULT_BACKUP.json</code> gerado na Área de Trabalho.</p>
+            <p>Lê automaticamente o arquivo <code>FC_CAREER_VAULT_BACKUP.json</code> da pasta <code>Dados_Carreira_FC</code> na Área de Trabalho.</p>
           </div>
           <button class="btn-primary" style="margin-top: 0.75rem; width: 100%;">
             <i data-lucide="refresh-cw"></i> Sincronizar Agora

@@ -16,14 +16,14 @@ local MEMORY = require 'imports/core/memory'
 -- CONFIGURAÇÕES DE DIRETÓRIOS E API
 -- ------------------------------------------------------------------------------
 local userprofile = os.getenv('USERPROFILE') or "C:"
-local folder_name = "Imersão_Carreira_FC"
+local folder_name = "Imersao_Modo_Carreira"
 
 local primary_folder = string.format("%s\\Desktop\\%s", userprofile, folder_name)
 local onedrive_folder = string.format("%s\\OneDrive\\Desktop\\%s", userprofile, folder_name)
 local onedrive_pt_folder = string.format("%s\\OneDrive\\Área de Trabalho\\%s", userprofile, folder_name)
 local desktop_pt_folder = string.format("%s\\Área de Trabalho\\%s", userprofile, folder_name)
 
--- Criar pasta no Desktop
+-- Criar pasta oficial no Desktop
 pcall(function()
     os.execute(string.format('mkdir "%s" 2>nul', primary_folder))
     os.execute(string.format('mkdir "%s" 2>nul', onedrive_folder))
@@ -46,7 +46,7 @@ local VAULT_CONFIG = {
     API_URL_FULL = "http://localhost:8000/api/sync/full",
     SAVE_ID = "carreira_ativa",
     TARGET_DIR = target_folder,
-    BACKUP_FILE = string.format("%s\\FC_CAREER_VAULT_BACKUP.json", target_folder)
+    BACKUP_FILE = string.format("%s\\DADOS_CARREIRA.json", target_folder)
 }
 
 LOGGER:LogInfo("==================================================================")
@@ -1277,8 +1277,16 @@ function ExtractAndSyncFullCareer(is_silent)
     
     local backup_locations = {
         VAULT_CONFIG.BACKUP_FILE,
+        string.format("%s\\FC_CAREER_VAULT_BACKUP.json", target_folder),
+        string.format("%s\\Desktop\\Imersao_Modo_Carreira\\DADOS_CARREIRA.json", userprofile),
+        string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\DADOS_CARREIRA.json", userprofile),
+        string.format("%s\\Desktop\\Imersao_Modo_Carreira\\FC_CAREER_VAULT_BACKUP.json", userprofile),
+        string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\FC_CAREER_VAULT_BACKUP.json", userprofile),
         string.format("%s\\Desktop\\Imersão_Carreira_FC\\FC_CAREER_VAULT_BACKUP.json", userprofile),
         string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\FC_CAREER_VAULT_BACKUP.json", userprofile),
+        string.format("%s\\Desktop\\Dados_Carreira_FC\\FC_CAREER_VAULT_BACKUP.json", userprofile),
+        string.format("%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\FC_CAREER_VAULT_BACKUP.json", userprofile),
+        "DADOS_CARREIRA.json",
         "dados_carreira_sync.json",
         "FC_CAREER_VAULT_BACKUP.json"
     }
@@ -1290,7 +1298,7 @@ function ExtractAndSyncFullCareer(is_silent)
             f:write(json_str)
             f:close()
             saved_path = loc
-            LOGGER:LogInfo(string.format("[Career Vault] 💾 Backup completo salvo em: %s", loc))
+            LOGGER:LogInfo(string.format("[Imersão Modo Carreira] 💾 Backup completo salvo em: %s", loc))
         end
     end
 
@@ -1309,8 +1317,12 @@ function ExtractAndSyncFullCareer(is_silent)
             local cal_json = json.encode(cal_payload)
             local cal_locations = {
                 string.format("%s\\PROXIMOS_JOGOS_CALENDARIO.json", VAULT_CONFIG.TARGET_DIR),
+                string.format("%s\\Desktop\\Imersao_Modo_Carreira\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
+                string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
                 string.format("%s\\Desktop\\Imersão_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
                 string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
+                string.format("%s\\Desktop\\Dados_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
+                string.format("%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
                 "PROXIMOS_JOGOS_CALENDARIO.json"
             }
             for _, cloc in ipairs(cal_locations) do
@@ -1318,7 +1330,7 @@ function ExtractAndSyncFullCareer(is_silent)
                 if cf then
                     cf:write(cal_json)
                     cf:close()
-                    LOGGER:LogInfo(string.format("[Career Vault] 📅 Calendário de Próximos Jogos exportado: %s", cloc))
+                    LOGGER:LogInfo(string.format("[Imersão Modo Carreira] 📅 Calendário de Próximos Jogos exportado: %s", cloc))
                 end
             end
         end
@@ -1337,8 +1349,12 @@ function ExtractAndSyncFullCareer(is_silent)
             local scout_json = json.encode(scout_payload)
             local scout_locations = {
                 string.format("%s\\SCOUT_LIVE_DATABASE.json", VAULT_CONFIG.TARGET_DIR),
+                string.format("%s\\Desktop\\Imersao_Modo_Carreira\\SCOUT_LIVE_DATABASE.json", userprofile),
+                string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\SCOUT_LIVE_DATABASE.json", userprofile),
                 string.format("%s\\Desktop\\Imersão_Carreira_FC\\SCOUT_LIVE_DATABASE.json", userprofile),
                 string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\SCOUT_LIVE_DATABASE.json", userprofile),
+                string.format("%s\\Desktop\\Dados_Carreira_FC\\SCOUT_LIVE_DATABASE.json", userprofile),
+                string.format("%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\SCOUT_LIVE_DATABASE.json", userprofile),
                 "SCOUT_LIVE_DATABASE.json"
             }
             for _, sloc in ipairs(scout_locations) do
@@ -1346,14 +1362,17 @@ function ExtractAndSyncFullCareer(is_silent)
                 if sf then
                     sf:write(scout_json)
                     sf:close()
-                    LOGGER:LogInfo(string.format("[Career Vault] 🎯 Base Master de Scout Live (%d atletas) salva em: %s", #scout_all_players, sloc))
+                    LOGGER:LogInfo(string.format("[Imersão Modo Carreira] 🎯 Base Master de Scout Live (%d atletas) salva em: %s", #scout_all_players, sloc))
                 end
             end
 
-            -- Exportar jogadores_contratos.csv na pasta Imersão_Carreira_FC (apenas no início de cada mês do calendário)
+            -- Exportar jogadores_contratos.csv
             local csv_contratos_locations = {
                 string.format("%s\\jogadores_contratos.csv", VAULT_CONFIG.TARGET_DIR),
+                string.format("%s\\Desktop\\Imersao_Modo_Carreira\\jogadores_contratos.csv", userprofile),
+                string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\jogadores_contratos.csv", userprofile),
                 string.format("%s\\Desktop\\jogadores_contratos.csv", userprofile),
+                string.format("%s\\OneDrive\\Desktop\\jogadores_contratos.csv", userprofile),
                 string.format("%s\\Desktop\\Imersão_Carreira_FC\\jogadores_contratos.csv", userprofile),
                 string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\jogadores_contratos.csv", userprofile)
             }

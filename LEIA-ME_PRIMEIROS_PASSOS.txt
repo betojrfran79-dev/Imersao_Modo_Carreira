@@ -1,0 +1,31 @@
+==============================================================================
+🏆 IMERSAO MODO CARREIRA - EA FC & FC MANIA
+==============================================================================
+
+COMO INSTALAR (FEITO APENAS UMA VEZ):
+
+1. Extraia todo o conteudo deste arquivo ZIP em qualquer pasta do seu PC
+   (Exemplo: C:\Imersao_Modo_Carreira ou dentro da sua pasta Documentos).
+
+2. Entre na pasta extraida e de DOIS CLIQUES no arquivo:
+   👉 INSTALAR_PRIMEIRA_VEZ.bat
+
+3. Pronto! O atalho oficial com o icone do app sera criado automaticamente
+   na sua Area de Trabalho e tambem dentro desta pasta.
+   (Se preferir, voce tambem pode clicar com o botao direito no atalho
+   'Imersao Modo Carreira - EA FC' e escolher 'Enviar para > Area de trabalho').
+
+COMO USAR NO DIA A DIA:
+- De dois cliques no atalho 'Imersao Modo Carreira - EA FC' na sua Area de Trabalho.
+- O navegador abrira automaticamente ja com o aplicativo pronto para uso!
+- NAO e necessario instalar o Python (o interpretador portatil ja vem incluso).
+
+COMO SINCRONIZAR COM O SEU JOGO (LIVE EDITOR):
+1. Com o EA FC aberto no seu Modo Carreira, aperte F9 para abrir o Live Editor.
+2. Va na aba de scripts Lua e execute o arquivo EXTRAIR_DADOS_CARREIRA.lua.
+3. O script criara na sua Area de Trabalho a pasta 'Imersao_Modo_Carreira'
+   com o seu arquivo 'DADOS_CARREIRA.json'.
+4. No aplicativo, clique no botao 'Sincronizar' (ou apenas recarregue a pagina).
+   Todos os seus dados reais de elenco, tabela e partidas serao carregados!
+
+==============================================================================

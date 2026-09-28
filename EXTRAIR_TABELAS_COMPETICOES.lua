@@ -15,7 +15,7 @@ require 'imports/http/request'
 require 'imports/http/enums'
 
 local userprofile = os.getenv('USERPROFILE') or 'C:\\Users\\Roberto'
-local OUTPUT_DIR = string.format('%s\\Desktop\\Imersão_Carreira_FC', userprofile)
+local OUTPUT_DIR = string.format('%s\\Desktop\\Imersao_Modo_Carreira', userprofile)
 local OUTPUT_JSON = string.format('%s\\TABELAS_COMPETICOES.json', OUTPUT_DIR)
 local OUTPUT_CSV  = string.format('%s\\TABELAS_COMPETICOES.csv', OUTPUT_DIR)
 
@@ -449,6 +449,10 @@ function ExtractCareerStandings()
     -- Salvar Arquivos JSON em múltiplos destinos seguros
     local target_paths = {
         OUTPUT_JSON,
+        string.format('%s\\Desktop\\Imersao_Modo_Carreira\\TABELAS_COMPETICOES.json', userprofile),
+        string.format('%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\TABELAS_COMPETICOES.json', userprofile),
+        string.format('%s\\Desktop\\Dados_Carreira_FC\\TABELAS_COMPETICOES.json', userprofile),
+        string.format('%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\TABELAS_COMPETICOES.json', userprofile),
         string.format('%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\TABELAS_COMPETICOES.json', userprofile),
         'TABELAS_COMPETICOES.json'
     }

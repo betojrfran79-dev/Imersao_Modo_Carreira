@@ -20,7 +20,7 @@ LOGGER:LogInfo("================================================================
 
 -- 1. Resolução do Diretório de Destino
 local userprofile = os.getenv('USERPROFILE') or "C:"
-local folder_name = "Imersão_Carreira_FC"
+local folder_name = "Imersao_Modo_Carreira"
 
 local primary_folder = string.format("%s\\Desktop\\%s", userprofile, folder_name)
 local onedrive_folder = string.format("%s\\OneDrive\\Desktop\\%s", userprofile, folder_name)
@@ -304,6 +304,10 @@ local function ExtractUpcomingMatches()
 
     local target_paths = {
         OUTPUT_FILE,
+        string.format("%s\\Desktop\\Imersao_Modo_Carreira\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
+        string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
+        string.format("%s\\Desktop\\Dados_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
+        string.format("%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
         string.format("%s\\Desktop\\Imersão_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
         string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
         "PROXIMOS_JOGOS_CALENDARIO.json"

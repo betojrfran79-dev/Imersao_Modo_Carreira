@@ -81,6 +81,9 @@ document.addEventListener("DOMContentLoaded", () => {
   loadOpponentsList();
   loadScoutHubData();
   loadSetupStatus();
+
+  // Sincronização automática inicial com dados do Desktop se disponíveis
+  checkAndAutoSyncDesktop();
 });
 
 function initLucideIcons() {
@@ -2600,6 +2603,40 @@ async function initSettings() {
 // -------------------------------------------------------------
 // 13. BOTÃO E MODAL DE SINCRONIZAÇÃO & BACKUP DA CARREIRA
 // -------------------------------------------------------------
+async function refreshAllData() {
+  try {
+    await Promise.allSettled([
+      loadDashboardData(),
+      loadManagerData(),
+      loadSeasonsList(),
+      loadCalendarData(),
+      loadSquadData(),
+      loadTransfersData(),
+      loadFinancesData(),
+      loadHallOfFameData(),
+      loadOpponentsList(),
+      loadScoutHubData(),
+      loadSetupStatus()
+    ]);
+    initLucideIcons();
+  } catch (e) {
+    console.warn("Aviso ao atualizar dados:", e);
+  }
+}
+
+async function checkAndAutoSyncDesktop() {
+  try {
+    const res = await fetch("/api/sync/import_desktop");
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      console.log(`[AutoSync] Carreira sincronizada automaticamente: ${data.team_name} (${data.manager_name})`);
+      await refreshAllData();
+    }
+  } catch (err) {
+    // Silencioso se não houver arquivo no Desktop
+  }
+}
+
 function initManualSyncButton() {
   const btn = document.getElementById("btnManualSync");
   const modal = document.getElementById("syncModal");
@@ -2625,7 +2662,7 @@ function initManualSyncButton() {
           const bannerText = document.getElementById("syncFeedbackText");
           if (banner && bannerText) {
             banner.className = "sync-feedback-banner error";
-            bannerText.textContent = `⚠️ ${data.message || "Nenhum arquivo de backup recente encontrado na pasta Imersão_Carreira_FC da Área de Trabalho. Execute o script Lua no Live Editor (F9)."}`;
+            bannerText.textContent = `⚠️ ${data.message || "Nenhum arquivo de backup recente encontrado na pasta Dados_Carreira_FC da Área de Trabalho. Execute o script Lua no Live Editor (F9)."}`;
             banner.style.display = "flex";
           }
         }
@@ -2719,7 +2756,7 @@ function initSyncModal() {
           }, 1800);
         } else {
           banner.className = "sync-feedback-banner error";
-          bannerText.textContent = `⚠️ ${data.message || "Arquivo de backup não encontrado na pasta Imersão_Carreira_FC da Área de Trabalho. Execute o script Lua no Live Editor (F9)."}`;
+          bannerText.textContent = `⚠️ ${data.message || "Arquivo de backup não encontrado na pasta Dados_Carreira_FC da Área de Trabalho. Execute o script Lua no Live Editor (F9)."}`;
           banner.style.display = "flex";
           showToast("Nenhum backup recente encontrado na Área de Trabalho", "error");
         }
@@ -6507,14 +6544,14 @@ function initSetupWizard() {
   const btnPrepDesk = document.getElementById("btnPrepareDesktopFolder");
   if (btnPrepDesk) {
     btnPrepDesk.addEventListener("click", async () => {
-      showToast("⚙️ Criando pasta Imersão_Carreira_FC e gravando EXTRAIR_DADOS_CARREIRA.lua no Desktop...", 3000);
+      showToast("⚙️ Criando pasta Dados_Carreira_FC e gravando EXTRAIR_DADOS_CARREIRA.lua no Desktop...", 3000);
       try {
         const resp = await fetch(`${API_BASE}/setup/prepare_desktop_folder`, {
           method: "POST",
           headers: { "Content-Type": "application/json" }
         });
         const data = await resp.json();
-        showToast(data.message || "Pasta Imersão_Carreira_FC criada e script EXTRAIR_DADOS_CARREIRA.lua copiado com sucesso!", 5000);
+        showToast(data.message || "Pasta Dados_Carreira_FC criada e script EXTRAIR_DADOS_CARREIRA.lua copiado com sucesso!", 5000);
         loadSetupStatus();
       } catch (err) {
         showToast("Erro ao preparar pasta: " + err.message);

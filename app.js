@@ -6095,6 +6095,14 @@ function renderScoutPlayerCards(players, source = "live_editor") {
 }
 
 window.executeManualScoutSearch = async function() {
+  const btn = document.getElementById("btnSearchScoutManual");
+  const originalBtnHtml = btn ? btn.innerHTML : "";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader" class="spin"></i> Buscando no mercado...`;
+    if (typeof initLucideIcons === "function") initLucideIcons();
+  }
+
   const getVal = (id) => {
     const el = document.getElementById(id);
     return el ? el.value.trim() : "";
@@ -6107,6 +6115,7 @@ window.executeManualScoutSearch = async function() {
   const nameVal = getVal("filterScoutName");
   const posVal = getVal("filterScoutPos");
   const natVal = getVal("filterScoutNationality");
+  const genderVal = getVal("filterScoutGender");
   const minOvr = getNum("filterScoutMinOvr");
   const maxOvr = getNum("filterScoutMaxOvr");
   const minPot = getNum("filterScoutMinPot");
@@ -6135,6 +6144,7 @@ window.executeManualScoutSearch = async function() {
   if (nameVal) params.append("q", nameVal);
   if (posVal) params.append("positions", posVal);
   if (natVal) params.append("nationality_id", natVal);
+  if (genderVal !== "") params.append("gender", genderVal);
   if (minOvr !== null) params.append("min_ovr", minOvr);
   if (maxOvr !== null) params.append("max_ovr", maxOvr);
   if (minPot !== null) params.append("min_pot", minPot);
@@ -6157,16 +6167,38 @@ window.executeManualScoutSearch = async function() {
   if (maxHead !== null) params.append("max_heading", maxHead);
   if (maxPrice !== null) params.append("max_price", maxPrice);
   if (isWonderkid) params.append("is_wonderkid", "1");
-  params.append("limit", "24");
+  params.append("limit", "30");
 
   try {
     const resp = await fetch(`${API_BASE}/scout/search?${params.toString()}`);
     const data = await resp.json();
     if (resp.ok && data) {
-      renderScoutPlayerCards(data.players || [], data.source || "live_editor");
+      const players = data.players || [];
+      renderScoutPlayerCards(players, data.source || "live_editor");
+      
+      if (players.length > 0) {
+        showToast(`🎯 Encontrados ${players.length} atletas correspondentes.`);
+      } else {
+        showToast(`⚠️ Nenhum atleta encontrado com esses filtros.`);
+      }
+
+      // Rolar suavemente para a área de resultados
+      const resultsEl = document.querySelector(".scout-results-card");
+      if (resultsEl) {
+        resultsEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    } else {
+      showToast("Erro ao realizar busca de scout.");
     }
   } catch (err) {
     console.error("Erro na busca manual de scout:", err);
+    showToast("Falha de conexão com o servidor de busca.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = originalBtnHtml;
+      if (typeof initLucideIcons === "function") initLucideIcons();
+    }
   }
 };
 

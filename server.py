@@ -1182,6 +1182,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     "query": query.get("q", [""])[0].strip(),
                     "positions": query.get("positions", [""])[0].strip() or None,
                     "nationality_id": query.get("nationality_id", [None])[0],
+                    "gender": int(query.get("gender", [0])[0]),
                     "min_ovr": query.get("min_ovr", [None])[0],
                     "max_ovr": query.get("max_ovr", [None])[0],
                     "min_pot": query.get("min_pot", [None])[0],
@@ -1223,6 +1224,23 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     if not players or len(players) == 0:
                         players = fcm_resolver.search_scout_players(search_params)
                         source = "fcm_database"
+
+                if not players:
+                    players = []
+
+                for p in players:
+                    pid = p.get("player_id", 0)
+                    if not p.get("head_url"):
+                        p["head_url"] = fcm_resolver.get_head_image_path_or_url(pid)
+                    if not p.get("crest_url") and p.get("team_id"):
+                        p["crest_url"] = fcm_resolver.get_crest_image_path_or_url(p["team_id"])
+
+                return self.send_json({
+                    "status": "success",
+                    "players": players,
+                    "count": len(players),
+                    "source": source
+                })
 
             # ========================================================
             # SETUP / GUIA DE INÍCIO RÁPIDO & STATUS DO SISTEMA

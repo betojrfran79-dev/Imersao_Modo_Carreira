@@ -5310,14 +5310,15 @@ function speakScoutReply(text) {
 
     if (!cleanText) return;
 
+    const curLang = window.i18n ? window.i18n.getLanguage() : "pt";
     const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = "pt-BR";
+    utterance.lang = curLang === 'en' ? "en-US" : (curLang === 'es' ? "es-ES" : "pt-BR");
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
 
     const voices = window.speechSynthesis.getVoices();
-    const ptVoice = voices.find(v => v.lang === "pt-BR" || v.lang === "pt_BR" || v.lang.startsWith("pt"));
-    if (ptVoice) utterance.voice = ptVoice;
+    const langVoice = voices.find(v => v.lang.toLowerCase().startsWith(curLang));
+    if (langVoice) utterance.voice = langVoice;
 
     window.speechSynthesis.speak(utterance);
   } catch (err) {
@@ -5385,7 +5386,8 @@ function initScoutHub() {
 
   if (SpeechRec && btnVoice) {
     scoutSpeechRecognition = new SpeechRec();
-    scoutSpeechRecognition.lang = "pt-BR";
+    const curAppLang = window.i18n ? window.i18n.getLanguage() : "pt";
+    scoutSpeechRecognition.lang = curAppLang === 'en' ? "en-US" : (curAppLang === 'es' ? "es-ES" : "pt-BR");
     scoutSpeechRecognition.continuous = true;
     scoutSpeechRecognition.interimResults = true;
     scoutSpeechRecognition.maxAlternatives = 1;
@@ -5394,12 +5396,14 @@ function initScoutHub() {
       isVoiceRecording = true;
       btnVoice.classList.add("is-recording");
       btnVoice.innerHTML = `<i data-lucide="mic-off"></i>`;
-      btnVoice.title = "Gravando voz... Pode falar com pausas de até 3s (Clique para enviar agora)";
+      const activeLang = window.i18n ? window.i18n.getLanguage() : "pt";
+      scoutSpeechRecognition.lang = activeLang === 'en' ? "en-US" : (activeLang === 'es' ? "es-ES" : "pt-BR");
+      btnVoice.title = window.i18n ? window.i18n.t("scout.listening", "Gravando voz... Pode falar com pausas de até 3s") : "Gravando voz...";
       if (inputScoutMessage) {
-        inputScoutMessage.placeholder = "🎙️ Ouvindo... Fale sua frase com calma (espera até 3s de pausa)...";
+        inputScoutMessage.placeholder = activeLang === 'en' ? "🎙️ Listening... Speak your request naturally..." : (activeLang === 'es' ? "🎙️ Escuchando... Di tu pedido con tranquilidad..." : "🎙️ Ouvindo... Fale sua frase com calma (espera até 3s de pausa)...");
       }
       initLucideIcons();
-      showToast("🎙️ Microfone ativo! Fale à vontade (espera até 3 segundos de pausa)...", "info");
+      showToast(window.i18n ? window.i18n.t("scout.micActiveToast", "🎙️ Microfone ativo! Fale à vontade...") : "🎙️ Microfone ativo!", "info");
     };
 
     scoutSpeechRecognition.onresult = (event) => {
@@ -5772,7 +5776,8 @@ async function sendScoutChatMessage(userMsg) {
         persona_id: currentActivePersona,
         scout_name: scoutSettingsCache.scout_name,
         scout_role: scoutSettingsCache.scout_role,
-        scout_avatar: scoutSettingsCache.scout_avatar
+        scout_avatar: scoutSettingsCache.scout_avatar,
+        language: window.i18n ? window.i18n.getLanguage() : "pt"
       })
     });
 
@@ -6704,7 +6709,37 @@ async function loadSetupStatus() {
   }
 }
 
+// ==============================================================================
+// 🌐 LISTENER GLOBAL DE INTERNACIONALIZAÇÃO (i18n)
+// Re-renderiza o conteúdo da aba ativa imediatamente ao alternar idioma
+// ==============================================================================
+window.addEventListener("appLanguageChanged", (e) => {
+  const newLang = e.detail ? e.detail.lang : "pt";
+  console.log(`[i18n] Idioma alterado para: ${newLang}`);
 
+  if (scoutSpeechRecognition) {
+    scoutSpeechRecognition.lang = newLang === 'en' ? 'en-US' : (newLang === 'es' ? 'es-ES' : 'pt-BR');
+  }
 
+  // Atualizar textos e tooltips na tela inteira
+  if (window.i18n) {
+    window.i18n.applyToDOM();
+  }
 
+  // Notificar usuário com Toast elegante no novo idioma
+  const toastMsg = newLang === 'en' ? "Language changed to English 🇺🇸" : (newLang === 'es' ? "Idioma cambiado a Español 🇪🇸" : "Idioma alterado para Português 🇧🇷");
+  showToast(toastMsg, "success");
 
+  // Re-renderizar aba ativa
+  const activeTabBtn = document.querySelector(".nav-item.active");
+  const activeTab = activeTabBtn ? activeTabBtn.getAttribute("data-tab") : "dashboard";
+  if (activeTab === "dashboard") loadDashboardData();
+  else if (activeTab === "squad") loadSquadData();
+  else if (activeTab === "calendar") loadCalendarData();
+  else if (activeTab === "manager") loadManagerData();
+  else if (activeTab === "seasons") loadSeasonsData();
+  else if (activeTab === "transfers") loadTransfersData();
+  else if (activeTab === "scout") loadScoutHubData();
+  else if (activeTab === "finances") loadFinancesData();
+  else if (activeTab === "setup") loadSetupStatus();
+});

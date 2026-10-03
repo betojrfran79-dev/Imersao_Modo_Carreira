@@ -1981,182 +1981,391 @@ NATIONALITY_DISPLAY_MAP = {
     50: "País de Gales 🏴󠁧󠁢󠁷󠁬󠁳󠁿"
 }
 
-def build_criteria_summary(params):
+def build_criteria_summary(params, language="pt"):
     """
-    Gera uma lista estruturada de critérios reconhecidos para exibição em chips visuais.
+    Gera uma lista estruturada de critérios reconhecidos para exibição em chips visuais
+    com suporte multilíngue em Português (PT), Inglês (EN) e Espanhol (ES).
     """
+    lang = (language or "pt").lower()
     criteria = []
     
+    labels = {
+        "pt": {
+            "gender_m": "Futebol Masculino 👨", "gender_f": "Futebol Feminino 👩", "gender_lbl": "Categoria",
+            "pos_lbl": "Posição", "sector_lbl": "Setor",
+            "league_lbl": "Campeonato", "country_lbl": "País de Atuação", "nat_lbl": "Nacionalidade",
+            "ovr_lbl": "Overall", "pot_lbl": "Potencial", "age_lbl": "Idade", "price_lbl": "Teto de Preço",
+            "foot_lbl": "Pé Preferencial", "pace_lbl": "Velocidade", "finish_lbl": "Finalização",
+            "pass_lbl": "Passe & Visão", "drib_lbl": "Drible", "def_lbl": "Defesa", "phy_lbl": "Físico",
+            "head_lbl": "Cabeceio", "skill_lbl": "Fintas", "weak_lbl": "Perna Ruim", "height_lbl": "Estatura",
+            "name_lbl": "Nome", "wonderkid_val": "Promessa / Wonderkid ⭐", "wonderkid_lbl": "Especial",
+            "exact": "Exato", "between": "Entre", "min": "Mínimo", "max": "Até", "years": "anos", "from": "A partir de"
+        },
+        "en": {
+            "gender_m": "Men's Football 👨", "gender_f": "Women's Football 👩", "gender_lbl": "Category",
+            "pos_lbl": "Position", "sector_lbl": "Sector",
+            "league_lbl": "League", "country_lbl": "Playing Country", "nat_lbl": "Nationality",
+            "ovr_lbl": "Overall", "pot_lbl": "Potential", "age_lbl": "Age", "price_lbl": "Max Budget",
+            "foot_lbl": "Preferred Foot", "pace_lbl": "Pace", "finish_lbl": "Finishing",
+            "pass_lbl": "Passing & Vision", "drib_lbl": "Dribbling", "def_lbl": "Defending", "phy_lbl": "Physical",
+            "head_lbl": "Heading", "skill_lbl": "Skill Moves", "weak_lbl": "Weak Foot", "height_lbl": "Height",
+            "name_lbl": "Player Name", "wonderkid_val": "Wonderkid / Future Star ⭐", "wonderkid_lbl": "Special",
+            "exact": "Exact", "between": "Between", "min": "Min", "max": "Up to", "years": "yrs", "from": "From"
+        },
+        "es": {
+            "gender_m": "Fútbol Masculino 👨", "gender_f": "Fútbol Femenino 👩", "gender_lbl": "Categoría",
+            "pos_lbl": "Posición", "sector_lbl": "Sector",
+            "league_lbl": "Liga / Torneo", "country_lbl": "País de Actuación", "nat_lbl": "Nacionalidad",
+            "ovr_lbl": "Overall", "pot_lbl": "Potencial", "age_lbl": "Edad", "price_lbl": "Presupuesto Máx.",
+            "foot_lbl": "Pie Preferido", "pace_lbl": "Ritmo / Velocidad", "finish_lbl": "Definición",
+            "pass_lbl": "Pase y Visión", "drib_lbl": "Regate", "def_lbl": "Defensa", "phy_lbl": "Físico",
+            "head_lbl": "Cabezazo", "skill_lbl": "Filigranas", "weak_lbl": "Pierna Mala", "height_lbl": "Estatura",
+            "name_lbl": "Nombre", "wonderkid_val": "Joya / Promesa Mundial ⭐", "wonderkid_lbl": "Especial",
+            "exact": "Exacto", "between": "Entre", "min": "Mínimo", "max": "Hasta", "years": "años", "from": "Desde"
+        }
+    }
+    L = labels.get(lang, labels["pt"])
+
     # 0. Gênero
     gender_req = params.get("gender", 0)
-    if gender_req == 1:
-        criteria.append({"key": "gender", "label": "Categoria", "value": "Futebol Feminino 👩", "icon": "users"})
-    else:
-        criteria.append({"key": "gender", "label": "Categoria", "value": "Futebol Masculino 👨", "icon": "users"})
+    criteria.append({
+        "key": "gender",
+        "label": L["gender_lbl"],
+        "value": L["gender_f"] if gender_req == 1 else L["gender_m"],
+        "icon": "users"
+    })
 
-    # 1. Setor / Posições
+    # 1. Posições
     positions = params.get("positions")
     if positions:
-        pos_set = set(positions)
-        if pos_set == {"ST", "CF"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Centroavante / Atacante (ATA, SA)", "icon": "crosshair"})
-        elif pos_set == {"LW", "RW", "LM", "RM"}:
-            criteria.append({"key": "position", "label": "Setor", "value": "Pontas / Extremos (PE, PD)", "icon": "wind"})
-        elif pos_set == {"ST", "CF", "LW", "RW", "LM", "RM"}:
-            criteria.append({"key": "position", "label": "Setor", "value": "Ataque Geral (ATA, Pontas)", "icon": "zap"})
-        elif pos_set == {"CAM", "CM", "CDM", "LM", "RM"}:
-            criteria.append({"key": "position", "label": "Setor", "value": "Meio-Campo Geral (MEI, MC, VOL)", "icon": "compass"})
-        elif pos_set == {"CAM", "CM"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Meia Central / Criação (MEI, MC)", "icon": "sparkles"})
-        elif pos_set == {"CAM"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Meia Atacante / Armador (MEI)", "icon": "sparkles"})
-        elif pos_set == {"CDM", "CM"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Volante / Marcador (VOL, MC)", "icon": "shield"})
-        elif pos_set == {"CB"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Zagueiro Central (ZAG)", "icon": "shield-check"})
-        elif pos_set == {"LB", "RB", "LWB", "RWB"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Laterais / Alas (LE, LD)", "icon": "chevrons-left-right"})
-        elif pos_set == {"LB", "LWB"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Lateral Esquerdo (LE)", "icon": "arrow-left"})
-        elif pos_set == {"RB", "RWB"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Lateral Direito (LD)", "icon": "arrow-right"})
-        elif pos_set == {"GK"}:
-            criteria.append({"key": "position", "label": "Posição", "value": "Goleiro (GOL)", "icon": "hand"})
-        else:
-            criteria.append({"key": "position", "label": "Posições", "value": ", ".join(positions), "icon": "crosshair"})
+        pos_str = ", ".join(positions) if isinstance(positions, list) else str(positions)
+        criteria.append({"key": "position", "label": L["pos_lbl"], "value": pos_str, "icon": "crosshair"})
 
-    # 2. País onde atua ou Campeonato
+    # 2. Liga / País
     if params.get("league_name"):
-        criteria.append({"key": "league", "label": "Campeonato", "value": params["league_name"], "icon": "trophy"})
+        criteria.append({"key": "league", "label": L["league_lbl"], "value": params["league_name"], "icon": "trophy"})
     elif params.get("club_country_name"):
-        criteria.append({"key": "club_country", "label": "País de Atuação", "value": params["club_country_name"], "icon": "map-pin"})
+        criteria.append({"key": "club_country", "label": L["country_lbl"], "value": params["club_country_name"], "icon": "map-pin"})
 
-    # 2.1 Nacionalidade
+    # 3. Nacionalidade
     nat_id = params.get("nationality_id")
     if nat_id:
         nat_display = NATIONALITY_DISPLAY_MAP.get(nat_id, params.get("nationality_name", f"Nac. #{nat_id}"))
-        criteria.append({"key": "nationality", "label": "Nacionalidade", "value": nat_display, "icon": "globe"})
+        criteria.append({"key": "nationality", "label": L["nat_lbl"], "value": nat_display, "icon": "globe"})
+    elif params.get("nationality_name"):
+        criteria.append({"key": "nationality", "label": L["nat_lbl"], "value": params["nationality_name"], "icon": "globe"})
 
-    # 3. Overall
+    # 4. Overall
     min_o = params.get("min_ovr")
     max_o = params.get("max_ovr")
     if min_o and max_o:
-        if min_o == max_o:
-            criteria.append({"key": "ovr", "label": "Overall", "value": f"Exato {min_o}", "icon": "award"})
-        else:
-            criteria.append({"key": "ovr", "label": "Overall", "value": f"Entre {min_o} e {max_o}", "icon": "award"})
+        criteria.append({"key": "ovr", "label": L["ovr_lbl"], "value": f"{L['between']} {min_o} - {max_o}", "icon": "award"})
     elif min_o:
-        criteria.append({"key": "ovr", "label": "Overall", "value": f"Mínimo {min_o}", "icon": "award"})
+        criteria.append({"key": "ovr", "label": L["ovr_lbl"], "value": f"{L['min']} {min_o}", "icon": "award"})
     elif max_o:
-        criteria.append({"key": "ovr", "label": "Overall", "value": f"Até {max_o}", "icon": "award"})
+        criteria.append({"key": "ovr", "label": L["ovr_lbl"], "value": f"{L['max']} {max_o}", "icon": "award"})
 
-    # 4. Potencial
-    min_p = params.get("min_pot")
-    if min_p:
-        criteria.append({"key": "pot", "label": "Potencial", "value": f"Mínimo {min_p}", "icon": "trending-up"})
-
-    # 5. Atributos
-    if params.get("min_pace") or params.get("max_pace"):
-        p_min, p_max = params.get("min_pace"), params.get("max_pace")
-        val = f"Entre {p_min} e {p_max}" if p_min and p_max else (f"Mínimo {p_min}" if p_min else f"Até {p_max}")
-        criteria.append({"key": "pace", "label": "Velocidade", "value": val, "icon": "zap"})
-
-    if params.get("min_strength") or params.get("max_strength"):
-        s_min, s_max = params.get("min_strength"), params.get("max_strength")
-        val = f"Entre {s_min} e {s_max}" if s_min and s_max else (f"Mínimo {s_min}" if s_min else f"Até {s_max}")
-        criteria.append({"key": "strength", "label": "Força / Físico", "value": val, "icon": "activity"})
-
-    if params.get("min_finishing") or params.get("max_finishing"):
-        f_min, f_max = params.get("min_finishing"), params.get("max_finishing")
-        val = f"Entre {f_min} e {f_max}" if f_min and f_max else (f"Mínimo {f_min}" if f_min else f"Até {f_max}")
-        criteria.append({"key": "finishing", "label": "Finalização", "value": val, "icon": "target"})
-
-    if params.get("min_passing") or params.get("max_passing"):
-        pa_min, pa_max = params.get("min_passing"), params.get("max_passing")
-        val = f"Entre {pa_min} e {pa_max}" if pa_min and pa_max else (f"Mínimo {pa_min}" if pa_min else f"Até {pa_max}")
-        criteria.append({"key": "passing", "label": "Passe", "value": val, "icon": "share-2"})
-
-    if params.get("min_dribbling") or params.get("max_dribbling"):
-        d_min, d_max = params.get("min_dribbling"), params.get("max_dribbling")
-        val = f"Entre {d_min} e {d_max}" if d_min and d_max else (f"Mínimo {d_min}" if d_min else f"Até {d_max}")
-        criteria.append({"key": "dribbling", "label": "Drible", "value": val, "icon": "feather"})
-
-    if params.get("min_defending") or params.get("max_defending"):
-        df_min, df_max = params.get("min_defending"), params.get("max_defending")
-        val = f"Entre {df_min} e {df_max}" if df_min and df_max else (f"Mínimo {df_min}" if df_min else f"Até {df_max}")
-        criteria.append({"key": "defending", "label": "Defesa", "value": val, "icon": "shield"})
-
-    if params.get("min_heading") or params.get("max_heading"):
-        h_min, h_max = params.get("min_heading"), params.get("max_heading")
-        val = f"Entre {h_min} e {h_max}" if h_min and h_max else (f"Mínimo {h_min}" if h_min else f"Até {h_max}")
-        criteria.append({"key": "heading", "label": "Cabeceio / Aéreo", "value": val, "icon": "chevrons-up"})
-
-    if params.get("min_stamina") or params.get("max_stamina"):
-        st_min, st_max = params.get("min_stamina"), params.get("max_stamina")
-        val = f"Entre {st_min} e {st_max}" if st_min and st_max else (f"Mínimo {st_min}" if st_min else f"Até {st_max}")
-        criteria.append({"key": "stamina", "label": "Resistência / Fôlego", "value": val, "icon": "battery-charging"})
-
-    # 6. Pé Preferencial & Skills
-    if params.get("preferred_foot"):
-        pf_name = "Canhoto 🦶 (Pé Esquerdo)" if params["preferred_foot"] == 2 else "Destro 🦶 (Pé Direito)"
-        criteria.append({"key": "foot", "label": "Pé Bom", "value": pf_name, "icon": "compass"})
-
-    if params.get("min_skillmoves"):
-        criteria.append({"key": "skill_moves", "label": "Drible / Fintas", "value": f"{params['min_skillmoves']}★ Estrelas", "icon": "sparkles"})
-
-    if params.get("min_weakfoot"):
-        criteria.append({"key": "weak_foot", "label": "Perna Ruim", "value": f"{params['min_weakfoot']}★ Estrelas", "icon": "shield"})
-
-    # 7. Altura
-    if params.get("min_height") or params.get("max_height"):
-        h_min, h_max = params.get("min_height"), params.get("max_height")
-        val = f"Entre {h_min} e {h_max} cm" if h_min and h_max else (f"Mínimo {h_min} cm" if h_min else f"Até {h_max} cm")
-        criteria.append({"key": "height", "label": "Estatura", "value": val, "icon": "bar-chart-2"})
-
-    # 8. Idade / Wonderkid
+    # 5. Potencial / Wonderkid
     if params.get("is_wonderkid"):
-        criteria.append({"key": "age", "label": "Perfil", "value": "Jovem Promessa / Wonderkid (Sub-22)", "icon": "star"})
-    elif params.get("min_age") or params.get("max_age"):
-        a_min, a_max = params.get("min_age"), params.get("max_age")
-        if a_min and a_max:
-            criteria.append({"key": "age", "label": "Idade", "value": f"Entre {a_min} e {a_max} anos", "icon": "calendar"})
-        elif a_max:
-            criteria.append({"key": "age", "label": "Idade", "value": f"Até {a_max} anos", "icon": "calendar"})
-        elif a_min:
-            criteria.append({"key": "age", "label": "Idade", "value": f"A partir de {a_min} anos", "icon": "calendar"})
+        criteria.append({"key": "wonderkid", "label": L["wonderkid_lbl"], "value": L["wonderkid_val"], "icon": "star"})
+    elif params.get("min_pot"):
+        criteria.append({"key": "pot", "label": L["pot_lbl"], "value": f"{L['min']} {params['min_pot']}", "icon": "trending-up"})
 
-    # 9. Nome específico
+    # 6. Idade
+    min_a = params.get("min_age")
+    max_a = params.get("max_age")
+    if min_a and max_a:
+        criteria.append({"key": "age", "label": L["age_lbl"], "value": f"{L['between']} {min_a} - {max_a} {L['years']}", "icon": "calendar"})
+    elif max_a:
+        criteria.append({"key": "age", "label": L["age_lbl"], "value": f"{L['max']} {max_a} {L['years']}", "icon": "calendar"})
+    elif min_a:
+        criteria.append({"key": "age", "label": L["age_lbl"], "value": f"{L['from']} {min_a} {L['years']}", "icon": "calendar"})
+
+    # 7. Preço
+    if params.get("max_price"):
+        p_val = params["max_price"]
+        val_fmt = f"€{p_val/1000000:.1f}M" if p_val >= 1000000 else f"€{p_val:,.0f}"
+        criteria.append({"key": "price", "label": L["price_lbl"], "value": f"{L['max']} {val_fmt}", "icon": "coins"})
+
+    # 8. Pé Preferencial
+    if params.get("preferred_foot"):
+        foot_label = "Canhoto" if params["preferred_foot"] == 2 else "Destro"
+        if lang == "en":
+            foot_label = "Left-footed" if params["preferred_foot"] == 2 else "Right-footed"
+        elif lang == "es":
+            foot_label = "Zurdo" if params["preferred_foot"] == 2 else "Diestro"
+        criteria.append({"key": "foot", "label": L["foot_lbl"], "value": foot_label, "icon": "footprints"})
+
+    # 9. Atributos Específicos
+    if params.get("min_pace"):
+        criteria.append({"key": "pace", "label": L["pace_lbl"], "value": f"⚡ {L['min']} {params['min_pace']}", "icon": "zap"})
+    if params.get("min_finishing"):
+        criteria.append({"key": "finishing", "label": L["finish_lbl"], "value": f"⚽ {L['min']} {params['min_finishing']}", "icon": "crosshair"})
+    if params.get("min_passing"):
+        criteria.append({"key": "passing", "label": L["pass_lbl"], "value": f"🎯 {L['min']} {params['min_passing']}", "icon": "send"})
+    if params.get("min_dribbling"):
+        criteria.append({"key": "dribbling", "label": L["drib_lbl"], "value": f"🪄 {L['min']} {params['min_dribbling']}", "icon": "sparkles"})
+    if params.get("min_defending"):
+        criteria.append({"key": "defending", "label": L["def_lbl"], "value": f"🛡️ {L['min']} {params['min_defending']}", "icon": "shield"})
+    if params.get("min_strength"):
+        criteria.append({"key": "strength", "label": L["phy_lbl"], "value": f"💪 {L['min']} {params['min_strength']}", "icon": "activity"})
+    if params.get("min_heading"):
+        criteria.append({"key": "heading", "label": L["head_lbl"], "value": f"🪂 {L['min']} {params['min_heading']}", "icon": "arrow-up-circle"})
+
+    # 10. Fintas e Perna Ruim
+    if params.get("min_skillmoves"):
+        criteria.append({"key": "skills", "label": L["skill_lbl"], "value": f"{params['min_skillmoves']}★+", "icon": "sparkles"})
+    if params.get("min_weakfoot"):
+        criteria.append({"key": "weakfoot", "label": L["weak_lbl"], "value": f"{params['min_weakfoot']}★+", "icon": "footprints"})
+
+    # 11. Altura
+    if params.get("min_height"):
+        criteria.append({"key": "height", "label": L["height_lbl"], "value": f"{L['min']} {params['min_height']} cm", "icon": "ruler"})
+
+    # 12. Nome
     if params.get("query"):
-        criteria.append({"key": "name", "label": "Nome", "value": params["query"], "icon": "user"})
+        criteria.append({"key": "name", "label": L["name_lbl"], "value": params["query"], "icon": "user"})
 
     return criteria
 
-def preview_scout_query(user_msg, persona_id="carlos", save_context=None):
+def get_gemini_api_key():
+    """
+    Recupera a chave do Gemini configurada no .env ou variável de ambiente.
+    """
+    env_file = os.path.join(BASE_DIR, ".env")
+    if os.path.exists(env_file):
+        try:
+            with open(env_file, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.strip().startswith("GEMINI_API_KEY="):
+                        return line.strip().split("=", 1)[1].strip()
+        except Exception:
+            pass
+    return os.environ.get("GEMINI_API_KEY", "")
+
+def normalize_spoken_numbers(text):
+    """
+    Converte números e expressões comuns faladas por extenso para dígitos numéricos
+    em Português, Inglês e Espanhol, facilitando a extração tanto pelo Gemini quanto pelo fallback regex.
+    """
+    if not text:
+        return ""
+    t = str(text)
+    
+    number_words = {
+        # Português
+        r'\bnoventa e nove\b': '99', r'\bnoventa e oito\b': '98', r'\bnoventa e sete\b': '97',
+        r'\bnoventa e seis\b': '96', r'\bnoventa e cinco\b': '95', r'\bnoventa e quatro\b': '94',
+        r'\bnoventa e tres\b': '93', r'\bnoventa e dois\b': '92', r'\bnoventa e um\b': '91',
+        r'\bnoventa\b': '90',
+        r'\boitenta e nove\b': '89', r'\boitenta e oito\b': '88', r'\boitenta e sete\b': '87',
+        r'\boitenta e seis\b': '86', r'\boitenta e cinco\b': '85', r'\boitenta e quatro\b': '84',
+        r'\boitenta e tres\b': '83', r'\boitenta e dois\b': '82', r'\boitenta e um\b': '81',
+        r'\boitenta\b': '80',
+        r'\bsetenta e nove\b': '79', r'\bsetenta e oito\b': '78', r'\bsetenta e sete\b': '77',
+        r'\bsetenta e seis\b': '76', r'\bsetenta e cinco\b': '75', r'\bsetenta e quatro\b': '74',
+        r'\bsetenta e tres\b': '73', r'\bsetenta e dois\b': '72', r'\bsetenta e um\b': '71',
+        r'\bsetenta\b': '70',
+        r'\bsessenta e cinco\b': '65', r'\bsessenta\b': '60',
+        r'\bcinquenta e cinco\b': '55', r'\bcinquenta\b': '50',
+        r'\bquarenta\b': '40',
+        r'\btrinta e cinco\b': '35', r'\btrinta e quatro\b': '34', r'\btrinta e tres\b': '33',
+        r'\btrinta e dois\b': '32', r'\btrinta e um\b': '31', r'\btrinta\b': '30',
+        r'\bvinte e nove\b': '29', r'\bvinte e oito\b': '28', r'\bvinte e sete\b': '27',
+        r'\bvinte e seis\b': '26', r'\bvinte e cinco\b': '25', r'\bvinte e quatro\b': '24',
+        r'\bvinte e tres\b': '23', r'\bvinte e dois\b': '22', r'\bvinte e um\b': '21',
+        r'\bvinte\b': '20',
+        r'\bdezenove\b': '19', r'\bdezoito\b': '18', r'\bdezessete\b': '17', r'\bdezesseis\b': '16',
+        r'\bquinze\b': '15',
+        r'\bcinco estrelas\b': '5 estrelas', r'\bquatro estrelas\b': '4 estrelas',
+        r'\btres estrelas\b': '3 estrelas',
+        r'\bduas estrelas\b': '2 estrelas',
+        # English
+        r'\beighty\b': '80', r'\bseventy\b': '70', r'\bninety\b': '90',
+        r'\btwenty one\b': '21', r'\btwenty two\b': '22', r'\btwenty three\b': '23',
+        r'\btwenty four\b': '24', r'\btwenty five\b': '25', r'\btwenty\b': '20',
+        r'\bunder twenty\b': 'under 20', r'\bunder twenty one\b': 'under 21',
+        # Spanish
+        r'\bochenta\b': '80', r'\bsetenta\b': '70', r'\bnoventa\b': '90',
+        r'\bveintiuno\b': '21', r'\bveintidos\b': '22', r'\bveintitres\b': '23',
+        r'\bveinticuatro\b': '24', r'\bveinticinco\b': '25', r'\bveinte\b': '20',
+        r'\bmenor de veinte\b': 'menor de 20', r'\bmenor de veintiuno\b': 'menor de 21'
+    }
+    
+    t_norm = normalize_text(t)
+    for pat, rep in number_words.items():
+        t_norm = re.sub(pat, rep, t_norm, flags=re.IGNORECASE)
+        
+    return t_norm
+
+def call_gemini_scout_parser(user_msg, language="pt", api_key=""):
+    """
+    Utiliza o modelo de ponta Google Gemini via REST API para transformar qualquer pedido livre
+    (em Português, Inglês ou Espanhol) em parâmetros JSON cirúrgicos de Scout para a base do jogo.
+    """
+    key = api_key or get_gemini_api_key()
+    if not key:
+        raise ValueError("Chave de API do Gemini não configurada.")
+
+    clean_msg = normalize_spoken_numbers(user_msg)
+
+    prompt_system = """Você é o motor de inteligência artificial de Scout do EA Sports FC Career Mode.
+Sua missão é interpretar a solicitação de voz/texto do treinador (que pode estar em Português, Inglês ou Espanhol) e convertê-la EXCLUSIVAMENTE em um objeto JSON com os filtros técnicos de pesquisa.
+
+Campos aceitos no JSON (inclua apenas os parâmetros solicitados ou fortemente implícitos):
+- positions: lista de siglas canônicas da posição (ex: ["ST"], ["CF"], ["CB"], ["LB", "LWB"], ["RB", "RWB"], ["CDM", "CM"], ["CAM"], ["LW", "LM"], ["RW", "RM"], ["GK"]).
+- min_ovr: inteiro (40 a 99)
+- max_ovr: inteiro (40 a 99)
+- min_pot: inteiro (50 a 99)
+- min_age: inteiro (15 a 45)
+- max_age: inteiro (15 a 45)
+- max_price: número (ex: 15 milhões / 15M / 15 millones = 15000000)
+- min_pace: inteiro (40 a 99) para velocidade/ritmo/rapidez/pace
+- min_finishing: inteiro (40 a 99) para chute/finalização/matador/goleador
+- min_passing: inteiro (40 a 99) para passe/visão/armador
+- min_dribbling: inteiro (40 a 99) para drible/habilidade/agilidade
+- min_defending: inteiro (40 a 99) para desarme/marcação/defesa
+- min_strength: inteiro (40 a 99) para força física/tanque/vigor
+- min_heading: inteiro (40 a 99) para cabeceio/jogo aéreo
+- min_height: altura mínima em cm (ex: 1.85m / alto = 185, muito alto = 190)
+- max_height: altura máxima em cm (ex: baixinho / baixo = 175)
+- preferred_foot: 1 para Destro, 2 para Canhoto/Perna Esquerda
+- min_skillmoves: inteiro de 1 a 5 (estrelas de finta/drible)
+- min_weakfoot: inteiro de 1 a 5 (estrelas de perna ruim / ambidestro = 5)
+- is_wonderkid: boolean (true se pediu joia, promessa mundial, wonderkid, futuro craque)
+- nationality_name: string com o país de nascimento (ex: 'Brasil', 'Argentina', 'França', 'Inglaterra', 'Espanha', etc.)
+- league_name: string com a liga onde joga (ex: 'Premier League', 'LALIGA', 'Brasileirão', 'Serie A', 'Bundesliga', etc.)
+- club_country: string com o país onde joga caso mencione um país em vez da liga (ex: 'Brasil', 'Espanha', 'Inglaterra')
+- query: string caso o usuário queira buscar um jogador específico pelo nome (ex: 'Endrick', 'Haaland', 'Vini Jr')
+- order_by: ordenação mais lógica para o pedido ('ovr_desc', 'pace_desc', 'finishing_desc', 'passing_desc', 'dribbling_desc', 'defending_desc', 'strength_desc', 'heading_desc', 'pot_desc', 'value_asc')
+- gender: 0 para masculino, 1 para feminino
+
+REGRAS OBRIGATÓRIAS:
+1. Seja tolerante a números falados por extenso ("oitenta e um" = 81, "sub vinte e dois" = max_age: 22, "trinta e dois anos" = 32).
+2. Se o usuário disser "zagueiro rápido", atribua min_pace de pelo menos 78 ou 80 e order_by "pace_desc".
+3. Se pedir "atacante matador", atribua min_finishing de pelo menos 80.
+4. Responda ESTRITAMENTE o JSON sem markdown, sem explicações extras."""
+
+    models = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"]
+    payload = {
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": f"{prompt_system}\n\nFrase do Treinador: \"{clean_msg}\""}]
+            }
+        ],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.1
+        }
+    }
+
+    req_data = json.dumps(payload).encode("utf-8")
+    last_err = None
+
+    for m in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={key}"
+        req = urllib.request.Request(url, data=req_data, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        raw_json = parts[0].get("text", "{}").strip()
+                        if raw_json.startswith("```json"):
+                            raw_json = raw_json[7:]
+                        if raw_json.startswith("```"):
+                            raw_json = raw_json[3:]
+                        if raw_json.endswith("```"):
+                            raw_json = raw_json[:-3]
+                        parsed_params = json.loads(raw_json.strip())
+                        
+                        # Pós-processamento e enriquecimento de dados
+                        parsed_params["recognized"] = True
+                        if "limit" not in parsed_params:
+                            parsed_params["limit"] = 20
+
+                        # Resolver Nacionalidade para ID numérico
+                        nat_name = parsed_params.get("nationality_name")
+                        if nat_name:
+                            nat_norm = normalize_text(nat_name)
+                            found_nat_id = None
+                            for nid, terms in NATIONALITY_DEMONYMS_MAP.items():
+                                for t in terms:
+                                    t_norm = normalize_text(t)
+                                    if t_norm == nat_norm or t_norm in nat_norm or nat_norm in t_norm:
+                                        found_nat_id = nid
+                                        break
+                                if found_nat_id:
+                                    break
+                            if found_nat_id:
+                                parsed_params["nationality_id"] = found_nat_id
+
+                        # Resolver Pé Preferencial
+                        if parsed_params.get("preferred_foot") == 2:
+                            parsed_params["preferred_foot_name"] = "Canhoto"
+                        elif parsed_params.get("preferred_foot") == 1:
+                            parsed_params["preferred_foot_name"] = "Destro"
+
+                        return parsed_params
+        except Exception as e:
+            last_err = e
+            continue
+
+    if last_err:
+        raise last_err
+    return None
+
+def preview_scout_query(user_msg, persona_id="carlos", save_context=None, language="pt"):
     """
     Retorna diretamente a busca instantânea de scout.
     """
-    return process_scout_chat(user_msg, persona_id, save_context)
+    return process_scout_chat(user_msg, persona_id, save_context, language=language)
 
-def format_scout_results_verdict(players, custom_name="Carlos Mendes", source="live_editor", query_params=None):
+def format_scout_results_verdict(players, custom_name="Carlos Mendes", source="live_editor", query_params=None, language="pt"):
     """
-    Gera o parecer técnico final do olheiro com os atletas encontrados.
+    Gera o parecer técnico final do olheiro com os atletas encontrados com suporte
+    a Português (PT), Inglês (EN) e Espanhol (ES).
     """
+    lang = (language or "pt").lower()
     count = len(players)
-    if count == 0:
-        return f"Professor, sou o **{custom_name}**. Varri o mercado do seu Save Ativo com base nos filtros solicitados, mas não localizei nenhum atleta que preenchesse 100% de todos esses critérios combinados. Recomendo flexibilizarmos um pouco a faixa de overall ou os atributos para abrirmos mais opções!"
-
     top_names = ", ".join([p["name"] for p in players[:3]])
-    src_label = "do seu Save Ativo no Live Editor" if source in ["live_editor", "live_editor_autorun"] else "da base oficial"
+    
+    if lang == "en":
+        src_label = "from your Active Live Editor Save" if source in ["live_editor", "live_editor_autorun"] else "from the official database"
+        if count == 0:
+            return f"Boss, this is **{custom_name}**. I've thoroughly searched {src_label} based on your requested filters, but found no player matching 100% of these combined conditions. I recommend relaxing the overall range or attributes to open up more options!"
+        elif count == 1:
+            return f"Boss, this is **{custom_name}**! I scouted {src_label} and found the top target: **{top_names}**. Detailed contractual and technical report is ready below!"
+        else:
+            return f"Boss, this is **{custom_name}**! I scouted {src_label} and compiled the **{count} best players** matching your exact profile. Highlighting **{top_names}** as priority targets. Review their dossiers below!"
+            
+    elif lang == "es":
+        src_label = "de tu Partida Activa en Live Editor" if source in ["live_editor", "live_editor_autorun"] else "de la base de datos oficial"
+        if count == 0:
+            return f"Míster, soy **{custom_name}**. He rastreado el mercado {src_label} según los filtros pedidos, pero no encontré futbolistas que cumplan el 100% de los criterios. ¡Recomiendo flexibilizar un poco el overall o los atributos!"
+        elif count == 1:
+            return f"¡Míster, aquí **{custom_name}**! He analizado {src_label} y localizado al mejor futbolista correspondiente: **{top_names}**. ¡El informe técnico y contractual completo está abajo!"
+        else:
+            return f"¡Míster, aquí **{custom_name}**! He analizado {src_label} y seleccionado a los **{count} mejores jugadores** según lo que pediste. Destacan especialmente **{top_names}** como objetivos prioritarios. ¡Fichas completas abajo para tu análisis!"
+            
+    else: # Português
+        src_label = "do seu Save Ativo no Live Editor" if source in ["live_editor", "live_editor_autorun"] else "da base oficial"
+        if count == 0:
+            return f"Professor, sou o **{custom_name}**. Varri o mercado {src_label} com base nos filtros solicitados, mas não localizei nenhum atleta que preenchesse 100% de todos esses critérios combinados. Recomendo flexibilizarmos um pouco a faixa de overall ou os atributos para abrirmos mais opções!"
+        elif count == 1:
+            return f"Professor, aqui é o **{custom_name}**! Analisei a base {src_label} e localizei o melhor atleta correspondente: **{top_names}**. O relatório detalhado com contratos e ficha técnica está logo abaixo!"
+        else:
+            return f"Professor, aqui é o **{custom_name}**! Analisei a base {src_label} e listei os **{count} melhores jogadores** para o que você pediu. Destaque para **{top_names}**, alvos prioritários para reforçar o time. O relatório completo de cada um está logo abaixo para sua avaliação!"
 
-    if count == 1:
-        return f"Professor, aqui é o **{custom_name}**! Analisei a base {src_label} e localizei o melhor atleta correspondente: **{top_names}**. O relatório detalhado com contratos e ficha técnica está logo abaixo!"
-    else:
-        return f"Professor, aqui é o **{custom_name}**! Analisei a base {src_label} e listei os **{count} melhores jogadores** para o que você pediu. Destaque para **{top_names}**, alvos prioritários para reforçar o time. O relatório completo de cada um está logo abaixo para sua avaliação!"
-
-def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_key=""):
+def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_key="", language="pt"):
     """
-    Processa chat de scout completo.
+    Processa chat de scout completo, combinando Inteligência Artificial Generativa (Gemini)
+    com busca local em tempo real no banco do jogo e fallback offline robusto.
     """
+    lang = (language or "pt").lower()
     save_id = "carreira_ativa"
     custom_name = "Carlos Mendes"
     custom_role = "Chefe de Scout & Mercado"
@@ -2176,10 +2385,30 @@ def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_
         "badge_color": "emerald"
     }
 
-    params = parse_natural_language_scout_query(user_msg)
-    criteria_list = build_criteria_summary(params)
+    # 1. Tentar interpretação primária via Gemini AI (alta precisão para voz e linguagem natural)
+    params = None
+    ai_engine_used = False
+    resolved_gemini_key = gemini_key or get_gemini_api_key()
 
-    # 1. Tentar busca na base viva extraída pelo Live Editor (Save Ativo)
+    if resolved_gemini_key:
+        try:
+            params = call_gemini_scout_parser(user_msg, language=lang, api_key=resolved_gemini_key)
+            if params:
+                ai_engine_used = True
+        except Exception as e:
+            print(f"[Scout Gemini AI Notice] Tentativa com IA falhou ({e}). Acionando motor offline...")
+            params = None
+
+    # 2. Se a IA falhar ou não houver chave de API, acionar Fallback Offline com normalização
+    if not params:
+        normalized_query = normalize_spoken_numbers(user_msg)
+        params = parse_natural_language_scout_query(normalized_query)
+        params["offline_fallback"] = True
+
+    params["ai_powered"] = ai_engine_used
+    criteria_list = build_criteria_summary(params, language=lang)
+
+    # 3. Tentar busca na base viva extraída pelo Live Editor (Save Ativo)
     players = []
     source = "live_editor"
     try:
@@ -2189,7 +2418,7 @@ def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_
             players = live_results
             source = "live_editor"
         else:
-            # 2. Se a base do Live Editor ainda não tem registros, busca na base FC Mania
+            # 4. Se a base do Live Editor ainda não tem registros, busca na base FC Mania
             players = search_scout_players(params)
             source = "fcm_database"
     except Exception as e:
@@ -2197,7 +2426,7 @@ def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_
         players = search_scout_players(params)
         source = "fcm_database"
 
-    verdict = format_scout_results_verdict(players, custom_name, source, params)
+    verdict = format_scout_results_verdict(players, custom_name, source, params, language=lang)
 
     return {
         "status": "success",
@@ -2206,8 +2435,11 @@ def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_
         "criteria": criteria_list,
         "players": players,
         "source": source,
-        "query_params": params
+        "query_params": params,
+        "ai_powered": ai_engine_used,
+        "language": lang
     }
+
 
 
 

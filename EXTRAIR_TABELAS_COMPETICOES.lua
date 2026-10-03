@@ -451,9 +451,6 @@ function ExtractCareerStandings()
         OUTPUT_JSON,
         string.format('%s\\Desktop\\Imersao_Modo_Carreira\\TABELAS_COMPETICOES.json', userprofile),
         string.format('%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\TABELAS_COMPETICOES.json', userprofile),
-        string.format('%s\\Desktop\\Dados_Carreira_FC\\TABELAS_COMPETICOES.json', userprofile),
-        string.format('%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\TABELAS_COMPETICOES.json', userprofile),
-        string.format('%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\TABELAS_COMPETICOES.json', userprofile),
         'TABELAS_COMPETICOES.json'
     }
 

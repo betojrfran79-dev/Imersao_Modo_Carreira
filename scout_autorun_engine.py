@@ -15,7 +15,7 @@ import time
 from datetime import datetime
 
 AUTORUN_DIR = r"C:\FC 26 Live Editor\lua\autorun"
-DESKTOP_FOLDER = os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "Imersão_Carreira_FC")
+DESKTOP_FOLDER = os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "Dados_Carreira_FC")
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def ensure_autorun_dirs():
@@ -436,8 +436,9 @@ local json_payload = json.encode(payload)
 -- 5. Gravar resultados no Desktop e pasta do App
 local userprofile = os.getenv('USERPROFILE') or "C:"
 local out_files = {{
+    string.format("%s\\\\Desktop\\\\Dados_Carreira_FC\\\\SCOUT_QUERY_RESULTS.json", userprofile),
+    string.format("%s\\\\OneDrive\\\\Desktop\\\\Dados_Carreira_FC\\\\SCOUT_QUERY_RESULTS.json", userprofile),
     string.format("%s\\\\Desktop\\\\Imersão_Carreira_FC\\\\SCOUT_QUERY_RESULTS.json", userprofile),
-    string.format("%s\\\\OneDrive\\\\Desktop\\\\Imersão_Carreira_FC\\\\SCOUT_QUERY_RESULTS.json", userprofile),
     [[{os.path.join(APP_DIR, "scout_query_results.json").replace('\\', '\\\\')}]]
 }}
 
@@ -523,6 +524,7 @@ def clear_previous_query_results():
     candidates = [
         os.path.join(APP_DIR, "scout_query_results.json"),
         os.path.join(DESKTOP_FOLDER, "SCOUT_QUERY_RESULTS.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC", "SCOUT_QUERY_RESULTS.json"),
         os.path.join(uprof, "OneDrive", "Desktop", "Imersão_Carreira_FC", "SCOUT_QUERY_RESULTS.json")
     ]
     for c in candidates:
@@ -540,6 +542,7 @@ def get_latest_scout_query_results():
     candidates = [
         os.path.join(APP_DIR, "scout_query_results.json"),
         os.path.join(DESKTOP_FOLDER, "SCOUT_QUERY_RESULTS.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC", "SCOUT_QUERY_RESULTS.json"),
         os.path.join(uprof, "OneDrive", "Desktop", "Imersão_Carreira_FC", "SCOUT_QUERY_RESULTS.json")
     ]
     for c in candidates:

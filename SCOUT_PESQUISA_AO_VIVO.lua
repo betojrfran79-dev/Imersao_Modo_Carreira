@@ -330,5 +330,4 @@ pcall(function()
     end
 end)
 
-local msg = string.format("Base de Scout Live Editor Atualizada com Sucesso!\n\n• Atletas Mapeados: %d\n• Temporada: %d\n• Arquivo: Desktop\\Dados_Carreira_FC\\SCOUT_LIVE_DATABASE.json\n\nAgora você pode conversar com o seu Olheiro no app!", total_extracted, current_year)
 MessageBox("🎯 Imersão Modo Carreira - Scout Atualizado", msg)

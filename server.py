@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import database
 import fcm_resolver
+import updater
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -1269,6 +1270,26 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     "server_port": PORT
                 })
 
+            if path == "/api/system/check_update":
+                try:
+                    local_info = updater.get_local_version_info()
+                    remote_info = updater.get_remote_latest_commit()
+                    if not remote_info:
+                        return self.send_json({
+                            "status": "warning",
+                            "message": "Nao foi possivel consultar o GitHub no momento.",
+                            "local": local_info
+                        })
+                    is_available = bool(remote_info.get("sha") and remote_info.get("sha") != local_info.get("commit"))
+                    return self.send_json({
+                        "status": "success",
+                        "update_available": is_available,
+                        "local": local_info,
+                        "remote": remote_info
+                    })
+                except Exception as ex:
+                    return self.send_json({"status": "error", "message": str(ex)}, 500)
+
             # 16.6 Download do Pacote de Instalação do Script Lua (.ZIP)
             if path in ["/api/setup/download_package", "/api/setup/download_zip"]:
                 zip_buffer = io.BytesIO()
@@ -1654,14 +1675,15 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             if path == "/api/scout/chat":
                 user_msg = payload.get("message", "")
                 persona_id = payload.get("persona_id", "carlos")
-                gemini_key = load_env().get("GEMINI_API_KEY", "")
+                language = str(payload.get("language", "pt")).lower()
+                gemini_key = payload.get("gemini_key") or load_env().get("GEMINI_API_KEY", "")
                 save_ctx = {
                     "save_id": save_id,
                     "scout_name": payload.get("scout_name"),
                     "scout_role": payload.get("scout_role"),
                     "scout_avatar": payload.get("scout_avatar")
                 }
-                res = fcm_resolver.process_scout_chat(user_msg, persona_id, save_ctx, gemini_key)
+                res = fcm_resolver.process_scout_chat(user_msg, persona_id, save_ctx, gemini_key, language=language)
                 return self.send_json(res)
 
             if path == "/api/scout/sync_live_players":
@@ -2356,25 +2378,27 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
             if path in ["/api/scout/chat", "/api/scout/preview", "/api/scout/confirm_autorun"]:
                 user_msg = str(payload.get("message", "")).strip()
                 persona_id = str(payload.get("persona_id", "carlos")).strip()
-                user_key = payload.get("gemini_key", "")
+                language = str(payload.get("language", "pt")).lower()
+                user_key = payload.get("gemini_key", "") or load_env().get("GEMINI_API_KEY", "")
                 save_ctx = {
                     "save_id": save_id,
                     "scout_name": payload.get("scout_name"),
                     "scout_role": payload.get("scout_role"),
                     "scout_avatar": payload.get("scout_avatar")
                 }
-                chat_res = fcm_resolver.process_scout_chat(user_msg, persona_id, save_ctx, user_key)
+                chat_res = fcm_resolver.process_scout_chat(user_msg, persona_id, save_ctx, user_key, language=language)
                 return self.send_json(chat_res)
 
             if path == "/api/scout/search_offline_fallback":
                 user_msg = str(payload.get("message", "")).strip()
+                language = str(payload.get("language", "pt")).lower()
                 query_params = payload.get("query_params")
                 if not query_params or not isinstance(query_params, dict):
                     query_params = fcm_resolver.parse_natural_language_scout_query(user_msg)
                 
                 scout_name = str(payload.get("scout_name", "Carlos Mendes")).strip()
                 players = fcm_resolver.search_scout_players(query_params)
-                verdict = fcm_resolver.format_scout_results_verdict(players, scout_name, "fcm_database", query_params)
+                verdict = fcm_resolver.format_scout_results_verdict(players, scout_name, "fcm_database", query_params, language=language)
                 return self.send_json({
                     "status": "success",
                     "reply": verdict,
@@ -2513,6 +2537,13 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                         "status": "success",
                         "message": "Chave do Gemini salva no arquivo .env!"
                     })
+
+            if path == "/api/system/apply_update":
+                try:
+                    res = updater.check_and_apply_update(auto_apply=True)
+                    return self.send_json(res)
+                except Exception as err:
+                    return self.send_json({"status": "error", "message": str(err)}, 500)
 
             return self.send_json({"error": "Endpoint não encontrado"}, 404)
         except Exception as e:

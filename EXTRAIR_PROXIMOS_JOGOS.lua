@@ -1,7 +1,6 @@
 -- ==============================================================================
 -- 📅 FC CAREER VAULT - SCRIPT DEDICADO: EXTRAÇÃO DO CALENDÁRIO & PRÓXIMOS JOGOS
 -- Compatível com: EA Sports FC 24, FC 25, FC 26 & Live Editor v25+
--- Gera: Desktop\Imersão_Carreira_FC\PROXIMOS_JOGOS_CALENDARIO.json
 -- ==============================================================================
 
 local json = require 'imports/external/json'
@@ -306,10 +305,6 @@ local function ExtractUpcomingMatches()
         OUTPUT_FILE,
         string.format("%s\\Desktop\\Imersao_Modo_Carreira\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
         string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
-        string.format("%s\\Desktop\\Dados_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
-        string.format("%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
-        string.format("%s\\Desktop\\Imersão_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
-        string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
         "PROXIMOS_JOGOS_CALENDARIO.json"
     }
 

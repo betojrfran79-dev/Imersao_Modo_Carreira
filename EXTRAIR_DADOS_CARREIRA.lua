@@ -2,7 +2,6 @@
 -- 🏆 FC CAREER VAULT - SCRIPT MASTER DE EXTRAÇÃO & SINCRONIZAÇÃO (LUA ENGINE v5.0)
 -- Compatível com: EA Sports FC 24, FC 25, FC 26 & Patches FC Mania / Live Editor
 -- Integração Completa: Transferências na Memória (Aranaktu Engine), Calendário Real,
--- Salários da Tabela de Contratos e Backup na Pasta Desktop\Imersão_Carreira_FC
 -- ==============================================================================
 
 local json = require 'imports/external/json'
@@ -1263,7 +1262,6 @@ function ExtractAndSyncFullCareer(is_silent)
         }
     end)
 
-    -- 7. Gravação do Backup Unificado na Pasta Centralizada Desktop\Imersão_Carreira_FC
     pcall(function()
         if payload.upcoming_matches and #payload.upcoming_matches > 0 then
             table.sort(payload.upcoming_matches, function(a, b)
@@ -1282,10 +1280,6 @@ function ExtractAndSyncFullCareer(is_silent)
         string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\DADOS_CARREIRA.json", userprofile),
         string.format("%s\\Desktop\\Imersao_Modo_Carreira\\FC_CAREER_VAULT_BACKUP.json", userprofile),
         string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\FC_CAREER_VAULT_BACKUP.json", userprofile),
-        string.format("%s\\Desktop\\Imersão_Carreira_FC\\FC_CAREER_VAULT_BACKUP.json", userprofile),
-        string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\FC_CAREER_VAULT_BACKUP.json", userprofile),
-        string.format("%s\\Desktop\\Dados_Carreira_FC\\FC_CAREER_VAULT_BACKUP.json", userprofile),
-        string.format("%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\FC_CAREER_VAULT_BACKUP.json", userprofile),
         "DADOS_CARREIRA.json",
         "dados_carreira_sync.json",
         "FC_CAREER_VAULT_BACKUP.json"
@@ -1319,10 +1313,6 @@ function ExtractAndSyncFullCareer(is_silent)
                 string.format("%s\\PROXIMOS_JOGOS_CALENDARIO.json", VAULT_CONFIG.TARGET_DIR),
                 string.format("%s\\Desktop\\Imersao_Modo_Carreira\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
                 string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
-                string.format("%s\\Desktop\\Imersão_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
-                string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
-                string.format("%s\\Desktop\\Dados_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
-                string.format("%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\PROXIMOS_JOGOS_CALENDARIO.json", userprofile),
                 "PROXIMOS_JOGOS_CALENDARIO.json"
             }
             for _, cloc in ipairs(cal_locations) do
@@ -1351,10 +1341,6 @@ function ExtractAndSyncFullCareer(is_silent)
                 string.format("%s\\SCOUT_LIVE_DATABASE.json", VAULT_CONFIG.TARGET_DIR),
                 string.format("%s\\Desktop\\Imersao_Modo_Carreira\\SCOUT_LIVE_DATABASE.json", userprofile),
                 string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\SCOUT_LIVE_DATABASE.json", userprofile),
-                string.format("%s\\Desktop\\Imersão_Carreira_FC\\SCOUT_LIVE_DATABASE.json", userprofile),
-                string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\SCOUT_LIVE_DATABASE.json", userprofile),
-                string.format("%s\\Desktop\\Dados_Carreira_FC\\SCOUT_LIVE_DATABASE.json", userprofile),
-                string.format("%s\\OneDrive\\Desktop\\Dados_Carreira_FC\\SCOUT_LIVE_DATABASE.json", userprofile),
                 "SCOUT_LIVE_DATABASE.json"
             }
             for _, sloc in ipairs(scout_locations) do
@@ -1373,8 +1359,6 @@ function ExtractAndSyncFullCareer(is_silent)
                 string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\jogadores_contratos.csv", userprofile),
                 string.format("%s\\Desktop\\jogadores_contratos.csv", userprofile),
                 string.format("%s\\OneDrive\\Desktop\\jogadores_contratos.csv", userprofile),
-                string.format("%s\\Desktop\\Imersão_Carreira_FC\\jogadores_contratos.csv", userprofile),
-                string.format("%s\\OneDrive\\Desktop\\Imersão_Carreira_FC\\jogadores_contratos.csv", userprofile)
             }
             for _, cloc in ipairs(csv_contratos_locations) do
                 local cf = io.open(cloc, "w+")

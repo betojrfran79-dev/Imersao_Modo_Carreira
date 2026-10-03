@@ -85,17 +85,10 @@ exit /b 1
 echo [OK] Python localizado: "%PYTHON_EXE%"
 echo.
 
-:: 4. Checagem de Atualizacoes Automaticas do Repositorio (Git Auto-Updater)
-if exist ".git" (
-    echo [Atualizacoes] Verificando se ha novas versoes no repositorio...
-    git pull origin main --quiet >nul 2>&1
-    if %ERRORLEVEL% EQU 0 (
-        echo [Atualizacoes] Sistema 100%% atualizado com sucesso!
-    ) else (
-        echo [Atualizacoes] Iniciando com a versao local.
-    )
-    echo.
-)
+:: 4. Checagem de Atualizacoes Automaticas (Git ou Download Direto Inteligente)
+echo [Atualizacoes] Verificando se ha novas versoes no GitHub...
+"%PYTHON_EXE%" updater.py
+echo.
 
 echo Iniciando servidor e abrindo aplicacao...
 echo.

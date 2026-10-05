@@ -289,6 +289,22 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
 
     raw = dict(live_p) if live_p else {}
 
+    # Consulta complementar ao banco oficial do FC Mania para nacionalidade e clube reais
+    fcm_p = None
+    f_db = find_fcm_db()
+    if f_db and os.path.exists(f_db):
+        try:
+            conn_f = sqlite3.connect(f_db)
+            conn_f.row_factory = sqlite3.Row
+            cur_f = conn_f.cursor()
+            cur_f.execute("SELECT nationality, nationteamname, teamid, teamname, leaguename FROM players WHERE playerid = ? LIMIT 1", (player_id,))
+            fr = cur_f.fetchone()
+            if fr:
+                fcm_p = dict(fr)
+            conn_f.close()
+        except Exception:
+            pass
+
     # 2. Resolução do Nome Oficial do Atleta
     # (Na tabela players do jogo não há colunas de nome; o nome vem da extração LE / jogadores_contratos.csv ou FCM_NAMES_DATABASE.json)
     clean_pname = ""
@@ -306,10 +322,38 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
     pos3 = str(raw.get("position3") or raw.get("Position3") or "").upper()
     sec_pos = [p for p in [pos2, pos3] if p and p != "NONE" and p != pos1]
 
-    # 4. Clube e Liga Atual no Save Ativo
-    team_name = str(raw.get("team_name") or "Sem Clube")
-    team_id = int(raw.get("team_id") or 0)
-    league_name = str(raw.get("league_name") or "")
+    # 4. Clube, Liga e Seleção Nacional (Separação estrita de Seleção e Clube Real)
+    NATIONAL_TEAMS_NAMES = {
+        "Brasil", "Argentina", "Portugal", "Espanha", "França", "França", "Alemanha", "Itália", "Itália", "Inglaterra",
+        "Holanda", "Bélgica", "Bélgica", "Uruguai", "Colômbia", "Colômbia", "Chile", "Noruega", "Suécia", "Suécia",
+        "Dinamarca", "Croácia", "Croácia", "Polônia", "Polônia", "Escócia", "Escócia", "País de Gales", "Irlanda",
+        "República Tcheca", "Áustria", "Áustria", "Suíça", "Suíça", "Turquia", "Arábia Saudita", "Arábia Saudita",
+        "Japão", "Japão", "Coreia do Sul", "Marrocos", "Senegal", "Nigéria", "Nigéria", "Estados Unidos", "México", "México"
+    }
+
+    raw_tname = str(raw.get("team_name") or "").strip()
+    raw_tid = int(raw.get("team_id") or 0)
+    is_national = (1300 <= raw_tid <= 1400) or (raw_tname in NATIONAL_TEAMS_NAMES)
+
+    nation_team_name = ""
+    if fcm_p and fcm_p.get("nationteamname"):
+        nation_team_name = str(fcm_p["nationteamname"]).strip()
+    elif is_national and raw_tname:
+        nation_team_name = raw_tname
+
+    if is_national:
+        if fcm_p and fcm_p.get("teamid") and not (1300 <= int(fcm_p["teamid"]) <= 1400):
+            team_id = int(fcm_p["teamid"])
+            team_name = str(fcm_p["teamname"] or "Sem Clube")
+            league_name = str(fcm_p.get("leaguename") or "")
+        else:
+            team_id = 0
+            team_name = "Sem Clube"
+            league_name = "Livre no Mercado"
+    else:
+        team_id = raw_tid
+        team_name = raw_tname if raw_tname else (str(fcm_p.get("teamname") or "Sem Clube") if fcm_p else "Sem Clube")
+        league_name = str(raw.get("league_name") or (fcm_p.get("leaguename") if fcm_p else "") or "")
 
     # 5. Overall e Potencial no Save Ativo
     ovr = int(raw.get("overall_rating") or raw.get("ovr") or 75)
@@ -336,8 +380,17 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
     skill_moves = int(raw.get("skill_moves") or raw.get("skillmoves") or 3)
     weak_foot = int(raw.get("weak_foot") or raw.get("weakfootabilitytypecode") or 3)
 
-    # 9. Nacionalidade
-    nat_id = int(raw.get("nationality_id") or raw.get("nationality") or 54)
+    # 9. Nacionalidade Real
+    nat_id = None
+    if fcm_p and fcm_p.get("nationality") and int(fcm_p["nationality"]) > 0:
+        nat_id = int(fcm_p["nationality"])
+    elif raw.get("nationality_id") and int(raw.get("nationality_id")) not in (0, 54):
+        nat_id = int(raw.get("nationality_id"))
+    elif raw.get("nationality") and int(raw.get("nationality")) not in (0, 54):
+        nat_id = int(raw.get("nationality"))
+    else:
+        nat_id = int(raw.get("nationality_id") or raw.get("nationality") or (fcm_p.get("nationality") if fcm_p else 54) or 54)
+
     nat_display = NATIONALITY_DISPLAY_MAP.get(nat_id, f"País #{nat_id}")
 
     # 10. Atributos Oficiais de Desempenho (Extraídos DIRETAMENTE da tabela players em memória pelo Live Editor)
@@ -393,8 +446,9 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
         "potential": pot,
         "contract_valid_until": contract_until,
         "join_date_formatted": "",
-        "nation_team_name": "",
+        "nation_team_name": nation_team_name,
         "nationality": nat_display,
+        "nationality_id": nat_id,
         "preferred_foot": pref_foot,
         "skill_moves": max(1, min(5, skill_moves)),
         "weak_foot": max(1, min(5, weak_foot)),

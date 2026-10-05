@@ -775,7 +775,12 @@ function ExtractAndSyncFullCareer(is_silent)
                 local pid = tpl_tbl:GetRecordFieldValue(cur, "playerid") or 0
                 local tid = tpl_tbl:GetRecordFieldValue(cur, "teamid") or 0
                 if pid > 0 and tid > 0 then
-                    all_player_team_map[pid] = tid
+                    local is_nat = (tid >= 1300 and tid <= 1400)
+                    if not is_nat then
+                        all_player_team_map[pid] = tid
+                    elseif not all_player_team_map[pid] then
+                        all_player_team_map[pid] = tid
+                    end
                     if tid == user_team_id and user_team_id > 0 then
                         user_players_map[pid] = true
                     end
@@ -907,6 +912,7 @@ function ExtractAndSyncFullCareer(is_silent)
                                 player_id = pid,
                                 name = pname,
                                 gender = tonumber(p_tbl:GetRecordFieldValue(cur, "gender")) or 0,
+                                nationality = tonumber(p_tbl:GetRecordFieldValue(cur, "nationality")) or 54,
                                 position = pos_name,
                                 position2 = pos2,
                                 position3 = pos3,

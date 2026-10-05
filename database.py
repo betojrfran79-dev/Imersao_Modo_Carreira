@@ -3965,6 +3965,25 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
             except Exception:
                 pass
 
+    # Carregar nacionalidade e gênero reais direto do banco de dados oficial do FC Mania
+    fcm_nat_map = {}
+    try:
+        import fcm_resolver
+        f_db = fcm_resolver.find_fcm_db()
+        if f_db and os.path.exists(f_db):
+            conn_f = sqlite3.connect(f_db)
+            cur_f = conn_f.cursor()
+            cur_f.execute("SELECT playerid, nationality, gender FROM players")
+            for f_row in cur_f.fetchall():
+                if f_row[0] is not None:
+                    fcm_nat_map[int(f_row[0])] = {
+                        "nationality": int(f_row[1]) if f_row[1] is not None else 54,
+                        "gender": int(f_row[2]) if f_row[2] is not None else 0
+                    }
+            conn_f.close()
+    except Exception as err:
+        print(f"[Career Vault] Aviso ao carregar nacionalidades do FCM: {err}")
+
     conn = get_db()
     cur = conn.cursor()
 
@@ -4056,8 +4075,9 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
             weight = int(r.get("Weight_kg") or r.get("weight") or 75)
 
             live_info = live_attrs_map.get(pid, {})
-            nat_id = int(live_info.get("nationality_id") or live_info.get("nationality") or 54)
-            gender = int(live_info.get("gender") or 0)
+            fcm_info = fcm_nat_map.get(pid, {})
+            nat_id = int(live_info.get("nationality_id") or live_info.get("nationality") or fcm_info.get("nationality") or 54)
+            gender = int(live_info.get("gender") if live_info.get("gender") is not None else (fcm_info.get("gender") or 0))
 
             # Atributos específicos da tabela players do Live Editor (ou calculados pelo OVR real do save)
             sp_speed = int(live_info.get("sprintspeed") or max(50, min(99, ovr - 5)))

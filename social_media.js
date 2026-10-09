@@ -52,10 +52,7 @@ window.initSocialMediaTab = function(isInitialLoad = false) {
   populateSocialAuthorSelect();
   loadCaptureFolderBadge();
   loadSavedSocialPosts();
-  
-  if (!isInitialLoad) {
-    reloadLatestCaptureFile();
-  }
+  reloadLatestCaptureFile();
 };
 
 window.loadSocialMediaTab = function() {
@@ -115,14 +112,16 @@ window.switchSocialSubTab = function(tabName) {
 
 // Carrega o caminho configurado da pasta de capturas
 async function loadCaptureFolderBadge() {
+  const textEl = document.getElementById("currentCaptureFolderText");
+  const inputEl = document.getElementById("inputCaptureFolderPath");
   try {
     const res = await fetch("/api/media/capture-folder");
-    if (!res.ok) return;
+    if (!res.ok) {
+      if (textEl) textEl.textContent = "Falha ao verificar pasta";
+      return;
+    }
     const data = await res.json();
     window.SocialStudioState.captureFolder = data.capture_folder || "";
-
-    const textEl = document.getElementById("currentCaptureFolderText");
-    const inputEl = document.getElementById("inputCaptureFolderPath");
 
     if (textEl) {
       if (data.capture_folder) {
@@ -138,6 +137,7 @@ async function loadCaptureFolderBadge() {
     }
   } catch (err) {
     console.error("Erro ao carregar pasta de capturas:", err);
+    if (textEl) textEl.textContent = "Erro na pasta de capturas";
   }
 }
 
@@ -146,6 +146,9 @@ window.reloadLatestCaptureFile = async function() {
   const nameText = document.getElementById("latestCaptureNameText");
   const trimmerArea = document.getElementById("socialTrimmerArea");
   const videoEl = document.getElementById("socialTrimmerVideo");
+  const imgArea = document.getElementById("socialImagePreviewArea");
+  const imgEl = document.getElementById("socialImagePreviewImg");
+  const clearBtn = document.getElementById("btnClearMediaSelection");
 
   if (nameText) nameText.textContent = "Verificando novos vídeos na pasta...";
 
@@ -167,8 +170,10 @@ window.reloadLatestCaptureFile = async function() {
       if (nameText) {
         nameText.innerHTML = `<span style="color: var(--neon-green); font-weight: 700;">${media.filename}</span> (${media.size_mb} MB - ${media.created_at})`;
       }
+      if (clearBtn) clearBtn.style.display = "inline-flex";
 
       if (media.type === 'video' && videoEl && trimmerArea) {
+        if (imgArea) imgArea.style.display = "none";
         trimmerArea.style.display = "flex";
         videoEl.src = media.url;
         videoEl.load();
@@ -191,12 +196,19 @@ window.reloadLatestCaptureFile = async function() {
 
           window.initVideoTrimLoop(videoEl, 0, duration > 0 ? duration : 30);
         };
+      } else if (media.type === 'image' && imgArea && imgEl) {
+        if (trimmerArea) trimmerArea.style.display = "none";
+        imgArea.style.display = "flex";
+        imgEl.src = media.url;
       }
+      if (window.lucide) lucide.createIcons();
     } else {
       if (nameText) {
         nameText.innerHTML = `<span style="color: var(--text-dim);">${data.message || "Nenhum arquivo gravado encontrado na pasta."}</span>`;
       }
       if (trimmerArea) trimmerArea.style.display = "none";
+      if (imgArea) imgArea.style.display = "none";
+      if (clearBtn) clearBtn.style.display = "none";
     }
   } catch (err) {
     console.error("Erro ao buscar último clipe:", err);
@@ -319,55 +331,111 @@ window.handleManualMediaSelect = async function(event) {
   if (!file) return;
 
   const hintEl = document.getElementById("socialGenStatusHint");
-  if (hintEl) hintEl.textContent = `Enviando arquivo local: ${file.name}...`;
+  const nameText = document.getElementById("latestCaptureNameText");
+  const trimmerArea = document.getElementById("socialTrimmerArea");
+  const videoEl = document.getElementById("socialTrimmerVideo");
+  const imgArea = document.getElementById("socialImagePreviewArea");
+  const imgEl = document.getElementById("socialImagePreviewImg");
+  const clearBtn = document.getElementById("btnClearMediaSelection");
 
-  const formData = new FormData();
-  formData.append("file", file);
+  const isVideo = file.type.startsWith("video/") || /\.(mp4|webm|mkv|mov|avi)$/i.test(file.name);
+  const mediaType = isVideo ? "video" : "image";
+  const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
 
-  try {
-    const res = await fetch("/api/upload-local", {
-      method: "POST",
-      body: formData
-    });
-    const data = await res.json();
+  // 1. Preview imediato local (0 ms de espera)
+  const localBlobUrl = URL.createObjectURL(file);
+  window.SocialStudioState.latestMedia = {
+    type: mediaType,
+    url: localBlobUrl,
+    filename: file.name,
+    size_mb: sizeMb,
+    created_at: new Date().toLocaleTimeString('pt-BR'),
+    is_local_blob: true
+  };
 
-    if (data.status === "success") {
-      window.SocialStudioState.latestMedia = {
-        type: data.type,
-        url: data.url,
-        filename: data.filename,
-        size_mb: (file.size / (1024 * 1024)).toFixed(1),
-        created_at: new Date().toLocaleTimeString('pt-BR')
-      };
-
-      const nameText = document.getElementById("latestCaptureNameText");
-      if (nameText) {
-        nameText.innerHTML = `<span style="color: var(--neon-blue); font-weight: 700;">${data.filename}</span> (Upload Manual - ${data.type.toUpperCase()})`;
-      }
-
-      const trimmerArea = document.getElementById("socialTrimmerArea");
-      const videoEl = document.getElementById("socialTrimmerVideo");
-
-      if (data.type === 'video' && videoEl && trimmerArea) {
-        trimmerArea.style.display = "flex";
-        videoEl.src = data.url;
-        videoEl.load();
-        videoEl.onloadedmetadata = () => {
-          window.initVideoTrimLoop(videoEl, 0, Math.min(30, videoEl.duration || 30));
-        };
-      } else if (trimmerArea) {
-        trimmerArea.style.display = "none";
-      }
-
-      if (hintEl) hintEl.textContent = "Arquivo pronto para uso!";
-      if (window.showToast) window.showToast("Mídia carregada com sucesso!", "success");
-    } else {
-      alert("Erro ao enviar mídia: " + (data.message || "Falha"));
-    }
-  } catch (err) {
-    console.error("Erro no upload manual:", err);
-    alert("Falha de rede ao enviar mídia.");
+  if (nameText) {
+    nameText.innerHTML = `<span style="color: var(--neon-blue); font-weight: 700;">${file.name}</span> (${sizeMb} MB - ${mediaType.toUpperCase()})`;
   }
+  if (clearBtn) clearBtn.style.display = "inline-flex";
+
+  if (isVideo && videoEl && trimmerArea) {
+    if (imgArea) imgArea.style.display = "none";
+    trimmerArea.style.display = "flex";
+    videoEl.src = localBlobUrl;
+    videoEl.load();
+    videoEl.onloadedmetadata = () => {
+      const duration = Math.min(30, Math.floor(videoEl.duration || 30));
+      const trimStartInput = document.getElementById("socialTrimStart");
+      const trimEndInput = document.getElementById("socialTrimEnd");
+      const durLabel = document.getElementById("videoDurationLabel");
+      if (durLabel) durLabel.textContent = `Total: ${Math.round(videoEl.duration || 0)}s | Trecho em loop: máx 30s`;
+      if (trimStartInput) trimStartInput.value = 0;
+      if (trimEndInput) {
+        trimEndInput.value = duration > 0 ? duration : 30;
+        trimEndInput.max = Math.round(videoEl.duration || 300);
+      }
+      window.initVideoTrimLoop(videoEl, 0, duration > 0 ? duration : 30);
+    };
+  } else if (!isVideo && imgArea && imgEl) {
+    if (trimmerArea) trimmerArea.style.display = "none";
+    imgArea.style.display = "flex";
+    imgEl.src = localBlobUrl;
+  }
+
+  if (hintEl) hintEl.textContent = `Carregando ${file.name}...`;
+  if (window.lucide) lucide.createIcons();
+
+  // 2. Upload persistente em base64 para o servidor
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const base64Data = e.target.result;
+      const res = await fetch("/api/upload-local", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          data: base64Data,
+          fileName: file.name,
+          mimeType: file.type || (isVideo ? "video/mp4" : "image/jpeg")
+        })
+      });
+      const data = await res.json();
+      if (data.status === "success" || data.success) {
+        if (window.SocialStudioState.latestMedia) {
+          window.SocialStudioState.latestMedia.url = data.url;
+        }
+        if (hintEl) hintEl.textContent = `Arquivo ${file.name} pronto para uso!`;
+        if (window.showToast) window.showToast("Mídia pronta para a publicação!", "success");
+      }
+    } catch (err) {
+      console.warn("Upload em background finalizado localmente:", err);
+      if (hintEl) hintEl.textContent = `Mídia pronta (${file.name})`;
+    }
+  };
+  reader.readAsDataURL(file);
+};
+
+// Remove qualquer mídia selecionada (permitindo gerar publicação apenas em texto)
+window.clearSelectedMedia = function() {
+  window.SocialStudioState.latestMedia = null;
+  const nameText = document.getElementById("latestCaptureNameText");
+  const trimmerArea = document.getElementById("socialTrimmerArea");
+  const videoEl = document.getElementById("socialTrimmerVideo");
+  const imgArea = document.getElementById("socialImagePreviewArea");
+  const fileInput = document.getElementById("socialManualFileInput");
+  const clearBtn = document.getElementById("btnClearMediaSelection");
+  const hintEl = document.getElementById("socialGenStatusHint");
+
+  if (nameText) nameText.innerHTML = `<span style="color: var(--text-dim);">Nenhuma mídia selecionada (gerar apenas texto).</span>`;
+  if (trimmerArea) trimmerArea.style.display = "none";
+  if (videoEl) {
+    videoEl.pause();
+    videoEl.src = "";
+  }
+  if (imgArea) imgArea.style.display = "none";
+  if (fileInput) fileInput.value = "";
+  if (clearBtn) clearBtn.style.display = "none";
+  if (hintEl) hintEl.textContent = "Modo somente texto ativado.";
 };
 
 // ==============================================================================
@@ -545,6 +613,7 @@ window.handleGenerateMediaContent = async function(event) {
   }
   if (hintEl) hintEl.textContent = "Conectando ao modelo de IA multimodal...";
 
+  try {
     const userApiKey = localStorage.getItem("gemini_api_key") || localStorage.getItem("user_gemini_api_key") || "";
 
     const payload = {

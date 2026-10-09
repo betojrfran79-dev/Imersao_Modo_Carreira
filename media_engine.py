@@ -475,7 +475,7 @@ def analyze_media_with_ai(req_data, base_dir, env_api_key=""):
         if media_data:
             if ',' in media_data:
                 media_data_pure = media_data.split(',', 1)[1]
-            else:
+            elif not media_data.startswith(('/api/', 'http://', 'https://', 'blob:', '/uploads/')) and len(media_data) > 100:
                 media_data_pure = media_data
 
         prompt = build_multimodal_prompt(player_name, team_name, career_type, journalist, media_type, notes, post_author)

@@ -1567,17 +1567,26 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         b64_data = b64_data.split(",", 1)[1]
                     raw_bytes = base64.b64decode(b64_data)
                     mime = payload.get("mimeType", "")
-                    if "video" in mime or payload.get("fileName", "").endswith(('.mp4', '.webm', '.mkv', '.avi')):
+                    orig_name = payload.get("fileName", "")
+                    if "video" in mime or orig_name.lower().endswith(('.mp4', '.webm', '.mkv', '.avi')):
                         file_ext = ".mp4"
-                    elif "png" in mime:
+                    elif "png" in mime or orig_name.lower().endswith('.png'):
                         file_ext = ".png"
                     
                     up_name = f"media_{int(time.time())}_{random.randint(100, 999)}{file_ext}"
                     up_path = os.path.join(UPLOADS_DIR, up_name)
                     with open(up_path, "wb") as f:
                         f.write(raw_bytes)
-                    return self.send_json({"success": True, "url": f"/uploads/{up_name}"})
-                return self.send_json({"success": False, "error": "Nenhum arquivo enviado."}, 400)
+                    is_vid = file_ext == ".mp4"
+                    return self.send_json({
+                        "status": "success",
+                        "success": True,
+                        "url": f"/uploads/{up_name}",
+                        "type": "video" if is_vid else "image",
+                        "filename": orig_name or up_name,
+                        "size_bytes": len(raw_bytes)
+                    })
+                return self.send_json({"status": "error", "success": False, "error": "Nenhum arquivo enviado."}, 400)
 
             # Upload de Foto Customizada do Treinador (Base64)
             if path == "/api/manager/avatar":

@@ -1769,10 +1769,26 @@
                 </div>
               </div>
 
-              <!-- Opção de Escolher Outro Arquivo Manualmente -->
-              <div style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-                <label style="font-size: 0.75rem; color: var(--text-dim);">Ou selecione outro vídeo / print manualmente:</label>
-                <input type="file" id="socialManualFileInput" accept="image/*,video/*" onchange="handleManualMediaSelect(event)" style="font-size: 0.78rem; color: var(--text-dim);">
+              <!-- Pré-visualização de Imagem Selecionada / Detectada -->
+              <div id="socialImagePreviewArea" style="display: none; flex-direction: column; gap: 0.5rem; align-items: center; margin-top: 0.75rem;">
+                <div style="position: relative; max-width: 480px; width: 100%; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.15); background: #000;">
+                  <img id="socialImagePreviewImg" src="" alt="Pré-visualização da Imagem" style="width: 100%; max-height: 240px; object-fit: contain; display: block; margin: 0 auto;">
+                </div>
+                <span style="font-size: 0.75rem; color: var(--neon-green); font-weight: 600; display: flex; align-items: center; gap: 4px;">
+                  <i data-lucide="image" style="width: 13px; height: 13px;"></i>
+                  Imagem pronta para ilustrar a matéria e o post
+                </span>
+              </div>
+
+              <!-- Opção de Escolher Outro Arquivo Manualmente + Botão de Descartar -->
+              <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <label style="font-size: 0.75rem; color: var(--text-dim); font-weight: 600;">Carregar outro print ou vídeo:</label>
+                  <input type="file" id="socialManualFileInput" accept="image/*,video/*" onchange="handleManualMediaSelect(event)" style="font-size: 0.78rem; color: var(--text-dim);">
+                </div>
+                <button type="button" class="btn-xs btn-secondary" id="btnClearMediaSelection" onclick="clearSelectedMedia()" style="display: none; color: var(--neon-red); border-color: rgba(255,75,75,0.3);">
+                  <i data-lucide="x" style="width: 12px; height: 12px;"></i> Descartar Mídia (Apenas Texto)
+                </button>
               </div>
 
             </div>

@@ -7233,3 +7233,27 @@ body {
   box-shadow: 0 6px 20px rgba(0,0,0,0.4);
 }
 
+/* Campos Editáveis Livres no Card do X e Jornal Siga La Pelota */
+.editable-field {
+  transition: all 0.15s ease-in-out;
+  border-radius: 4px;
+  position: relative;
+}
+.editable-field:hover {
+  outline: 1px dashed rgba(0, 210, 255, 0.45);
+  cursor: text;
+}
+.editable-field:focus {
+  outline: 2px solid var(--neon-blue);
+  background: rgba(0, 210, 255, 0.08);
+}
+
+.classic-newspaper-sheet .editable-field:hover {
+  outline: 1px dashed rgba(180, 140, 20, 0.6);
+  cursor: text;
+}
+.classic-newspaper-sheet .editable-field:focus {
+  outline: 2px solid var(--accent-gold);
+  background: rgba(245, 158, 11, 0.08);
+}
+

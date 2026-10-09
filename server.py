@@ -1555,6 +1555,22 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"status": "error", "message": "Caminho da pasta não informado."}, 400)
 
             if path == "/api/analyze-media":
+                db_save = database.get_or_create_active_save()
+                db_club = db_save.get("current_team_name") or "Madureira"
+                db_manager = db_save.get("manager_name") or "Beto Junior"
+                
+                generic_clubs = ["Meu Clube", "Clube", "Time", "", None]
+                generic_mgrs = ["Treinador", "Roberto", "Técnico", "", None]
+                
+                if payload.get("club_name") in generic_clubs:
+                    payload["club_name"] = db_club
+                if payload.get("teamName") in generic_clubs:
+                    payload["teamName"] = db_club
+                if payload.get("manager_name") in generic_mgrs:
+                    payload["manager_name"] = db_manager
+                if payload.get("playerName") in generic_mgrs:
+                    payload["playerName"] = db_manager
+
                 env_k = load_env().get("GEMINI_API_KEY", "")
                 res = media_engine.analyze_media_with_ai(payload, BASE_DIR, env_k)
                 return self.send_json(res)

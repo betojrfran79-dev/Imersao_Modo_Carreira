@@ -45,6 +45,50 @@ window.SocialStudioState = {
   selectedFile: null
 };
 
+// Resolve e valida metadados reais do Clube e Treinador no Banco / Dashboard
+window.resolveCurrentCareerMeta = async function() {
+  let clubName = window.cachedDashboardData?.save?.current_team_name;
+  let managerName = window.cachedDashboardData?.save?.manager_name;
+  let clubCrest = window.cachedDashboardData?.team_crest;
+  let seasonYear = window.cachedDashboardData?.active_season;
+
+  if (!clubName || clubName === "Meu Clube" || clubName === "Carregando...") {
+    const topClub = document.getElementById("topClubName")?.textContent?.trim();
+    if (topClub && topClub !== "Carregando..." && topClub !== "Meu Clube") clubName = topClub;
+  }
+  if (!managerName || managerName === "Treinador") {
+    const topMgr = document.getElementById("topManagerName")?.textContent?.replace("Técnico:", "").trim();
+    if (topMgr && topMgr !== "Roberto" && topMgr !== "Treinador") managerName = topMgr;
+  }
+
+  if (!clubName || clubName === "Meu Clube" || !managerName || managerName === "Treinador") {
+    try {
+      const res = await fetch("/api/dashboard");
+      if (res.ok) {
+        const d = await res.json();
+        if (d && d.save) {
+          clubName = d.save.current_team_name || clubName;
+          managerName = d.save.manager_name || managerName;
+          clubCrest = d.team_crest || clubCrest;
+          seasonYear = d.active_season || seasonYear;
+          window.cachedDashboardData = d;
+        }
+      }
+    } catch (e) {}
+  }
+
+  clubName = clubName || "Madureira";
+  managerName = managerName || "Beto Junior";
+  seasonYear = seasonYear || "2026";
+
+  const badgeClub = document.getElementById("studioClubNameBadge");
+  const badgeMgr = document.getElementById("studioManagerNameBadge");
+  if (badgeClub) badgeClub.textContent = clubName;
+  if (badgeMgr) badgeMgr.textContent = managerName;
+
+  return { clubName, managerName, clubCrest, seasonYear };
+};
+
 // ==============================================================================
 // 1. INICIALIZAÇÃO DA ABA
 // ==============================================================================
@@ -53,6 +97,7 @@ window.initSocialMediaTab = function(isInitialLoad = false) {
   loadCaptureFolderBadge();
   loadSavedSocialPosts();
   reloadLatestCaptureFile();
+  window.resolveCurrentCareerMeta();
 };
 
 window.loadSocialMediaTab = function() {
@@ -598,11 +643,12 @@ window.handleGenerateMediaContent = async function(event) {
   let videoStart = parseFloat(document.getElementById("socialTrimStart")?.value || 0);
   let videoEnd = parseFloat(document.getElementById("socialTrimEnd")?.value || 30);
 
-  // Informações da Carreira
-  const clubName = (window.cachedDashboardData?.save?.current_team_name) || "Meu Clube";
-  const managerName = (window.cachedDashboardData?.save?.manager_name) || "Treinador";
-  const clubCrest = window.cachedDashboardData?.team_crest || null;
-  const seasonYear = (window.cachedDashboardData?.active_season) || "2027";
+  // Informações da Carreira (Sempre consistentes)
+  const meta = await window.resolveCurrentCareerMeta();
+  const clubName = meta.clubName;
+  const managerName = meta.managerName;
+  const clubCrest = meta.clubCrest;
+  const seasonYear = meta.seasonYear;
 
   // Loading state
   const origBtnContent = btnSubmit ? btnSubmit.innerHTML : "";
@@ -797,19 +843,22 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
   if (comments.length > 0) {
     commentsHtml = `
       <div style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 12px;">
-        <div style="font-size: 0.78rem; text-transform: uppercase; color: var(--neon-blue); font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 4px;">
-          <i data-lucide="messages-square" style="width: 13px; height: 13px;"></i> Respostas no X (${comments.length})
+        <div style="font-size: 0.78rem; text-transform: uppercase; color: var(--neon-blue); font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <i data-lucide="messages-square" style="width: 13px; height: 13px;"></i> Respostas no X (${comments.length})
+          </span>
+          <span style="font-size: 0.7rem; color: var(--text-dim); text-transform: none; font-weight: normal;">(Clique no texto do comentário para editar)</span>
         </div>
         <div style="display: flex; flex-direction: column; gap: 10px;">
-          ${comments.map(c => `
+          ${comments.map((c, idx) => `
             <div style="display: flex; gap: 10px; background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.04);">
               <img src="${c.avatar || '/assets/avatars/AndreRizek.jpg'}" onerror="this.src='/assets/avatars/ESPN.png'" style="width: 34px; height: 34px; border-radius: 50%; object-fit: cover; flex-shrink: 0;" />
               <div style="flex: 1; font-size: 0.85rem;">
                 <div style="display: flex; align-items: center; gap: 6px;">
-                  <strong style="color: #fff;">${c.name}</strong>
+                  <strong class="editable-field" contenteditable="true" data-comment-idx="${idx}" data-field="name" style="color: #fff;" title="Clique para editar nome">${c.name}</strong>
                   <span style="color: var(--text-dim); font-size: 0.78rem;">${c.handle || ''}</span>
                 </div>
-                <div style="color: #e2e8f0; margin-top: 2px; line-height: 1.35;">${c.text}</div>
+                <div class="editable-field editable-comment-text" contenteditable="true" data-comment-idx="${idx}" data-field="text" style="color: #e2e8f0; margin-top: 2px; line-height: 1.35; padding: 2px 4px;" title="Clique para editar este comentário">${c.text}</div>
               </div>
             </div>
           `).join('')}
@@ -821,6 +870,18 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
   const nowFormatted = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' · ' + new Date().toLocaleDateString('pt-BR');
 
   container.innerHTML = `
+    <!-- Barra de Auxílio à Edição -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.85rem; padding: 0.55rem 0.9rem; background: rgba(0, 210, 255, 0.08); border: 1px solid rgba(0, 210, 255, 0.25); border-radius: 10px;">
+      <div style="font-size: 0.78rem; color: var(--neon-blue); display: flex; align-items: center; gap: 6px;">
+        <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+        <span><strong>Modo Edição Livre:</strong> Clique diretamente sobre o texto do post ou nos comentários para alterar o que quiser antes de salvar ou exportar!</span>
+      </div>
+      <button type="button" class="btn-xs btn-primary" onclick="saveEditedCardContent()" title="Salvar alterações no banco de dados" style="display: flex; align-items: center; gap: 4px; padding: 0.25rem 0.65rem; white-space: nowrap;">
+        <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+        <span>Salvar Alterações</span>
+      </button>
+    </div>
+
     <div class="share-x-card dark-mode" id="exportableTweetElement" style="background: #000; color: #fff; border: 1px solid #2f3336; border-radius: 16px; padding: 18px 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
       
       <!-- Cabeçalho do Autor -->
@@ -829,7 +890,7 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
           <img src="${data.author_avatar || '/assets/avatars/AndreRizek.jpg'}" onerror="this.src='/assets/avatars/ESPN.png'" style="width: 46px; height: 46px; border-radius: 50%; object-fit: cover;" />
           <div>
             <div style="display: flex; align-items: center; gap: 4px;">
-              <span style="font-weight: 700; font-size: 1rem; color: #fff;">${data.author_name}</span>
+              <span class="editable-field" contenteditable="true" id="editableTweetAuthor" style="font-weight: 700; font-size: 1rem; color: #fff; padding: 1px 4px;" title="Clique para editar nome do autor">${data.author_name}</span>
               ${verifiedBadgeSvg}
             </div>
             <span style="color: #71767b; font-size: 0.85rem;">${data.author_handle}</span>
@@ -840,8 +901,8 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
         </svg>
       </div>
 
-      <!-- Texto do Post -->
-      <div style="font-size: 1.05rem; line-height: 1.45; color: #e7e9ea; white-space: pre-line; word-break: break-word;">
+      <!-- Texto do Post (Editável) -->
+      <div class="editable-field" contenteditable="true" id="editableTweetText" style="font-size: 1.05rem; line-height: 1.45; color: #e7e9ea; white-space: pre-line; word-break: break-word; padding: 4px 6px;" title="Clique para editar o texto principal da postagem">
         ${data.post_text}
       </div>
 
@@ -863,7 +924,7 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
         <span style="display: flex; align-items: center; gap: 6px;"><i data-lucide="bookmark" style="width: 15px; height: 15px;"></i> 482</span>
       </div>
 
-      <!-- Debate com Comentários -->
+      <!-- Debate com Comentários (Editáveis) -->
       ${commentsHtml}
 
     </div>
@@ -908,6 +969,18 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
   }
 
   container.innerHTML = `
+    <!-- Barra de Auxílio à Edição -->
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.85rem; padding: 0.55rem 0.9rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; max-width: 820px; margin-left: auto; margin-right: auto;">
+      <div style="font-size: 0.78rem; color: var(--accent-gold); display: flex; align-items: center; gap: 6px;">
+        <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
+        <span><strong>Modo Edição Livre:</strong> Clique diretamente na manchete, subtítulo ou parágrafos para editar a matéria antes de exportar a capa!</span>
+      </div>
+      <button type="button" class="btn-xs btn-primary" onclick="saveEditedCardContent()" title="Salvar alterações no banco de dados" style="display: flex; align-items: center; gap: 4px; padding: 0.25rem 0.65rem; background: var(--accent-gold); color: #000; white-space: nowrap;">
+        <i data-lucide="check" style="width: 12px; height: 12px;"></i>
+        <span>Salvar Alterações</span>
+      </button>
+    </div>
+
     <div class="classic-newspaper-sheet" id="exportableNewspaperElement" style="background: #fbf9f4; color: #1a1a1a; padding: 32px 36px; border-radius: 4px; box-shadow: 0 12px 35px rgba(0,0,0,0.35); font-family: 'Georgia', serif; border: 1px solid #dcd7ce;">
       
       <!-- Masthead Superior do Jornal -->
@@ -923,25 +996,25 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
         <div style="display: flex; align-items: center; gap: 14px;">
           ${clubCrest ? `<img src="${clubCrest}" style="width: 34px; height: 34px; object-fit: contain;" />` : ''}
           <div style="text-align: right; font-family: 'Inter', sans-serif;">
-            <div style="font-weight: 800; font-size: 0.88rem; text-transform: uppercase; color: #111;">${clubName}</div>
+            <div class="editable-field" contenteditable="true" id="editableNewsClubName" style="font-weight: 800; font-size: 0.88rem; text-transform: uppercase; color: #111; padding: 1px 4px;" title="Clique para editar clube">${clubName}</div>
             <div style="font-size: 0.75rem; color: #666;">${dateStr}</div>
           </div>
         </div>
       </div>
 
-      <!-- Manchete e Linha Fina -->
+      <!-- Manchete e Linha Fina (Editáveis) -->
       <div style="margin-bottom: 20px; border-bottom: 1px solid #1a1a1a; padding-bottom: 16px;">
-        <h1 style="font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 2.1rem; line-height: 1.15; color: #0a0a0a; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: -0.02em;">
+        <h1 class="editable-field" contenteditable="true" id="editableNewsHeadline" style="font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 2.1rem; line-height: 1.15; color: #0a0a0a; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: -0.02em; padding: 2px 4px;" title="Clique para editar a manchete">
           ${news.headline || news.title || 'DESTAQUE DA RODADA'}
         </h1>
-        <h2 style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 1.05rem; line-height: 1.4; color: #444; margin: 0; font-style: italic;">
+        <h2 class="editable-field" contenteditable="true" id="editableNewsSubtitle" style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 1.05rem; line-height: 1.4; color: #444; margin: 0; font-style: italic; padding: 2px 4px;" title="Clique para editar o subtítulo">
           ${news.subtitle || ''}
         </h2>
       </div>
 
       <!-- Assinatura do Jornalista -->
       <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px; font-family: 'Inter', sans-serif; font-size: 0.82rem; color: #444; text-transform: uppercase; letter-spacing: 0.05em; border-left: 3px solid var(--accent-gold); padding-left: 10px;">
-        <span>Por <strong>${journalist}</strong></span>
+        <span>Por <strong class="editable-field" contenteditable="true" id="editableNewsJournalist" style="padding: 1px 4px;" title="Clique para editar o jornalista">${journalist}</strong></span>
         <span>•</span>
         <span>Direto da Redação</span>
       </div>
@@ -949,20 +1022,20 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
       <!-- Layout em Duas Colunas Estilo Folha de Notícias -->
       <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; font-size: 0.95rem; line-height: 1.6; text-align: justify;">
         
-        <!-- Coluna da Esquerda: Texto Principal -->
+        <!-- Coluna da Esquerda: Texto Principal (Editável) -->
         <div>
-          <p style="text-indent: 1.5rem; margin: 0 0 12px 0;">
+          <p class="editable-field" contenteditable="true" id="editableNewsLead" style="text-indent: 1.5rem; margin: 0 0 12px 0; padding: 2px 4px;" title="Clique para editar parágrafo">
             ${news.lead || (news.body ? news.body.split('\n')[0] : '')}
           </p>
-          <p style="text-indent: 1.5rem; margin: 0 0 12px 0;">
+          <p class="editable-field" contenteditable="true" id="editableNewsP1" style="text-indent: 1.5rem; margin: 0 0 12px 0; padding: 2px 4px;" title="Clique para editar parágrafo">
             ${news.analysis_paragraph_1 || ''}
           </p>
         </div>
 
-        <!-- Coluna da Direita: Imagem/Clipe + Análise Final -->
+        <!-- Coluna da Direita: Imagem/Clipe + Análise Final (Editável) -->
         <div>
           ${mediaColumnHtml}
-          <p style="text-indent: 1.5rem; margin: 0;">
+          <p class="editable-field" contenteditable="true" id="editableNewsP2" style="text-indent: 1.5rem; margin: 0; padding: 2px 4px;" title="Clique para editar parágrafo">
             ${news.analysis_paragraph_2 || ''}
           </p>
         </div>
@@ -978,6 +1051,8 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
     </div>
   `;
 
+  if (window.lucide) lucide.createIcons();
+
   if (mediaType === 'video') {
     const renVideo = document.getElementById("renderedNewsVideo");
     if (renVideo) {
@@ -985,6 +1060,62 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
     }
   }
 }
+
+// Salva as alterações de texto feitas pelo usuário diretamente no card ou capa
+window.saveEditedCardContent = async function() {
+  if (!window.SocialStudioState.activeGeneratedPost) {
+    if (window.showToast) window.showToast("Nenhuma publicação ativa gerada para salvar.", "info");
+    return;
+  }
+
+  const post = window.SocialStudioState.activeGeneratedPost;
+
+  // 1. Lê edições do Card do X se existirem
+  const editPostText = document.getElementById("editableTweetText");
+  if (editPostText) post.post_text = editPostText.innerText.trim();
+
+  const editAuthor = document.getElementById("editableTweetAuthor");
+  if (editAuthor) post.author_name = editAuthor.innerText.trim();
+
+  const commentElems = document.querySelectorAll(".editable-comment-text");
+  if (commentElems.length > 0 && post.comments) {
+    commentElems.forEach(el => {
+      const idx = parseInt(el.getAttribute("data-comment-idx"), 10);
+      if (!isNaN(idx) && post.comments[idx]) {
+        post.comments[idx].text = el.innerText.trim();
+      }
+    });
+  }
+
+  // 2. Lê edições da Capa do Jornal se existirem
+  if (!post.newspaper) post.newspaper = {};
+  const editHeadline = document.getElementById("editableNewsHeadline");
+  if (editHeadline) post.newspaper.headline = editHeadline.innerText.trim();
+
+  const editSubtitle = document.getElementById("editableNewsSubtitle");
+  if (editSubtitle) post.newspaper.subtitle = editSubtitle.innerText.trim();
+
+  const editJournalist = document.getElementById("editableNewsJournalist");
+  if (editJournalist) post.newspaper.journalist = editJournalist.innerText.trim();
+
+  const editLead = document.getElementById("editableNewsLead");
+  if (editLead) post.newspaper.lead = editLead.innerText.trim();
+
+  const editP1 = document.getElementById("editableNewsP1");
+  if (editP1) post.newspaper.analysis_paragraph_1 = editP1.innerText.trim();
+
+  const editP2 = document.getElementById("editableNewsP2");
+  if (editP2) post.newspaper.analysis_paragraph_2 = editP2.innerText.trim();
+
+  // 3. Salva no banco de dados SQLite
+  try {
+    await savePostToCareerVault(post);
+    if (window.showToast) window.showToast("Alterações no post e na matéria salvas com sucesso!", "success");
+  } catch (err) {
+    console.error("Erro ao salvar edições:", err);
+    if (window.showToast) window.showToast("Edição mantida na tela!", "info");
+  }
+};
 
 // ==============================================================================
 // 8. HISTÓRICO DE PUBLICAÇÕES SALVAS
@@ -1167,6 +1298,11 @@ window.exportCurrentTweetPng = async function() {
 
   if (window.showToast) window.showToast("Renderizando imagem em alta resolução...", "info");
 
+  if (document.activeElement && document.activeElement.blur) {
+    document.activeElement.blur();
+  }
+  if (window.saveEditedCardContent) await window.saveEditedCardContent();
+
   const video = el.querySelector('video');
   let tempCanvas = null;
   if (video && video.videoWidth > 0) {
@@ -1225,6 +1361,11 @@ window.exportCurrentNewspaperPng = async function() {
   }
 
   if (window.showToast) window.showToast("Renderizando capa do jornal em alta resolução...", "info");
+
+  if (document.activeElement && document.activeElement.blur) {
+    document.activeElement.blur();
+  }
+  if (window.saveEditedCardContent) await window.saveEditedCardContent();
 
   const video = el.querySelector('video');
   let tempCanvas = null;

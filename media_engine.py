@@ -403,7 +403,7 @@ def build_multimodal_prompt(player_name, team_name, career_type, journalist, med
     1. O post principal no X (Twitter), todas as respostas/comentários e a matéria do jornal DEVEM girar EXCLUSIVAMENTE em torno dos fatos descritos pelo usuário acima.
     2. Mencione explicitamente os lances, minutos, gols, jogadores, polêmicas de arbitragem, defesas ou qualquer evento narrado no relato!
     3. NUNCA invente vitória se o usuário relatou empate ou derrota, e NUNCA invente derrota se o usuário relatou vitória!
-    4. Trate o treinador como {player_name} e o time como {team_name}.
+    4. REGRA OBRIGATÓRIA DE NOMES: O clube é SEMPRE '{team_name}' e o técnico é SEMPRE '{player_name}'. É PROIBIDO usar termos genéricos como "meu clube", "o clube", "o time", "o treinador" ou "o técnico" de forma vaga. Sempre cite nominalmente o time como '{team_name}' (ex: "o {team_name}", "o {team_name} de {player_name}") e o técnico como '{player_name}' tanto no post principal, quanto em cada um dos comentários, na manchete e na matéria do jornal!
     
     {author_instruction}
     
@@ -452,8 +452,12 @@ def analyze_media_with_ai(req_data, base_dir, env_api_key=""):
     media_data = req_data.get('mediaData', '') or req_data.get('media_url', '') or req_data.get('mediaUrl', '')
     mime_type = req_data.get('mimeType', 'image/jpeg')
     media_type = req_data.get('mediaType', '') or req_data.get('media_type', 'match')
-    player_name = req_data.get('playerName') or req_data.get('manager_name') or req_data.get('coach_name') or 'Beto Junior'
-    team_name = req_data.get('teamName') or req_data.get('club_name') or req_data.get('team_name') or 'Madureira'
+    player_name = req_data.get('playerName') or req_data.get('manager_name') or req_data.get('coach_name') or ''
+    if not player_name or player_name in ['Treinador', 'Roberto', 'Técnico', '']:
+        player_name = 'Beto Junior'
+    team_name = req_data.get('teamName') or req_data.get('club_name') or req_data.get('team_name') or ''
+    if not team_name or team_name in ['Meu Clube', 'Clube', 'Time', '']:
+        team_name = 'Madureira'
     career_type = req_data.get('careerType', 'manager')
     journalist = req_data.get('journalist', 'André Rizek')
     post_author = req_data.get('postAuthor') or req_data.get('persona') or ''

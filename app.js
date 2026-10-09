@@ -81,6 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadOpponentsList();
   loadScoutHubData();
   loadSetupStatus();
+  if (window.initSocialMediaTab) window.initSocialMediaTab(true);
 
   // Sincronização automática inicial com dados do Desktop se disponíveis
   checkAndAutoSyncDesktop();
@@ -200,6 +201,7 @@ function initTabsNavigation() {
       if (tabTarget === "hall-of-fame" || tabTarget === "halloffame") loadHallOfFameData();
       if (tabTarget === "h2h") loadOpponentsList();
       if (tabTarget === "scout") loadScoutHubData();
+      if (tabTarget === "midias-sociais" && window.loadSocialMediaTab) window.loadSocialMediaTab();
 
       initLucideIcons();
     });

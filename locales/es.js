@@ -40,6 +40,7 @@ window.I18N_LOCALES['es'] = {
     finances: 'Finanzas del Club',
     halloffame: 'Salón de la Fama',
     h2h: 'Cara a Cara (H2H)',
+    socialMedia: 'Medios Sociales',
     settings: 'Configuración',
     winrateLabel: 'RENDIMIENTO GENERAL'
   },

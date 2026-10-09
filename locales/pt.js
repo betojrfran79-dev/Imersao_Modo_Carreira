@@ -40,6 +40,7 @@ window.I18N_LOCALES['pt'] = {
     finances: 'Finanças do Clube',
     halloffame: 'Hall da Fama Eterno',
     h2h: 'Raio-X de Duelos (H2H)',
+    socialMedia: 'Mídias Sociais',
     settings: 'Configurações',
     winrateLabel: 'APROVEITAMENTO GERAL'
   },

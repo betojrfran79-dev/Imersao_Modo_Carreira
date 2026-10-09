@@ -40,6 +40,7 @@ window.I18N_LOCALES['en'] = {
     finances: 'Club Finances',
     halloffame: 'Hall of Fame',
     h2h: 'Head-to-Head (H2H)',
+    socialMedia: 'Social Media',
     settings: 'Settings',
     winrateLabel: 'OVERALL WIN RATE'
   },

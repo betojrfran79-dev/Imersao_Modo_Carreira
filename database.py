@@ -536,6 +536,39 @@ def init_db():
     )
     """)
 
+    # 18. Posts e Matérias de Mídias Sociais (X/Twitter e Jornal Siga La Pelota)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS social_posts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        save_id TEXT DEFAULT '',
+        season_year TEXT DEFAULT '',
+        post_type TEXT NOT NULL DEFAULT 'tweet',
+        author_name TEXT NOT NULL,
+        author_handle TEXT DEFAULT '',
+        author_avatar TEXT DEFAULT '',
+        author_role TEXT DEFAULT '',
+        headline TEXT DEFAULT '',
+        content TEXT NOT NULL,
+        media_url TEXT DEFAULT '',
+        media_type TEXT DEFAULT 'none',
+        video_start REAL DEFAULT 0,
+        video_end REAL DEFAULT 30,
+        stats_json TEXT DEFAULT '{}',
+        newspaper_data TEXT DEFAULT '{}',
+        comments_json TEXT DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Configuração de pasta de capturas
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS app_settings (
+        setting_key TEXT PRIMARY KEY,
+        setting_value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     # Índices de performance e integridade anti-duplicação
     cursor.execute("""
     CREATE UNIQUE INDEX IF NOT EXISTS idx_matches_unique 
@@ -1338,13 +1371,29 @@ def sync_full_career(save_id, full_data, purge_previous=False):
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("SELECT avatar_url, weekly_wage, total_salary_earned FROM saves WHERE id = ?", (save_id,))
+    cur.execute("SELECT current_team_id, avatar_url, weekly_wage, total_salary_earned FROM saves WHERE id = ?", (save_id,))
     prev_save = cur.fetchone()
+    prev_team_id = prev_save["current_team_id"] if prev_save and "current_team_id" in prev_save.keys() else 0
     preserved_avatar = prev_save["avatar_url"] if prev_save and prev_save["avatar_url"] else ""
     prev_total_salary = prev_save["total_salary_earned"] if prev_save else 0.0
 
     incoming_manager_name = full_data.get("manager_name", "").strip()
     team_id = int(full_data.get("team_id", 0))
+
+    # Se purge_previous for verdadeiro ou se o clube mudou (troca de carreira ativa), limpa dados residuais
+    if purge_previous or (prev_team_id and team_id and prev_team_id != team_id):
+        tables = [
+            "manager_clubs", "manager_awards", "seasons",
+            "season_competitions", "standings", "matches", "match_scorers",
+            "player_season_stats", "player_awards", "retired_players",
+            "transfers", "finances", "calendar_fixtures", "knockout_stages"
+        ]
+        for t in tables:
+            try:
+                cur.execute(f"DELETE FROM {t} WHERE save_id = ?", (save_id,))
+            except Exception:
+                pass
+        conn.commit()
     team_name = full_data.get("team_name", "Clube")
     weekly_wage = float(full_data.get("weekly_wage", 0.0))
     raw_season = full_data.get("season_year", "")
@@ -4679,6 +4728,179 @@ def search_live_scout_players(save_id, params):
         return []
     finally:
         conn.close()
+
+def save_social_post(post_data):
+    """
+    Salva um post ou capa de jornal no banco de dados.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        stats_val = post_data.get("stats_json") or "{}"
+        if isinstance(stats_val, dict):
+            stats_val = json.dumps(stats_val)
+
+        comments_val = post_data.get("comments_json") or "[]"
+        if isinstance(comments_val, list):
+            comments_val = json.dumps(comments_val)
+
+        news_val = post_data.get("newspaper_data") or "{}"
+        if isinstance(news_val, dict):
+            news_val = json.dumps(news_val)
+
+        cursor.execute("""
+        INSERT INTO social_posts (
+            save_id, season_year, post_type, author_name, author_handle, author_avatar,
+            author_role, headline, content, media_url, media_type, video_start, video_end,
+            stats_json, newspaper_data, comments_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            str(post_data.get("save_id", "")),
+            str(post_data.get("season_year", "")),
+            str(post_data.get("post_type", "tweet")),
+            str(post_data.get("author_name", "")),
+            str(post_data.get("author_handle", "")),
+            str(post_data.get("author_avatar", "")),
+            str(post_data.get("author_role", "")),
+            str(post_data.get("headline", "")),
+            str(post_data.get("content", "")),
+            str(post_data.get("media_url", "")),
+            str(post_data.get("media_type", "none")),
+            float(post_data.get("video_start", 0.0) or 0.0),
+            float(post_data.get("video_end", 30.0) or 30.0),
+            stats_val,
+            news_val,
+            comments_val
+        ))
+        post_id = cursor.lastrowid
+        conn.commit()
+        return post_id
+    except Exception as e:
+        print(f"Erro ao salvar post social: {e}")
+        return None
+    finally:
+        conn.close()
+
+def get_social_posts(save_id=None, season_year=None, post_type=None, limit=100):
+    """
+    Retorna os posts sociais e matérias de jornal armazenados em ordem cronológica reversa.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        query = "SELECT * FROM social_posts WHERE 1=1"
+        params = []
+        if save_id:
+            query += " AND (save_id = ? OR save_id = '')"
+            params.append(str(save_id))
+        if season_year:
+            query += " AND (season_year = ? OR season_year = '')"
+            params.append(str(season_year))
+        if post_type:
+            query += " AND post_type = ?"
+            params.append(str(post_type))
+
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        posts = []
+        for r in rows:
+            p = dict(r)
+            try:
+                p["stats"] = json.loads(p.get("stats_json") or "{}")
+            except Exception:
+                p["stats"] = {}
+            try:
+                p["comments"] = json.loads(p.get("comments_json") or "[]")
+            except Exception:
+                p["comments"] = []
+            try:
+                p["newspaper_data"] = json.loads(p.get("newspaper_data") or "{}")
+            except Exception:
+                p["newspaper_data"] = {}
+            posts.append(p)
+        return posts
+    except Exception as e:
+        print(f"Erro ao buscar posts sociais: {e}")
+        return []
+    finally:
+        conn.close()
+
+def delete_social_post(post_id):
+    """
+    Exclui um post ou matéria de jornal pelo ID.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("DELETE FROM social_posts WHERE id = ?", (post_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Erro ao excluir post social {post_id}: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_app_setting(key, default=None):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT setting_value FROM app_settings WHERE setting_key = ?", (key,))
+        row = cursor.fetchone()
+        return row[0] if row else default
+    except Exception:
+        return default
+    finally:
+        conn.close()
+
+def set_app_setting(key, value):
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+        INSERT INTO app_settings (setting_key, setting_value, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value, updated_at = CURRENT_TIMESTAMP
+        """, (key, str(value)))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar configuração {key}: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_capture_folder():
+    """
+    Retorna a pasta configurada de capturas de vídeo/imagens.
+    Fallback automático para a pasta padrão de Capturas do Windows.
+    """
+    saved = get_app_setting("capture_folder")
+    if saved and os.path.exists(saved):
+        return saved
+    
+    # Fallback 1: Windows Captures
+    win_captures = os.path.join(os.path.expanduser("~"), "Videos", "Captures")
+    if os.path.exists(win_captures):
+        return win_captures
+    
+    # Fallback 2: D: drive
+    d_captures = r"D:\Posts_Jornais_Modo_Carreira\capturas"
+    if os.path.exists(d_captures):
+        return d_captures
+
+    # Fallback 3: uploads local
+    local_captures = os.path.join(BASE_DIR, "uploads")
+    return local_captures
+
+def set_capture_folder(folder_path):
+    if not folder_path:
+        return False
+    clean_path = folder_path.strip().strip('"').strip("'")
+    return set_app_setting("capture_folder", clean_path)
 
 # Inicializar tabelas essenciais ao importar (rápido e seguro)
 init_db()

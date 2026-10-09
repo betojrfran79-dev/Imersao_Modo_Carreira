@@ -20,6 +20,9 @@
   <!-- Main CSS -->
   <link rel="stylesheet" href="style.css?v=4.0">
 
+  <!-- html2canvas CDN (Exportação de cards e capas de jornais em imagem PNG) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
   <!-- i18n Locales & Engine -->
   <script src="locales/pt.js"></script>
   <script src="locales/en.js"></script>
@@ -144,6 +147,10 @@
         <button class="nav-item" data-tab="h2h">
           <i data-lucide="swords"></i>
           <span data-i18n="menu.h2h">Raio-X de Duelos (H2H)</span>
+        </button>
+        <button class="nav-item" data-tab="midias-sociais">
+          <i data-lucide="share-2"></i>
+          <span data-i18n="menu.socialMedia">Mídias Sociais</span>
         </button>
         <button class="nav-item" data-tab="settings">
           <i data-lucide="settings"></i>
@@ -1594,6 +1601,281 @@
       </section>
 
       <!-- ======================================================== -->
+      <!-- ABA: MÍDIAS SOCIAIS & IMPRENSA ESPORTIVA (SOCIAL HUB)    -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-midias-sociais">
+        
+        <!-- Header Principal da Aba de Mídias Sociais -->
+        <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="badge-tag" style="background: rgba(0, 210, 255, 0.15); color: var(--neon-blue); border: 1px solid rgba(0, 210, 255, 0.3);">
+                <i data-lucide="share-2" style="width: 12px; height: 12px;"></i>
+                IMPRENSA & REDES
+              </span>
+              <h2>Mídias Sociais & Cobertura da Carreira</h2>
+            </div>
+            <p style="margin-top: 0.25rem;">Repercussão da torcida no X/Twitter, debate com as 29 personalidades e capas de jornal do <em>Siga La Pelota</em>.</p>
+          </div>
+
+          <!-- Ações Rápidas: Configuração de Pasta de Capturas & Sub-Abas -->
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            
+            <!-- Badge da Pasta de Capturas Atual com botão de alterar -->
+            <div class="capture-folder-pill" id="captureFolderPill" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.78rem;">
+              <i data-lucide="folder-video" style="color: var(--accent-gold); width: 15px; height: 15px;"></i>
+              <span id="currentCaptureFolderText" style="color: var(--text-dim); max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Pasta monitorada de vídeos e capturas">Detectando pasta...</span>
+              <button type="button" class="btn-xs btn-secondary" onclick="openCaptureFolderModal()" title="Alterar pasta de gravação">
+                <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Alterar
+              </button>
+            </div>
+
+            <!-- Sub-abas / Filtro de Visualização -->
+            <div class="lang-selector" style="background: rgba(18, 22, 33, 0.8);">
+              <button type="button" class="lang-btn active" id="btnSubTabFeed" onclick="switchSocialSubTab('feed')">
+                <i data-lucide="message-square" style="width: 13px; height: 13px;"></i> Feed (X)
+              </button>
+              <button type="button" class="lang-btn" id="btnSubTabNews" onclick="switchSocialSubTab('news')">
+                <i data-lucide="newspaper" style="width: 13px; height: 13px;"></i> Capa Jornal
+              </button>
+              <button type="button" class="lang-btn" id="btnSubTabHistory" onclick="switchSocialSubTab('history')">
+                <i data-lucide="history" style="width: 13px; height: 13px;"></i> Histórico (<span id="savedPostsCount">0</span>)
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ====================================================== -->
+        <!-- ESTÚDIO GERADOR DE POSTS & MATÉRIAS                    -->
+        <!-- ====================================================== -->
+        <div class="glass-card" style="padding: 1.5rem; margin-bottom: 2rem; border-color: rgba(0, 210, 255, 0.2);">
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+            <h3 style="font-size: 1.15rem; color: #fff; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+              <i data-lucide="sparkles" style="color: var(--neon-green); width: 20px; height: 20px;"></i>
+              Estúdio de Repercussão da Rodada
+            </h3>
+            <button type="button" class="btn-xs btn-secondary" onclick="autoFillLastMatchData()" style="display: flex; align-items: center; gap: 0.35rem; color: var(--accent-gold); border-color: rgba(245, 158, 11, 0.3);">
+              <i data-lucide="zap" style="width: 13px; height: 13px;"></i>
+              <span>Puxar Contexto da Última Partida</span>
+            </button>
+          </div>
+
+          <form id="socialMediaForm" onsubmit="handleGenerateMediaContent(event)" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            
+            <!-- Linha 1: Personalidade do X / Jornalista do Siga La Pelota -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="socialAuthorSelect" style="display: flex; align-items: center; gap: 0.35rem; font-weight: 600; font-size: 0.85rem;">
+                  <i data-lucide="user-check" style="width: 15px; height: 15px; color: var(--neon-blue);"></i>
+                  Autor Principal do Post (Escolha entre as 29 Personalidades)
+                </label>
+                <select id="socialAuthorSelect" class="vault-select" style="font-size: 0.88rem; width: 100%;">
+                  <option value="">🎲 Sorteio Aleatório da IA (Qualquer uma das 29 Personalidades)</option>
+                  <!-- Preenchido dinamicamente via JS com as 29 personalidades -->
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label for="journalistSelect" style="display: flex; align-items: center; gap: 0.35rem; font-weight: 600; font-size: 0.85rem;">
+                  <i data-lucide="newspaper" style="width: 15px; height: 15px; color: var(--accent-gold);"></i>
+                  Jornalista que Assina a Capa (Siga La Pelota)
+                </label>
+                <select id="journalistSelect" class="vault-select" style="font-size: 0.88rem; width: 100%;">
+                  <option value="André Rizek" selected>André Rizek (SporTV / Seleção)</option>
+                  <option value="Mauro Cezar">Mauro Cezar (Crítica Tática Aprofundada)</option>
+                  <option value="Bruno Formiga">Bruno Formiga (Debate Histórico & Contexto)</option>
+                  <option value="Vitor Sergio Rodrigues (VSR)">Vitor Sergio Rodrigues (VSR - Números & Métricas)</option>
+                  <option value="PVC">PVC (Enciclopédico & Memória do Futebol)</option>
+                  <option value="Jorge Iggor">Jorge Iggor (TNT - Emoção & Narração Épica)</option>
+                  <option value="Galvão Bueno">Galvão Bueno (Haja Coração & Tom Dramático)</option>
+                  <option value="Milly Lacombe">Milly Lacombe (Estética Coletiva & Análise Crítica)</option>
+                  <option value="Fred Caldeira">Fred Caldeira (TNT Sports Londres / Premier League)</option>
+                  <option value="Marcelo Bechler">Marcelo Bechler (TNT Sports Barcelona / Vestirário Europeu)</option>
+                  <option value="Casimiro (Cazé TV)">Casimiro (Cazé TV - Papo Reto & Resenha)</option>
+                  <option value="Craque Neto">Craque Neto (Os Donos da Bola)</option>
+                  <option value="Romário">Romário (O Baixinho da Área)</option>
+                  <option value="Lance!">Lance! (Manchete Dinâmica & Destaques)</option>
+                  <option value="ESPN Brasil">ESPN Brasil (Jornalismo Esportivo Internacional)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Linha 2: Narração / Contexto + Microfone -->
+            <div class="form-group" style="margin-bottom: 0;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+                <label for="socialContextInput" style="margin: 0; font-weight: 600; font-size: 0.85rem;">
+                  O que aconteceu na partida? (Narração / Bastidores / Destaques)
+                </label>
+                
+                <!-- Botão de Microfone / Gravação por Voz Nativo -->
+                <button type="button" class="btn btn-voice" id="btnVoiceRecordContext" onclick="toggleVoiceInput('socialContextInput', this)" 
+                        title="Falar pelo Microfone"
+                        style="display: flex; align-items: center; gap: 0.35rem; padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 20px; background: rgba(0, 210, 255, 0.12); color: var(--neon-blue); border: 1px solid rgba(0, 210, 255, 0.35); cursor: pointer;">
+                  <i data-lucide="mic" style="width: 13px; height: 13px;"></i>
+                  <span>Gravar por Voz</span>
+                </button>
+              </div>
+              <textarea id="socialContextInput" rows="3" class="vault-input" 
+                        placeholder="Ex: Ganhamos de 2x1 do Corinthians com gol no final aos 93 minutos, o árbitro não marcou um pênalti claro no primeiro tempo e a torcida fez festa histórica no estádio..." 
+                        required style="font-size: 0.88rem; width: 100%; resize: vertical;"></textarea>
+            </div>
+
+            <!-- Linha 3: Captura de Gameplay / Vídeo com Trimmer Automático -->
+            <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 1rem;">
+              
+              <!-- Banner do Último Vídeo Local Detectado -->
+              <div id="latestCaptureCard" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; padding-bottom: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.08); flex-wrap: wrap; gap: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="badge-tag" style="background: rgba(0, 255, 102, 0.15); color: var(--neon-green); border: 1px solid rgba(0, 255, 102, 0.3); font-size: 0.7rem;">
+                    <i data-lucide="film" style="width: 12px; height: 12px;"></i> AUTO-DETECTADO
+                  </span>
+                  <span id="latestCaptureNameText" style="font-weight: 600; font-size: 0.85rem; color: #fff;">Buscando último clipe gravado...</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <button type="button" class="btn-xs btn-secondary" onclick="reloadLatestCaptureFile()" title="Atualizar detecção da pasta">
+                    <i data-lucide="refresh-cw" style="width: 12px; height: 12px;"></i> Recarregar Pasta
+                  </button>
+                </div>
+              </div>
+
+              <!-- Trimmer & Player de Vídeo -->
+              <div id="socialTrimmerArea" style="display: none; flex-direction: column; gap: 0.75rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                  <span style="font-size: 0.78rem; color: var(--neon-blue); font-weight: 700;">
+                    <i data-lucide="scissors" style="width: 13px; height: 13px;"></i> Trimmer de Vídeo (O clipe cortado roda em loop na matéria / post)
+                  </span>
+                  <span id="videoDurationLabel" style="font-size: 0.75rem; color: var(--text-dim);">Duração máx: 30s</span>
+                </div>
+
+                <div style="position: relative; max-width: 480px; margin: 0 auto; width: 100%; border-radius: 8px; overflow: hidden; background: #000; border: 1px solid rgba(255,255,255,0.1);">
+                  <video id="socialTrimmerVideo" controls muted playsinline style="width: 100%; max-height: 220px; display: block; background: #000;"></video>
+                </div>
+
+                <!-- Controles de Início e Fim do Corte -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; max-width: 480px; margin: 0 auto; width: 100%;">
+                  <div>
+                    <label style="font-size: 0.72rem; color: var(--text-dim); display: block; margin-bottom: 2px;">Início do Corte (s)</label>
+                    <input type="number" id="socialTrimStart" min="0" step="0.1" value="0" class="vault-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;" oninput="validateSocialTrim()">
+                  </div>
+                  <div>
+                    <label style="font-size: 0.72rem; color: var(--text-dim); display: block; margin-bottom: 2px;">Fim do Corte (s) - máx +30s</label>
+                    <input type="number" id="socialTrimEnd" min="0.1" step="0.1" value="30" class="vault-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;" oninput="validateSocialTrim()">
+                  </div>
+                </div>
+                <div id="socialTrimWarning" style="color: var(--neon-red); font-size: 0.72rem; text-align: center; display: none;">
+                  O trecho cortado deve ter no máximo 30 segundos!
+                </div>
+              </div>
+
+              <!-- Opção de Escolher Outro Arquivo Manualmente -->
+              <div style="margin-top: 0.75rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+                <label style="font-size: 0.75rem; color: var(--text-dim);">Ou selecione outro vídeo / print manualmente:</label>
+                <input type="file" id="socialManualFileInput" accept="image/*,video/*" onchange="handleManualMediaSelect(event)" style="font-size: 0.78rem; color: var(--text-dim);">
+              </div>
+
+            </div>
+
+            <!-- Botões de Geração de Conteúdo -->
+            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08);">
+              <span id="socialGenStatusHint" style="font-size: 0.78rem; color: var(--text-dim); margin-right: auto;"></span>
+
+              <button type="submit" class="btn-primary" id="btnSubmitGenerateMedia" style="font-size: 0.9rem; padding: 0.65rem 1.6rem; display: flex; align-items: center; gap: 0.5rem;">
+                <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
+                <span>Gerar Publicação & Matéria Completa</span>
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+        <!-- ====================================================== -->
+        <!-- SUB-VISUALIZAÇÃO 1: FEED DE REDES SOCIAIS (X/TWITTER)  -->
+        <!-- ====================================================== -->
+        <div id="viewSocialFeedArea">
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <h3 style="font-size: 1.1rem; color: #fff; margin: 0;">Repercussão da Partida no X</h3>
+              <span class="badge-tag" id="socialAiSourceBadge" style="font-size: 0.7rem; background: rgba(0, 255, 102, 0.12); color: var(--neon-green); border: 1px solid rgba(0, 255, 102, 0.3);">IA Ativa</span>
+            </div>
+            
+            <button type="button" class="btn-secondary btn-sm" onclick="exportCurrentTweetPng()" style="display: flex; align-items: center; gap: 0.4rem;">
+              <i data-lucide="download" style="width: 14px; height: 14px; color: var(--neon-blue);"></i>
+              <span>Exportar Post em Imagem (PNG)</span>
+            </button>
+          </div>
+
+          <!-- Container do Post do X (Renderizado para Exportação) -->
+          <div id="currentTweetCardContainer" style="max-width: 620px; margin: 0 auto 2rem auto;">
+            <!-- Conteúdo inserido dinamicamente via JS -->
+            <div class="glass-card" style="padding: 2rem; text-align: center; color: var(--text-dim);">
+              <i data-lucide="message-square" style="width: 36px; height: 36px; opacity: 0.4; margin-bottom: 0.5rem;"></i>
+              <p>Nenhuma publicação recente gerada ainda. Use o estúdio acima para narrar sua última partida e gerar o primeiro debate!</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ====================================================== -->
+        <!-- SUB-VISUALIZAÇÃO 2: CAPA DO JORNAL (SIGA LA PELOTA)    -->
+        <!-- ====================================================== -->
+        <div id="viewSocialNewsArea" style="display: none;">
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; max-width: 820px; margin-left: auto; margin-right: auto;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <h3 style="font-size: 1.1rem; color: #fff; margin: 0;">Capa Oficial • Portal Siga La Pelota</h3>
+            </div>
+            
+            <button type="button" class="btn-primary btn-sm" onclick="exportCurrentNewspaperPng()" style="display: flex; align-items: center; gap: 0.4rem; background: var(--accent-gold); color: #000;">
+              <i data-lucide="download-cloud" style="width: 14px; height: 14px;"></i>
+              <span>Exportar Capa do Jornal (PNG)</span>
+            </button>
+          </div>
+
+          <!-- Layout do Portal Editorial Siga La Pelota -->
+          <div id="currentNewspaperContainer" style="max-width: 820px; margin: 0 auto 2rem auto;">
+            <!-- Conteúdo inserido dinamicamente via JS -->
+            <div class="glass-card" style="padding: 2rem; text-align: center; color: var(--text-dim);">
+              <i data-lucide="newspaper" style="width: 36px; height: 36px; opacity: 0.4; margin-bottom: 0.5rem;"></i>
+              <p>Nenhuma matéria de jornal gerada ainda. Preencha o estúdio acima para criar uma capa personalizada com as cores e o escudo do seu clube!</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ====================================================== -->
+        <!-- SUB-VISUALIZAÇÃO 3: HISTÓRICO DE POSTS SALVOS          -->
+        <!-- ====================================================== -->
+        <div id="viewSocialHistoryArea" style="display: none;">
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; color: #fff; margin: 0;">Linha do Tempo da Carreira (Posts & Notícias)</h3>
+              <p style="font-size: 0.8rem; color: var(--text-dim); margin-top: 2px;">Todas as publicações e manchetes registradas no banco de dados.</p>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <select id="historySeasonFilter" class="vault-select" onchange="loadSavedSocialPosts()" style="font-size: 0.82rem; padding: 0.35rem 0.75rem;">
+                <option value="">Todas as Temporadas</option>
+              </select>
+              <button type="button" class="btn-secondary btn-sm" onclick="loadSavedSocialPosts()">
+                <i data-lucide="refresh-cw" style="width: 13px; height: 13px;"></i> Atualizar
+              </button>
+            </div>
+          </div>
+
+          <!-- Grid com o Feed Histórico -->
+          <div id="socialHistoryGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem;">
+            <!-- Preenchido dinamicamente via JS -->
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
       <!-- ABA 9: CONFIGURAÇÕES & STATUS                           -->
       <!-- ======================================================== -->
       <section class="tab-pane" id="pane-settings">
@@ -2846,9 +3128,50 @@
     </div>
   </div>
 
+  <!-- Modal: Configurar Pasta de Gravações e Capturas -->
+  <div class="vault-modal" id="modalCaptureFolder" style="display: none;">
+    <div class="modal-content glass-card" style="max-width: 540px; width: 92%;">
+      <div class="modal-header flex-between">
+        <div class="ch-title" style="font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
+          <i data-lucide="folder-video" style="color: var(--accent-gold);"></i> Pasta de Gravações & Capturas
+        </div>
+        <button class="modal-close" onclick="closeCaptureFolderModal()"><i data-lucide="x"></i></button>
+      </div>
+
+      <form id="formCaptureFolderSubmit" onsubmit="saveCaptureFolderConfig(event)" style="margin-top: 1rem;">
+        <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 0.75rem;">
+          Indique o caminho completo da pasta no seu computador onde seus vídeos de gameplay ou capturas do EA FC são salvos (ex: Capturas do Windows, pasta do OBS ou pasta personalizada).
+        </p>
+
+        <div class="form-group">
+          <label for="inputCaptureFolderPath">Caminho da Pasta no Computador *</label>
+          <input type="text" id="inputCaptureFolderPath" class="vault-input" placeholder="Ex: C:\Users\Roberto\Videos\Captures" required style="font-family: monospace; font-size: 0.85rem;">
+        </div>
+
+        <!-- Atalhos Rápidos -->
+        <div style="margin-top: 10px; margin-bottom: 12px;">
+          <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 6px;">Atalhos comuns:</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <button type="button" class="btn-quick-val" onclick="setQuickCaptureFolder('win_captures')">🎮 Capturas do Windows (Padrão)</button>
+            <button type="button" class="btn-quick-val" onclick="setQuickCaptureFolder('d_captures')">💾 D:\Posts_Jornais_Modo_Carreira</button>
+          </div>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" onclick="closeCaptureFolderModal()">Cancelar</button>
+          <button type="submit" class="btn-primary">
+            <i data-lucide="check"></i> Salvar Pasta
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Toast Notification Container -->
   <div class="vault-toast-container" id="toastContainer"></div>
 
+  <!-- Social Media & Press Studio Module -->
+  <script src="social_media.js?v=1.0"></script>
   <!-- Main JavaScript Application -->
   <script src="app.js?v=4.3"></script>
 </body>

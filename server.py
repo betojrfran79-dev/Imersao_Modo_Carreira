@@ -21,6 +21,7 @@ import subprocess
 import database
 import fcm_resolver
 import updater
+import media_engine
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -499,6 +500,83 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Content-Length", "0")
             self.end_headers()
 
+    def serve_file_with_range(self, filepath):
+        try:
+            if not os.path.exists(filepath):
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            file_size = os.path.getsize(filepath)
+            ctype, _ = mimetypes.guess_type(filepath)
+            if not ctype:
+                ctype = 'application/octet-stream'
+            range_header = self.headers.get('Range')
+
+            if range_header and range_header.startswith('bytes='):
+                bytes_val = range_header[6:].strip()
+                start = 0
+                end = file_size - 1
+
+                if '-' in bytes_val:
+                    parts = bytes_val.split('-', 1)
+                    if parts[0] == '':
+                        length = int(parts[1])
+                        start = max(0, file_size - length)
+                    elif parts[1] == '':
+                        start = int(parts[0])
+                    else:
+                        start = int(parts[0])
+                        end = min(int(parts[1]), file_size - 1)
+
+                if start > end or start >= file_size:
+                    self.send_response(416, "Requested Range Not Satisfiable")
+                    self.send_header("Content-Range", f"bytes */{file_size}")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    return
+
+                content_length = end - start + 1
+                self.send_response(206, "Partial Content")
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
+                self.send_header("Content-Length", str(content_length))
+                self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+
+                with open(filepath, 'rb') as f:
+                    f.seek(start)
+                    remaining = content_length
+                    chunk_size = 64 * 1024
+                    while remaining > 0:
+                        chunk = f.read(min(chunk_size, remaining))
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                        remaining -= len(chunk)
+                return
+            else:
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(file_size))
+                self.send_header("Accept-Ranges", "bytes")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+
+                with open(filepath, 'rb') as f:
+                    chunk_size = 64 * 1024
+                    while True:
+                        chunk = f.read(chunk_size)
+                        if not chunk:
+                            break
+                        self.wfile.write(chunk)
+                return
+        except (ConnectionResetError, BrokenPipeError):
+            pass
+        except Exception as e:
+            print(f"[File Server] Erro ao servir arquivo com Range ({filepath}): {e}")
+
     def do_OPTIONS(self):
         self.send_response(200)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -527,6 +605,49 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 fname = os.path.basename(path.split("?")[0])
                 fpath = os.path.join(UPLOADS_DIR, fname)
                 return self.serve_image(fpath)
+
+            # 0.2 Mídias Sociais, Feed de Notícias & Capturas de Gameplay
+            if path == "/api/social-posts":
+                post_type = query.get("post_type", [None])[0]
+                posts = database.get_social_posts(save_id, season_year, post_type)
+                return self.send_json({"status": "success", "posts": posts})
+
+            if path == "/api/media/capture-folder":
+                folder = database.get_capture_folder()
+                return self.send_json({"status": "success", "capture_folder": folder})
+
+            if path == "/api/media/latest-capture":
+                folder = database.get_capture_folder()
+                latest = media_engine.get_latest_capture_file(folder)
+                if latest:
+                    return self.send_json(latest)
+                return self.send_json({"success": False, "message": "Nenhum arquivo de vídeo/imagem encontrado na pasta de capturas.", "capture_folder": folder})
+
+            if path == "/api/media/serve-capture":
+                fname = query.get("file", [""])[0]
+                fpath_param = query.get("path", [""])[0]
+                target_path = None
+                folder = database.get_capture_folder()
+                if fname:
+                    target_path = os.path.join(folder, fname)
+                elif fpath_param:
+                    target_path = fpath_param
+
+                if target_path and os.path.isfile(target_path):
+                    self.serve_file_with_range(target_path)
+                    return
+                self.send_response(404)
+                self.end_headers()
+                return
+
+            if path.startswith("/assets/uploads/"):
+                fname = os.path.basename(path.split("?")[0])
+                fpath = os.path.join(BASE_DIR, "assets", "uploads", fname)
+                if not os.path.exists(fpath):
+                    fpath = os.path.join(UPLOADS_DIR, fname)
+                if os.path.isfile(fpath):
+                    self.serve_file_with_range(fpath)
+                    return
 
             # 1. Minifaces do FC Mania e DDS do Live Editor (com fallback na silhueta cinza oficial)
             if path.startswith("/assets/heads/") or path.startswith("/api/heads/"):
@@ -621,44 +742,51 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     "weekly_wage": 0.0, "total_salary_earned": 0.0, "avatar_url": ""
                 }
 
-                # Determinar temporada ativa de forma dinâmica e robusta
+                cur_team_id = save_data.get("current_team_id", 0)
+                cur_team_name = save_data.get("current_team_name", "Meu Clube")
+
+                # Determinar temporada ativa de forma dinâmica e robusta vinculada ao clube atual
                 active_season = season_year
                 if not active_season:
                     cur.execute("""
-                    SELECT MAX(season_year) FROM (
-                        SELECT season_year FROM seasons WHERE save_id = ? AND is_active = 1
-                        UNION
-                        SELECT season_year FROM matches WHERE save_id = ? AND season_year NOT IN ('57053')
-                        UNION
-                        SELECT season_year FROM calendar_fixtures WHERE save_id = ?
-                        UNION
-                        SELECT season_year FROM standings WHERE save_id = ?
-                        UNION
-                        SELECT season_year FROM season_competitions WHERE save_id = ?
-                    ) WHERE season_year IS NOT NULL AND season_year != '' AND season_year NOT IN ('57053')
-                    """, (save_id, save_id, save_id, save_id, save_id))
-                    m_row = cur.fetchone()
-                    active_season = m_row[0] if m_row and m_row[0] else "2028"
+                    SELECT season_year FROM seasons 
+                    WHERE save_id = ? AND is_active = 1 AND (team_id = ? OR ? = 0)
+                    ORDER BY id DESC LIMIT 1
+                    """, (save_id, cur_team_id, cur_team_id))
+                    s_row = cur.fetchone()
+                    if s_row and s_row[0]:
+                        active_season = s_row[0]
+                    else:
+                        cur.execute("""
+                        SELECT MAX(season_year) FROM matches 
+                        WHERE save_id = ? AND (user_team_id = ? OR home_team_id = ? OR away_team_id = ? OR ? = 0)
+                          AND season_year NOT IN ('57053') AND season_year IS NOT NULL AND season_year != ''
+                        """, (save_id, cur_team_id, cur_team_id, cur_team_id, cur_team_id))
+                        m_row = cur.fetchone()
+                        active_season = m_row[0] if m_row and m_row[0] else save_data.get("season_year", "2026")
 
                 # Garantir registro de temporada ativa na tabela seasons
-                cur.execute("""
-                INSERT INTO seasons (save_id, season_year, team_id, team_name, is_active)
-                VALUES (?, ?, ?, ?, 1)
-                ON CONFLICT(save_id, season_year, team_id) DO UPDATE SET is_active = 1
-                """, (save_id, active_season, save_data.get("current_team_id", 132332), save_data.get("current_team_name", "Portuguesa-RJ")))
-                cur.execute("UPDATE seasons SET is_active = 0 WHERE save_id = ? AND season_year != ?", (save_id, active_season))
-                conn.commit()
+                if cur_team_id > 0:
+                    cur.execute("""
+                    INSERT INTO seasons (save_id, season_year, team_id, team_name, is_active)
+                    VALUES (?, ?, ?, ?, 1)
+                    ON CONFLICT(save_id, season_year, team_id) DO UPDATE SET is_active = 1
+                    """, (save_id, active_season, cur_team_id, cur_team_name))
+                    cur.execute("UPDATE seasons SET is_active = 0 WHERE save_id = ? AND (season_year != ? OR team_id != ?)", (save_id, active_season, cur_team_id))
+                    conn.commit()
 
+                # Última partida do clube atual (filtrada obrigatoriamente pelo time ativo)
                 cur.execute("""
                 SELECT * FROM matches 
                 WHERE save_id = ? AND is_user_match = 1
+                  AND (user_team_id = ? OR home_team_id = ? OR away_team_id = ? OR ? = 0)
                 ORDER BY 
                     CASE 
                         WHEN match_date LIKE '__/__/____' THEN substr(match_date, 7, 4) || '-' || substr(match_date, 4, 2) || '-' || substr(match_date, 1, 2)
                         ELSE match_date 
                     END DESC, id DESC 
                 LIMIT 1
-                """, (save_id,))
+                """, (save_id, cur_team_id, cur_team_id, cur_team_id, cur_team_id))
                 last_match_row = cur.fetchone()
                 last_match = None
                 if last_match_row:
@@ -1071,7 +1199,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         try:
                             with open(tab_path, "r", encoding="utf-8", errors="ignore") as tf:
                                 tab_data = json.load(tf)
-                                s_year = tab_data.get("season_year", payload.get("season_year", "2028"))
+                                s_year = tab_data.get("season_year", payload.get("season_year", "2026"))
                                 if tab_data.get("standings"):
                                     database.save_competition_standings(save_id, tab_data.get("standings"), s_year)
                                     standings_count = max(standings_count, len(tab_data.get("standings", [])))
@@ -1084,7 +1212,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         try:
                             with open(cal_path, "r", encoding="utf-8", errors="ignore") as cf:
                                 cal_data = json.load(cf)
-                                s_year = payload.get("season_year", "2028")
+                                s_year = payload.get("season_year", "2026")
                                 fixs = cal_data.get("proximos_jogos", [])
                                 if fixs:
                                     database.save_calendar_fixtures(save_id, fixs, s_year)
@@ -1400,6 +1528,56 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 payload = {}
 
             save_id = payload.get("save_id", "carreira_ativa")
+
+            # --- MÍDIAS SOCIAIS & REPERCUSSÃO DA CARREIRA ---
+            if path == "/api/social-posts":
+                post_id = database.save_social_post(payload)
+                if post_id:
+                    return self.send_json({"status": "success", "id": post_id, "message": "Publicação salva com sucesso no histórico!"})
+                return self.send_json({"status": "error", "message": "Falha ao gravar postagem no banco de dados."}, 500)
+
+            if path == "/api/social-posts/delete":
+                pid = payload.get("id")
+                if pid:
+                    database.delete_social_post(pid)
+                    return self.send_json({"status": "success", "message": "Publicação removida com sucesso!"})
+                return self.send_json({"status": "error", "message": "ID não informado."}, 400)
+
+            if path == "/api/media/capture-folder":
+                folder_path = payload.get("folder_path", "").strip()
+                if folder_path:
+                    try:
+                        os.makedirs(folder_path, exist_ok=True)
+                        database.set_capture_folder(folder_path)
+                        return self.send_json({"status": "success", "capture_folder": folder_path, "message": "Pasta de capturas configurada com sucesso!"})
+                    except Exception as err:
+                        return self.send_json({"status": "error", "message": f"Erro no caminho: {err}"}, 400)
+                return self.send_json({"status": "error", "message": "Caminho da pasta não informado."}, 400)
+
+            if path == "/api/analyze-media":
+                env_k = load_env().get("GEMINI_API_KEY", "")
+                res = media_engine.analyze_media_with_ai(payload, BASE_DIR, env_k)
+                return self.send_json(res)
+
+            if path == "/api/upload-local":
+                b64_data = payload.get("data") or payload.get("fileData") or ""
+                file_ext = ".jpg"
+                if b64_data:
+                    if "," in b64_data:
+                        b64_data = b64_data.split(",", 1)[1]
+                    raw_bytes = base64.b64decode(b64_data)
+                    mime = payload.get("mimeType", "")
+                    if "video" in mime or payload.get("fileName", "").endswith(('.mp4', '.webm', '.mkv', '.avi')):
+                        file_ext = ".mp4"
+                    elif "png" in mime:
+                        file_ext = ".png"
+                    
+                    up_name = f"media_{int(time.time())}_{random.randint(100, 999)}{file_ext}"
+                    up_path = os.path.join(UPLOADS_DIR, up_name)
+                    with open(up_path, "wb") as f:
+                        f.write(raw_bytes)
+                    return self.send_json({"success": True, "url": f"/uploads/{up_name}"})
+                return self.send_json({"success": False, "error": "Nenhum arquivo enviado."}, 400)
 
             # Upload de Foto Customizada do Treinador (Base64)
             if path == "/api/manager/avatar":

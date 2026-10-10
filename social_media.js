@@ -786,8 +786,14 @@ async function savePostToCareerVault(postData) {
         retweets: postData.retweets,
         comments_count: (postData.comments || []).length
       },
+      stats_json: {
+        likes: postData.likes,
+        retweets: postData.retweets,
+        comments_count: (postData.comments || []).length
+      },
       newspaper_data: postData.newspaper,
-      comments: postData.comments || []
+      comments: postData.comments || [],
+      comments_json: postData.comments || []
     };
 
     const res = await fetch("/api/social-posts", {
@@ -803,6 +809,49 @@ async function savePostToCareerVault(postData) {
   } catch (err) {
     console.error("Erro ao salvar post no banco:", err);
   }
+}
+
+// Gerador de respostas autênticas garantidas (mínimo de 3 comentários para o post do X)
+function generateFallbackCommentsForPost(postData) {
+  const clubName = postData?.club_name || window.cachedDashboardData?.save?.current_team_name || "Madureira";
+  const managerName = postData?.manager_name || window.cachedDashboardData?.save?.manager_name || "Beto Junior";
+  
+  const pool = [
+    {
+      name: "Vitor Sergio Rodrigues (VSR)",
+      handle: "@vitorsergio",
+      avatar: "/assets/avatars/VSR.jpg",
+      text: `Análise tática irretocável sobre o ${clubName} de ${managerName}. Leitura de jogo precisa em cada detalhe do confronto!`
+    },
+    {
+      name: "Mauro Cezar",
+      handle: "@maurocezar",
+      avatar: "/assets/avatars/Mauro_Cezar.jpg",
+      text: `Postura madura e competitiva apresentada pelo ${clubName}. O trabalho de ${managerName} tem método e convicção clara.`
+    },
+    {
+      name: "Craque Neto",
+      handle: "@10neto",
+      avatar: "/assets/avatars/CraqueNeto.jpg",
+      text: `Garotinho, não tem o que falar! O ${clubName} do ${managerName} foi pra cima e jogou com coração de verdade!`
+    },
+    {
+      name: "Casimiro",
+      handle: "@casimiro",
+      avatar: "/assets/avatars/casimiro.png",
+      text: `Que jogo absurdo, rapaziada! O ${clubName} de ${managerName} entregou entretenimento puro hoje!`
+    }
+  ];
+
+  const authorName = (postData?.author_name || "").toLowerCase();
+  const available = pool.filter(p => !p.name.toLowerCase().includes(authorName));
+  const existing = Array.isArray(postData?.comments) ? [...postData.comments] : [];
+  
+  while (existing.length < 3 && available.length > 0) {
+    const next = available.shift();
+    existing.push(next);
+  }
+  return existing;
 }
 
 // ==============================================================================
@@ -837,8 +886,12 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
     }
   }
 
-  // Comentários da torcida e outros comentaristas
-  const comments = data.comments || [];
+  // Comentários da torcida e outros comentaristas - Garantir sempre no mínimo 3 respostas
+  let comments = data.comments;
+  if (!Array.isArray(comments) || comments.length < 3) {
+    comments = generateFallbackCommentsForPost(data);
+    data.comments = comments;
+  }
   let commentsHtml = '';
   if (comments.length > 0) {
     commentsHtml = `
@@ -1235,18 +1288,29 @@ window.viewSavedPostDetail = function(postId) {
   const post = (window.SocialStudioState.savedPosts || []).find(p => p.id === postId);
   if (!post) return;
 
+  let comments = post.comments || [];
+  if (!Array.isArray(comments) || comments.length < 3) {
+    comments = generateFallbackCommentsForPost({
+      ...post,
+      club_name: window.cachedDashboardData?.save?.current_team_name || "Madureira",
+      manager_name: window.cachedDashboardData?.save?.manager_name || "Beto Junior"
+    });
+    post.comments = comments;
+  }
+
   const data = {
+    id: post.id,
     author_name: post.author_name,
     author_handle: post.author_handle,
     author_avatar: post.author_avatar,
     post_text: post.content,
     likes: post.stats?.likes || '12.4K',
     retweets: post.stats?.retweets || '1.2K',
-    comments: post.comments || [],
+    comments: comments,
     newspaper: post.newspaper_data
   };
 
-  const clubName = window.cachedDashboardData?.save?.current_team_name || "Meu Clube";
+  const clubName = window.cachedDashboardData?.save?.current_team_name || "Madureira";
   const clubCrest = window.cachedDashboardData?.team_crest || null;
 
   renderTweetCard(data, post.media_url, post.media_type, post.video_start, post.video_end);
@@ -1421,13 +1485,38 @@ window.openCaptureFolderModal = function() {
   if (input && window.SocialStudioState.captureFolder) {
     input.value = window.SocialStudioState.captureFolder;
   }
-  if (modal) modal.classList.add("active");
+  if (modal) {
+    modal.classList.add("active");
+    modal.style.display = "flex";
+  }
   if (window.lucide) lucide.createIcons();
 };
 
 window.closeCaptureFolderModal = function() {
   const modal = document.getElementById("modalCaptureFolder");
-  if (modal) modal.classList.remove("active");
+  if (modal) {
+    modal.classList.remove("active");
+    modal.style.display = "none";
+  }
+};
+
+window.browseCaptureFolderNative = async function() {
+  try {
+    if (window.showToast) window.showToast("Abrindo seletor de pastas...", "info");
+    const res = await fetch("/api/media/browse-folder");
+    const data = await res.json();
+    if (data.status === "success" && data.capture_folder) {
+      const input = document.getElementById("inputCaptureFolderPath");
+      if (input) input.value = data.capture_folder;
+      window.SocialStudioState.captureFolder = data.capture_folder;
+      loadCaptureFolderBadge();
+      reloadLatestCaptureFile();
+      closeCaptureFolderModal();
+      if (window.showToast) window.showToast("Pasta selecionada: " + data.capture_folder, "success");
+    }
+  } catch (err) {
+    console.warn("Seletor nativo falhou:", err);
+  }
 };
 
 window.setQuickCaptureFolder = function(type) {

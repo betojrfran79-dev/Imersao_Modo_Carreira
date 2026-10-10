@@ -546,6 +546,25 @@ def analyze_media_with_ai(req_data, base_dir, env_api_key=""):
             else:
                 post['avatar'] = "/assets/avatars/casimiro.png"
 
+            # Garantir obrigatoriamente pelo menos 3 comentários
+            post_comms = post.get('comments') or []
+            if len(post_comms) < 3:
+                needed = 3 - len(post_comms)
+                existing_names = [c.get('name', '').lower() for c in post_comms]
+                author_name = post.get('author', '').lower()
+                cand_keys = [k for k, v in PERSONAS.items() if v['name'].lower() not in existing_names and v['name'].lower() != author_name]
+                sampled = random.sample(cand_keys, min(needed, len(cand_keys)))
+                for sk in sampled:
+                    pers = PERSONAS[sk]
+                    c_text = get_mock_persona_comment(sk, player_name, team_name, structured_data.get('opponent', 'Adversário'), structured_data.get('result', 'draw'), career_type, structured_data.get('rating', 7.0), structured_data.get('goals', 0), structured_data.get('assists', 0))
+                    post_comms.append({
+                        "name": pers["name"],
+                        "handle": pers["handle"],
+                        "avatar": pers["avatar"],
+                        "text": c_text
+                    })
+            post['comments'] = post_comms
+
             for comm in post.get('comments', []):
                 comm_str = comm.get('name', '')
                 matched_c = None

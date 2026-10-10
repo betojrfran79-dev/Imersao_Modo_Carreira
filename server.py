@@ -616,6 +616,28 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 folder = database.get_capture_folder()
                 return self.send_json({"status": "success", "capture_folder": folder})
 
+            if path == "/api/media/browse-folder":
+                selected_folder = None
+                try:
+                    import tkinter as tk
+                    from tkinter import filedialog
+                    root = tk.Tk()
+                    root.withdraw()
+                    root.attributes('-topmost', True)
+                    cur_folder = database.get_capture_folder() or os.path.expanduser("~")
+                    selected_folder = filedialog.askdirectory(
+                        title="Selecione a Pasta de Capturas e Gravações do EA FC",
+                        initialdir=cur_folder
+                    )
+                    root.destroy()
+                except Exception as e:
+                    print("[Server] Erro ao abrir diálogo de pastas do Windows:", e)
+                if selected_folder:
+                    selected_folder = os.path.normpath(selected_folder)
+                    database.set_capture_folder(selected_folder)
+                    return self.send_json({"status": "success", "capture_folder": selected_folder})
+                return self.send_json({"status": "cancelled", "capture_folder": database.get_capture_folder()})
+
             if path == "/api/media/latest-capture":
                 folder = database.get_capture_folder()
                 latest = media_engine.get_latest_capture_file(folder)
@@ -824,6 +846,18 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 # Obter próximo confronto do calendário ativo
                 cal_fixtures = database.get_calendar_fixtures(save_id, active_season)
                 proximos = cal_fixtures.get("proximos_jogos", [])
+                
+                # Descartar caso o primeiro jogo seja idêntico à última partida já concluída
+                if proximos and last_match:
+                    lm_date = str(last_match.get("match_date", "")).strip()
+                    p_date = str(proximos[0].get("data") or proximos[0].get("match_date", "")).strip()
+                    lm_h = str(last_match.get("home_team_name", "")).strip().lower()
+                    p_h = str(proximos[0].get("mandante") or proximos[0].get("home_team_name", "")).strip().lower()
+                    lm_a = str(last_match.get("away_team_name", "")).strip().lower()
+                    p_a = str(proximos[0].get("visitante") or proximos[0].get("away_team_name", "")).strip().lower()
+                    if (lm_date == p_date and ((lm_h == p_h and lm_a == p_a) or (lm_h == p_a and lm_a == p_h))):
+                        proximos = proximos[1:]
+
                 next_match = None
                 if proximos:
                     next_match = proximos[0]
@@ -1555,9 +1589,19 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"status": "error", "message": "Caminho da pasta não informado."}, 400)
 
             if path == "/api/analyze-media":
-                db_save = database.get_or_create_active_save()
-                db_club = db_save.get("current_team_name") or "Madureira"
-                db_manager = db_save.get("manager_name") or "Beto Junior"
+                db_club = "Madureira"
+                db_manager = "Beto Junior"
+                try:
+                    conn = database.get_db()
+                    cur = conn.cursor()
+                    cur.execute("SELECT current_team_name, manager_name FROM saves WHERE id = 'carreira_ativa'")
+                    row = cur.fetchone()
+                    if row:
+                        db_club = row["current_team_name"] or "Madureira"
+                        db_manager = row["manager_name"] or "Beto Junior"
+                    conn.close()
+                except Exception as e:
+                    print("[Server] Erro ao consultar save ativo para analyze-media:", e)
                 
                 generic_clubs = ["Meu Clube", "Clube", "Time", "", None]
                 generic_mgrs = ["Treinador", "Roberto", "Técnico", "", None]

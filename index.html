@@ -1623,7 +1623,7 @@
             
             <!-- Badge da Pasta de Capturas Atual com botão de alterar -->
             <div class="capture-folder-pill" id="captureFolderPill" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); padding: 0.4rem 0.8rem; border-radius: 8px; font-size: 0.78rem;">
-              <i data-lucide="folder-video" style="color: var(--accent-gold); width: 15px; height: 15px;"></i>
+              <i data-lucide="film" style="color: var(--accent-gold); width: 15px; height: 15px;"></i>
               <span id="currentCaptureFolderText" style="color: var(--text-dim); max-width: 230px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="Pasta monitorada de vídeos e capturas">Detectando pasta...</span>
               <button type="button" class="btn-xs btn-secondary" onclick="openCaptureFolderModal()" title="Alterar pasta de gravação">
                 <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Alterar
@@ -3152,13 +3152,13 @@
   </div>
 
   <!-- Modal: Configurar Pasta de Gravações e Capturas -->
-  <div class="vault-modal" id="modalCaptureFolder" style="display: none;">
-    <div class="modal-content glass-card" style="max-width: 540px; width: 92%;">
-      <div class="modal-header flex-between">
+  <div class="modal-overlay" id="modalCaptureFolder">
+    <div class="modal-card" style="max-width: 540px; padding: 2rem;">
+      <div class="modal-header flex-between" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
         <div class="ch-title" style="font-size: 1.25rem; display: flex; align-items: center; gap: 8px;">
-          <i data-lucide="folder-video" style="color: var(--accent-gold);"></i> Pasta de Gravações & Capturas
+          <i data-lucide="film" style="color: var(--accent-gold);"></i> Pasta de Gravações & Capturas
         </div>
-        <button class="modal-close" onclick="closeCaptureFolderModal()"><i data-lucide="x"></i></button>
+        <button class="modal-close-btn" type="button" onclick="closeCaptureFolderModal()"><i data-lucide="x"></i></button>
       </div>
 
       <form id="formCaptureFolderSubmit" onsubmit="saveCaptureFolderConfig(event)" style="margin-top: 1rem;">
@@ -3166,9 +3166,14 @@
           Indique o caminho completo da pasta no seu computador onde seus vídeos de gameplay ou capturas do EA FC são salvos (ex: Capturas do Windows, pasta do OBS ou pasta personalizada).
         </p>
 
-        <div class="form-group">
-          <label for="inputCaptureFolderPath">Caminho da Pasta no Computador *</label>
-          <input type="text" id="inputCaptureFolderPath" class="vault-input" placeholder="Ex: C:\Users\Roberto\Videos\Captures" required style="font-family: monospace; font-size: 0.85rem;">
+        <div class="form-group" style="margin-bottom: 1rem;">
+          <label for="inputCaptureFolderPath" style="display: block; font-size: 0.8rem; margin-bottom: 6px; color: #fff;">Caminho da Pasta no Computador *</label>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" id="inputCaptureFolderPath" class="vault-input" placeholder="Ex: C:\Users\Roberto\Videos\Captures" required style="flex: 1; font-family: monospace; font-size: 0.85rem; padding: 8px 12px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-subtle); border-radius: 8px; color: #fff;">
+            <button type="button" class="btn-secondary" onclick="browseCaptureFolderNative()" title="Procurar pasta pelo Windows Explorer" style="white-space: nowrap; display: flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 0.82rem; cursor: pointer;">
+              <i data-lucide="folder"></i> Procurar...
+            </button>
+          </div>
         </div>
 
         <!-- Atalhos Rápidos -->

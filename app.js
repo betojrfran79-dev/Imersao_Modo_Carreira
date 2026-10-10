@@ -4979,8 +4979,26 @@ function renderDashboardNextMatch(proximosJogos) {
   const awayMando = document.getElementById("nmAwayMando");
   const btnH2H = document.getElementById("btnNextMatchH2H");
 
-  if (proximosJogos && proximosJogos.length > 0) {
-    const nm = proximosJogos[0];
+  // Descartar jogos que já coincidam com a última partida já finalizada
+  let validProximos = (proximosJogos || []).filter(nm => {
+    if (!cachedDashboardData?.last_match) return true;
+    const lm = cachedDashboardData.last_match;
+    const nmDate = String(nm.data_partida || nm.data || nm.match_date || "").trim();
+    const lmDate = String(lm.match_date || "").trim();
+    const nmHome = String(nm.mandante || nm.home_team_name || "").toLowerCase().trim();
+    const nmAway = String(nm.visitante || nm.away_team_name || "").toLowerCase().trim();
+    const lmHome = String(lm.home_team_name || "").toLowerCase().trim();
+    const lmAway = String(lm.away_team_name || "").toLowerCase().trim();
+    if (nmDate && lmDate && nmDate === lmDate) {
+      if ((nmHome === lmHome && nmAway === lmAway) || (nmHome === lmAway && nmAway === lmHome)) {
+        return false;
+      }
+    }
+    return true;
+  });
+
+  if (validProximos && validProximos.length > 0) {
+    const nm = validProximos[0];
 
     if (compTag) compTag.textContent = nm.competicao || nm.competition_name || "Competição";
     
@@ -5041,26 +5059,40 @@ function renderDashboardNextMatch(proximosJogos) {
       const oppId = isUserHome ? aId : hId;
       const oppName = isUserHome ? aName : hName;
       btnH2H.onclick = () => navigateToH2H(oppId, oppName);
+      btnH2H.innerHTML = `<i data-lucide="swords"></i> Raio-X do Duelo (H2H)`;
     }
   } else {
-    // Fallback inteligente com contexto da temporada ativa
-    const activeYr = cachedDashboardData?.active_season || "2028";
-    if (compTag) compTag.textContent = `Temporada ${activeYr} (Ativa)`;
+    // Temporada concluída sem mais partidas agendadas
+    const activeYr = cachedDashboardData?.active_season || "2026";
+    if (compTag) compTag.textContent = `Temporada ${activeYr}`;
     if (countBadge) {
-      countBadge.textContent = "Aguardando Próxima Rodada";
-      countBadge.className = "badge-tag blue";
+      countBadge.textContent = "Temporada Encerrada";
+      countBadge.className = "badge-tag gold";
     }
-    const currentClub = cachedDashboardData?.save?.current_team_name || "Portuguesa-RJ";
+    const currentClub = cachedDashboardData?.save?.current_team_name || "Madureira";
     const currentCrest = cachedDashboardData?.team_crest || "/assets/default_crest.png";
 
     if (homeName) homeName.textContent = currentClub;
-    if (awayName) awayName.textContent = "Aguardando EA FC / Sorteio";
+    if (awayName) awayName.textContent = "Fim de Temporada";
     if (homeCrest) homeCrest.src = currentCrest;
-    if (awayCrest) awayCrest.src = "/assets/default_crest.png";
-    if (dateEl) dateEl.textContent = "Próxima Rodada";
-    if (timeEl) timeEl.innerHTML = `<i data-lucide="calendar" style="width: 12px; height: 12px; display: inline-block;"></i> Em Breve`;
-    if (homeMando) homeMando.textContent = "CASA";
-    if (awayMando) awayMando.textContent = "FORA";
+    if (awayCrest) awayCrest.src = currentCrest;
+    if (dateEl) dateEl.textContent = "Todos os jogos disputados";
+    if (timeEl) timeEl.innerHTML = `<i data-lucide="calendar" style="width: 12px; height: 12px; display: inline-block; color: var(--accent-gold);"></i> Calendário Finalizado`;
+    if (homeMando) {
+      homeMando.textContent = "FINAL";
+      homeMando.className = "team-mando-badge home";
+    }
+    if (awayMando) {
+      awayMando.textContent = "FIM";
+      awayMando.className = "team-mando-badge away";
+    }
+    if (btnH2H) {
+      btnH2H.onclick = () => {
+        const calTab = document.querySelector('[data-tab="calendar"]');
+        if (calTab) calTab.click();
+      };
+      btnH2H.innerHTML = `<i data-lucide="calendar-days"></i> Ver Histórico da Temporada`;
+    }
   }
 }
 

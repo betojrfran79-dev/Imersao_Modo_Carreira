@@ -1740,8 +1740,7 @@ def sync_full_career(save_id, full_data, purge_previous=False):
 
     # Sincronizar Próximos Jogos / Calendário diretamente do backup completo
     upcoming_matches = full_data.get("upcoming_matches", [])
-    if upcoming_matches:
-        save_calendar_fixtures(save_id, upcoming_matches, season_year)
+    save_calendar_fixtures(save_id, upcoming_matches, season_year)
 
     recalculate_competition_status_and_trophies(save_id, season_year)
     return True
@@ -3379,9 +3378,6 @@ def save_calendar_fixtures(save_id, fixtures_list, season_year="2028"):
     """
     Salva ou atualiza a lista de próximos jogos agendados no banco de dados.
     """
-    if not fixtures_list:
-        return []
-    
     conn = get_db()
     cur = conn.cursor()
     
@@ -3392,6 +3388,11 @@ def save_calendar_fixtures(save_id, fixtures_list, season_year="2028"):
     
     # 2. Limpar próximos jogos pendentes desta temporada para evitar duplicações
     cur.execute("DELETE FROM calendar_fixtures WHERE save_id = ? AND season_year = ? AND is_completed = 0", (save_id, s_year))
+    
+    if not fixtures_list:
+        conn.commit()
+        conn.close()
+        return []
     
     first_h_id = 0
     first_h_name = ""
@@ -3514,23 +3515,41 @@ def get_calendar_fixtures(save_id="carreira_ativa", season_year=None):
                     return f"{parts[2]:0>4}-{parts[1]:0>2}-{parts[0]:0>2}"
         return s
 
-    # Identificar a data da última partida realizada
+    # Identificar partidas já realizadas na temporada
+    played_match_keys = set()
     latest_played_iso = ""
-    if m_rows:
-        latest_played_iso = to_iso_fixture_date(m_rows[-1].get("match_date"))
+    for m in m_rows:
+        m_iso = to_iso_fixture_date(m.get("match_date"))
+        if m_iso and m_iso != "9999-99-99":
+            if not latest_played_iso or m_iso > latest_played_iso:
+                latest_played_iso = m_iso
+        h = str(m.get("home_team_name") or "").strip().lower()
+        a = str(m.get("away_team_name") or "").strip().lower()
+        played_match_keys.add((m_iso, h, a))
+        played_match_keys.add((m_iso, a, h))
 
-    # Filtrar próximos jogos reais (ano da data deve ser compatível com s_target)
+    # Filtrar próximos jogos reais (descartar jogos já disputados ou anteriores/iguais à última partida)
     valid_upcoming = []
     for f in raw_fixtures:
         f_iso = to_iso_fixture_date(f.get("data") or f.get("match_date"))
-        # Se houver data de última partida e o jogo for anterior com certeza, pular
-        if latest_played_iso and f_iso < latest_played_iso and f_iso != "9999-99-99":
-            continue
-        valid_upcoming.append(f)
+        h_f = str(f.get("mandante") or f.get("home_team_name") or "").strip().lower()
+        a_f = str(f.get("visitante") or f.get("away_team_name") or "").strip().lower()
 
-    # Se a lista filtrada ficou vazia mas existem raw_fixtures da temporada, usar raw_fixtures
-    if not valid_upcoming and raw_fixtures:
-        valid_upcoming = raw_fixtures
+        # Se houver data de última partida e o jogo for anterior, ou se for a mesma data e equipes de um jogo já disputado, pular
+        if latest_played_iso and f_iso != "9999-99-99":
+            if f_iso < latest_played_iso:
+                continue
+            if f_iso == latest_played_iso and m_rows:
+                lm = m_rows[-1]
+                lm_h = str(lm.get("home_team_name") or "").strip().lower()
+                lm_a = str(lm.get("away_team_name") or "").strip().lower()
+                if (h_f == lm_h and a_f == lm_a) or (h_f == lm_a and a_f == lm_h):
+                    continue
+
+        if (f_iso, h_f, a_f) in played_match_keys or (f_iso, a_f, h_f) in played_match_keys:
+            continue
+
+        valid_upcoming.append(f)
 
     valid_upcoming.sort(key=lambda x: to_iso_fixture_date(x.get("data") or x.get("match_date")))
     for idx, u in enumerate(valid_upcoming):
@@ -4736,15 +4755,15 @@ def save_social_post(post_data):
     conn = get_db()
     cursor = conn.cursor()
     try:
-        stats_val = post_data.get("stats_json") or "{}"
-        if isinstance(stats_val, dict):
+        stats_val = post_data.get("stats_json") or post_data.get("stats") or "{}"
+        if isinstance(stats_val, (dict, list)):
             stats_val = json.dumps(stats_val)
 
-        comments_val = post_data.get("comments_json") or "[]"
+        comments_val = post_data.get("comments_json") or post_data.get("comments") or "[]"
         if isinstance(comments_val, list):
             comments_val = json.dumps(comments_val)
 
-        news_val = post_data.get("newspaper_data") or "{}"
+        news_val = post_data.get("newspaper_data") or post_data.get("newspaper") or "{}"
         if isinstance(news_val, dict):
             news_val = json.dumps(news_val)
 

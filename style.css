@@ -6100,16 +6100,186 @@ body {
   color: var(--accent-gold);
 }
 
-.psm-stats-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
+/* ==============================================================================
+   CATEGORIAS OFICIAIS DE ATRIBUTOS (OFENSIVO, HABILIDADE, MOV, FORÇA, ETC.)
+   ============================================================================== */
+.psm-categories-section {
+  margin-top: 14px;
 }
 
-@media (max-width: 640px) {
-  .psm-stats-cards-grid {
-    grid-template-columns: repeat(3, 1fr);
+.psm-categories-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.psm-toggle-all-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.psm-toggle-all-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.psm-toggle-all-btn svg {
+  width: 13px;
+  height: 13px;
+  color: var(--accent-gold);
+}
+
+.psm-category-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .psm-category-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
+}
+
+@media (max-width: 520px) {
+  .psm-category-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.psm-cat-card {
+  background: rgba(18, 22, 28, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.psm-cat-card:hover {
+  border-color: rgba(245, 158, 11, 0.35);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+.psm-cat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s ease;
+}
+
+.psm-cat-header:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.psm-cat-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.psm-cat-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--accent-gold);
+}
+
+.psm-cat-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.psm-cat-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.psm-cat-badge {
+  min-width: 30px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  font-weight: 900;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.psm-cat-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--text-dim);
+  transition: transform 0.25s ease;
+}
+
+.psm-cat-card.collapsed .psm-cat-chevron {
+  transform: rotate(-90deg);
+}
+
+.psm-cat-body {
+  padding: 6px 10px 8px;
+}
+
+.psm-cat-card.collapsed .psm-cat-body {
+  display: none;
+}
+
+.psm-subattr-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-size: 0.78rem;
+}
+
+.psm-subattr-row:last-child {
+  border-bottom: none;
+}
+
+.psm-subattr-name {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.psm-subattr-val {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.3px;
+}
+
+.psm-plus-badge {
+  color: #f59e0b;
+  font-weight: 900;
+  font-size: 0.85rem;
+  margin-left: 2px;
 }
 
 .psm-stat-card {

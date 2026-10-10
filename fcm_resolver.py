@@ -259,15 +259,49 @@ def format_date_pt(val):
         pass
     return val_str
 
+_NATIONAL_TEAM_IDS = None
+_NATIONAL_TEAM_NAMES = None
+
+def get_national_teams_info():
+    global _NATIONAL_TEAM_IDS, _NATIONAL_TEAM_NAMES
+    if _NATIONAL_TEAM_IDS is not None and _NATIONAL_TEAM_NAMES is not None:
+        return _NATIONAL_TEAM_IDS, _NATIONAL_TEAM_NAMES
+
+    _NATIONAL_TEAM_IDS = set()
+    _NATIONAL_TEAM_NAMES = set()
+    f_db = find_fcm_db()
+    if f_db and os.path.exists(f_db):
+        try:
+            conn = sqlite3.connect(f_db)
+            cur = conn.cursor()
+            cur.execute("SELECT DISTINCT teamid FROM leagueteamlinks WHERE leagueid IN (78, 2136) UNION SELECT DISTINCT nationteamid FROM players WHERE nationteamid > 0")
+            _NATIONAL_TEAM_IDS = set(int(r[0]) for r in cur.fetchall() if r[0])
+            cur.execute("SELECT DISTINCT nationteamname FROM players WHERE nationteamname IS NOT NULL AND nationteamname != ''")
+            _NATIONAL_TEAM_NAMES = set(str(r[0]).strip() for r in cur.fetchall() if r[0])
+            if _NATIONAL_TEAM_IDS:
+                cur.execute("SELECT DISTINCT teamname FROM teams WHERE teamid IN (" + ",".join(str(i) for i in _NATIONAL_TEAM_IDS) + ")")
+                for r in cur.fetchall():
+                    if r[0]:
+                        _NATIONAL_TEAM_NAMES.add(str(r[0]).strip())
+            conn.close()
+        except Exception:
+            pass
+
+    if not _NATIONAL_TEAM_NAMES:
+        _NATIONAL_TEAM_NAMES = {
+            "Brasil", "Argentina", "Portugal", "Espanha", "França", "França", "Alemanha", "Itália", "Itália", "Inglaterra",
+            "Holanda", "Bélgica", "Bélgica", "Uruguai", "Colômbia", "Colômbia", "Chile", "Noruega", "Suécia", "Suécia",
+            "Dinamarca", "Croácia", "Croácia", "Polônia", "Polônia", "Escócia", "Escócia", "País de Gales", "Irlanda",
+            "República Tcheca", "Áustria", "Áustria", "Suíça", "Suíça", "Turquia", "Arábia Saudita", "Arábia Saudita",
+            "Japão", "Japão", "Coreia do Sul", "Marrocos", "Senegal", "Nigéria", "Nigéria", "Estados Unidos", "México", "México"
+        }
+    return _NATIONAL_TEAM_IDS, _NATIONAL_TEAM_NAMES
+
 def get_full_player_profile(player_id, save_id="carreira_ativa"):
     """
     Retorna a ficha técnica completa do atleta puxando DIRETAMENTE do save ativo via Live Editor
     (tabela scout_live_players no career_vault.db, gerada a partir de jogadores_contratos.csv e
-    da extração da tabela players em memória do jogo).
-
-    Lembrando: Na tabela 'players' em memória do jogo NÃO existem as colunas commonname,
-    firstname, lastname ou playername. O nome real vem do campo 'name' da extração / CSV
-    (resolvido via GetPlayerName no Live Editor) ou do FCM_NAMES_DATABASE.json.
+    da extração da tabela players em memória do jogo) e complementada pela base oficial do FC Mania.
     """
     player_id = int(player_id)
 
@@ -289,7 +323,7 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
 
     raw = dict(live_p) if live_p else {}
 
-    # Consulta complementar ao banco oficial do FC Mania para nacionalidade e clube reais
+    # Consulta complementar ao banco oficial do FC Mania com TODAS as colunas
     fcm_p = None
     f_db = find_fcm_db()
     if f_db and os.path.exists(f_db):
@@ -297,7 +331,7 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
             conn_f = sqlite3.connect(f_db)
             conn_f.row_factory = sqlite3.Row
             cur_f = conn_f.cursor()
-            cur_f.execute("SELECT nationality, nationteamname, teamid, teamname, leaguename FROM players WHERE playerid = ? LIMIT 1", (player_id,))
+            cur_f.execute("SELECT * FROM players WHERE playerid = ? LIMIT 1", (player_id,))
             fr = cur_f.fetchone()
             if fr:
                 fcm_p = dict(fr)
@@ -306,7 +340,6 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
             pass
 
     # 2. Resolução do Nome Oficial do Atleta
-    # (Na tabela players do jogo não há colunas de nome; o nome vem da extração LE / jogadores_contratos.csv ou FCM_NAMES_DATABASE.json)
     clean_pname = ""
     if live_p and live_p.get("name") and not str(live_p["name"]).strip().startswith("Jogador #"):
         clean_pname = str(live_p["name"]).strip()
@@ -317,32 +350,26 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
     clean_fullname = clean_pname
 
     # 3. Posições
-    pos1 = str(raw.get("position") or raw.get("Position") or "ATA").upper()
-    pos2 = str(raw.get("position2") or raw.get("Position2") or "").upper()
-    pos3 = str(raw.get("position3") or raw.get("Position3") or "").upper()
+    pos1 = str(raw.get("position") or (fcm_p.get("Position") if fcm_p else "") or "ATA").upper()
+    pos2 = str(raw.get("position2") or (fcm_p.get("Position2") if fcm_p else "") or "").upper()
+    pos3 = str(raw.get("position3") or (fcm_p.get("Position3") if fcm_p else "") or "").upper()
     sec_pos = [p for p in [pos2, pos3] if p and p != "NONE" and p != pos1]
 
-    # 4. Clube, Liga e Seleção Nacional (Separação estrita de Seleção e Clube Real)
-    NATIONAL_TEAMS_NAMES = {
-        "Brasil", "Argentina", "Portugal", "Espanha", "França", "França", "Alemanha", "Itália", "Itália", "Inglaterra",
-        "Holanda", "Bélgica", "Bélgica", "Uruguai", "Colômbia", "Colômbia", "Chile", "Noruega", "Suécia", "Suécia",
-        "Dinamarca", "Croácia", "Croácia", "Polônia", "Polônia", "Escócia", "Escócia", "País de Gales", "Irlanda",
-        "República Tcheca", "Áustria", "Áustria", "Suíça", "Suíça", "Turquia", "Arábia Saudita", "Arábia Saudita",
-        "Japão", "Japão", "Coreia do Sul", "Marrocos", "Senegal", "Nigéria", "Nigéria", "Estados Unidos", "México", "México"
-    }
-
+    # 4. Clube, Liga e Seleção Nacional (Separação estrita: NUNCA mostrar Seleção como Clube)
+    nat_ids, nat_names = get_national_teams_info()
     raw_tname = str(raw.get("team_name") or "").strip()
     raw_tid = int(raw.get("team_id") or 0)
-    is_national = (1300 <= raw_tid <= 1400) or (raw_tname in NATIONAL_TEAMS_NAMES)
+
+    is_national = (raw_tid in nat_ids) or (raw_tname in nat_names) or (1300 <= raw_tid <= 1400)
 
     nation_team_name = ""
     if fcm_p and fcm_p.get("nationteamname"):
         nation_team_name = str(fcm_p["nationteamname"]).strip()
-    elif is_national and raw_tname:
+    elif is_national and raw_tname and raw_tname in nat_names:
         nation_team_name = raw_tname
 
     if is_national:
-        if fcm_p and fcm_p.get("teamid") and not (1300 <= int(fcm_p["teamid"]) <= 1400):
+        if fcm_p and fcm_p.get("teamid") and int(fcm_p["teamid"]) not in nat_ids and not (1300 <= int(fcm_p["teamid"]) <= 1400):
             team_id = int(fcm_p["teamid"])
             team_name = str(fcm_p["teamname"] or "Sem Clube")
             league_name = str(fcm_p.get("leaguename") or "")
@@ -356,29 +383,42 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
         league_name = str(raw.get("league_name") or (fcm_p.get("leaguename") if fcm_p else "") or "")
 
     # 5. Overall e Potencial no Save Ativo
-    ovr = int(raw.get("overall_rating") or raw.get("ovr") or 75)
-    pot = int(raw.get("potential") or raw.get("pot") or ovr)
+    ovr = int(raw.get("overall_rating") or raw.get("ovr") or (fcm_p.get("overallrating") if fcm_p else 75) or 75)
+    pot = int(raw.get("potential") or raw.get("pot") or (fcm_p.get("potential") if fcm_p else ovr) or ovr)
 
-    # 6. Idade e Ano
+    # 6. Idade e Datas Formatadas
     calc_age = int(raw.get("age") or 24)
+    raw_birth = fcm_p.get("birthdate") if fcm_p and fcm_p.get("birthdate") else raw.get("birthdate")
+    birthdate_formatted = format_date_pt(raw_birth) if raw_birth else ""
 
-    # 7. Contrato, Salário e Valores de Mercado (jogadores_contratos.csv / Live Editor)
-    contract_until = int(raw.get("contract_valid_until") or 2028)
+    raw_join = fcm_p.get("playerjointeamdate") if fcm_p and fcm_p.get("playerjointeamdate") else raw.get("playerjointeamdate")
+    join_date_formatted = format_date_pt(raw_join) if raw_join else ""
+
+    # 7. Contrato, Salário e Valores de Mercado
+    contract_until = int(raw.get("contract_valid_until") or (fcm_p.get("contractvaliduntil") if fcm_p else 2028) or 2028)
     m_val = float(raw.get("market_value") or 0.0)
     w_wage = float(raw.get("weekly_wage") or 0.0)
     r_clause = float(raw.get("release_clause") or 0.0)
 
     # 8. Dados Físicos
-    height_cm = int(raw.get("height") or raw.get("height_cm") or 180)
-    weight_kg = int(raw.get("weight") or raw.get("weight_kg") or 75)
-    p_foot_raw = str(raw.get("preferred_foot") or raw.get("preferredfoot") or "Destro").strip().lower()
-    if p_foot_raw in ("2", "left", "canhoto", "c"):
-        pref_foot = "Canhoto"
-    else:
-        pref_foot = "Destro"
+    height_cm = int(raw.get("height") or raw.get("height_cm") or (fcm_p.get("height") if fcm_p else 180) or 180)
+    weight_kg = int(raw.get("weight") or raw.get("weight_kg") or (fcm_p.get("weight") if fcm_p else 75) or 75)
 
-    skill_moves = int(raw.get("skill_moves") or raw.get("skillmoves") or 3)
-    weak_foot = int(raw.get("weak_foot") or raw.get("weakfootabilitytypecode") or 3)
+    if fcm_p and fcm_p.get("preferredfoot") is not None:
+        pref_foot = "Canhoto" if int(fcm_p["preferredfoot"]) == 2 else "Destro"
+    else:
+        p_foot_raw = str(raw.get("preferred_foot") or raw.get("preferredfoot") or "Destro").strip().lower()
+        pref_foot = "Canhoto" if p_foot_raw in ("2", "left", "canhoto", "c") else "Destro"
+
+    if fcm_p and fcm_p.get("skillmoves") is not None:
+        skill_moves = max(1, min(5, int(fcm_p["skillmoves"]) + 1))
+    else:
+        skill_moves = int(raw.get("skill_moves") or raw.get("skillmoves") or 3)
+
+    if fcm_p and fcm_p.get("weakfootabilitytypecode") is not None:
+        weak_foot = max(1, min(5, int(fcm_p["weakfootabilitytypecode"])))
+    else:
+        weak_foot = int(raw.get("weak_foot") or raw.get("weakfootabilitytypecode") or 3)
 
     # 9. Nacionalidade Real
     nat_id = None
@@ -393,34 +433,113 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
 
     nat_display = NATIONALITY_DISPLAY_MAP.get(nat_id, f"País #{nat_id}")
 
-    # 10. Atributos Oficiais de Desempenho (Extraídos DIRETAMENTE da tabela players em memória pelo Live Editor)
-    def attr(name, default_calc):
-        if live_p and name in live_p and live_p[name] is not None and int(live_p[name]) > 0:
-            return int(live_p[name])
-        return default_calc
+    # 10. Extrator de Atributos com prioridade FCM DB (tabela players autêntica) > Live Editor > Calibração por OVR
+    def get_attr(col_name, default_calc=None):
+        if fcm_p and col_name in fcm_p and fcm_p[col_name] is not None:
+            try:
+                v = int(fcm_p[col_name])
+                if v > 0:
+                    return v
+            except (ValueError, TypeError):
+                pass
+        if live_p and col_name in live_p and live_p[col_name] is not None:
+            try:
+                v = int(live_p[col_name])
+                if v > 0:
+                    return v
+            except (ValueError, TypeError):
+                pass
+        if default_calc is not None:
+            return default_calc
+        return max(40, min(99, ovr - 5))
 
-    # Se ainda não tiver atributos individuais gravados no live_p, calibra proporcionalmente ao OVR real do save
-    sp_speed = attr("sprintspeed", max(50, min(99, ovr - 5)))
-    accel = attr("acceleration", max(50, min(99, ovr - 5)))
-    finish = attr("finishing", max(45, min(99, ovr - 10 if pos1 in ("CB", "LB", "RB", "GK", "ZAG", "LE", "LD", "GL") else ovr - 2)))
-    spower = attr("shotpower", max(50, min(99, ovr - 5)))
-    lshots = attr("longshots", max(45, min(99, ovr - 8)))
-    head_acc = attr("headingaccuracy", max(45, min(99, ovr - 5)))
-    spass = attr("shortpassing", max(50, min(99, ovr - 4)))
-    lpass = attr("longpassing", max(45, min(99, ovr - 8)))
-    vision = attr("vision", max(45, min(99, ovr - 6)))
-    drib = attr("dribbling", max(50, min(99, ovr - 4)))
-    bcontrol = attr("ballcontrol", max(50, min(99, ovr - 4)))
-    agil = attr("agility", max(50, min(99, ovr - 5)))
-    strength = attr("strength", max(50, min(99, ovr - 5)))
-    stam = attr("stamina", max(55, min(99, ovr - 3)))
-    jump = attr("jumping", max(50, min(99, ovr - 5)))
-    stand_tkl = attr("standingtackle", max(40, min(99, ovr - 2 if pos1 in ("CB", "LB", "RB", "ZAG", "LE", "LD", "VOL") else 45)))
-    slide_tkl = attr("slidingtackle", max(35, min(99, ovr - 4 if pos1 in ("CB", "LB", "RB", "ZAG", "LE", "LD", "VOL") else 40)))
-    interc = attr("interceptions", max(40, min(99, ovr - 3 if pos1 in ("CB", "LB", "RB", "ZAG", "LE", "LD", "VOL") else 45)))
-    def_aware = attr("defensiveawareness", max(40, min(99, ovr - 3 if pos1 in ("CB", "LB", "RB", "ZAG", "LE", "LD", "VOL") else 45)))
+    # 11. Estrutura Oficial de 7 Categorias FCM (Ofensivo, Habilidade, Movimentação, Força, Mentalidade, Defesa, Goleiro)
+    CATEGORIES_CONFIG = [
+        ("Ofensivo", "ofensivo", [
+            ("Cruzamento", "crossing", max(45, min(99, ovr - 8))),
+            ("Finalização", "finishing", max(45, min(99, ovr - 10 if pos1 in ("CB", "LB", "RB", "GK", "ZAG", "LE", "LD", "GL") else ovr - 2))),
+            ("Precisão Cabeceio", "headingaccuracy", max(45, min(99, ovr - 5))),
+            ("Passe Curto", "shortpassing", max(50, min(99, ovr - 4))),
+            ("Voleios", "volleys", max(40, min(99, ovr - 10)))
+        ]),
+        ("Habilidade", "habilidade", [
+            ("Dribles", "dribbling", max(50, min(99, ovr - 4))),
+            ("Curva", "curve", max(45, min(99, ovr - 8))),
+            ("Precisão nas Faltas", "freekickaccuracy", max(40, min(99, ovr - 10))),
+            ("Lançamento", "longpassing", max(45, min(99, ovr - 8))),
+            ("Controle de Bola", "ballcontrol", max(50, min(99, ovr - 4)))
+        ]),
+        ("Movimentação", "movimentacao", [
+            ("Aceleração", "acceleration", max(50, min(99, ovr - 5))),
+            ("Pique", "sprintspeed", max(50, min(99, ovr - 5))),
+            ("Agilidade", "agility", max(50, min(99, ovr - 5))),
+            ("Reação", "reactions", max(50, min(99, ovr - 4))),
+            ("Equilíbrio", "balance", max(45, min(99, ovr - 6)))
+        ]),
+        ("Força", "forca", [
+            ("Força do Chute", "shotpower", max(50, min(99, ovr - 5))),
+            ("Impulsão", "jumping", max(50, min(99, ovr - 5))),
+            ("Fôlego", "stamina", max(55, min(99, ovr - 3))),
+            ("Força", "strength", max(50, min(99, ovr - 5))),
+            ("Chutes de Longe", "longshots", max(45, min(99, ovr - 8)))
+        ]),
+        ("Mentalidade", "mentalidade", [
+            ("Combatividade", "aggression", max(45, min(99, ovr - 5))),
+            ("Interceptação", "interceptions", max(40, min(99, ovr - 3 if pos1 in ("CB", "LB", "RB", "ZAG", "LE", "LD", "VOL") else 45))),
+            ("Pos. de Ataque", "positioning", max(45, min(99, ovr - 5))),
+            ("Visão de Jogo", "vision", max(45, min(99, ovr - 6))),
+            ("Pênaltis", "penalties", max(40, min(99, ovr - 8))),
+            ("Compostura", "composure", max(50, min(99, ovr - 4)))
+        ]),
+        ("Defesa", "defesa", [
+            ("Habilidade Defensiva", "defensiveawareness", max(40, min(99, ovr - 3 if pos1 in ("CB", "LB", "RB", "ZAG", "LE", "LD", "VOL") else 45))),
+            ("Dividida em Pé", "standingtackle", max(40, min(99, ovr - 2 if pos1 in ("CB", "LB", "RB", "ZAG", "LE", "LD", "VOL") else 45))),
+            ("Carrinho", "slidingtackle", max(35, min(99, ovr - 4 if pos1 in ("CB", "LB", "RB", "ZAG", "LE", "LD", "VOL") else 40)))
+        ]),
+        ("Goleiro", "goleiro", [
+            ("Elasticidade GL", "gkdiving", max(10, min(99, ovr if pos1 in ("GK", "GL") else 12))),
+            ("Manejo GL", "gkhandling", max(10, min(99, ovr - 2 if pos1 in ("GK", "GL") else 10))),
+            ("Chute GL", "gkkicking", max(10, min(99, ovr - 5 if pos1 in ("GK", "GL") else 13))),
+            ("Posicionamento GL", "gkpositioning", max(10, min(99, ovr - 1 if pos1 in ("GK", "GL") else 10))),
+            ("Reflexos GL", "gkreflexes", max(10, min(99, ovr if pos1 in ("GK", "GL") else 10)))
+        ])
+    ]
 
-    # 6 Atributos Oficiais de Cartão (PAC, SHO, PAS, DRI, DEF, PHY)
+    categories = []
+    for cat_name, cat_id, sub_attrs in CATEGORIES_CONFIG:
+        attr_items = []
+        for label, col, dflt in sub_attrs:
+            val = get_attr(col, dflt)
+            attr_items.append({"name": label, "key": col, "value": val})
+        cat_score = int(round(sum(a["value"] for a in attr_items) / len(attr_items)))
+        categories.append({
+            "id": cat_id,
+            "name": cat_name,
+            "score": cat_score,
+            "attributes": attr_items
+        })
+
+    # Atributos clássicos de cartão (PAC, SHO, PAS, DRI, DEF, PHY) para compatibilidade retroativa
+    sp_speed = get_attr("sprintspeed", max(50, min(99, ovr - 5)))
+    accel = get_attr("acceleration", max(50, min(99, ovr - 5)))
+    finish = get_attr("finishing", max(45, min(99, ovr - 2)))
+    spower = get_attr("shotpower", max(50, min(99, ovr - 5)))
+    lshots = get_attr("longshots", max(45, min(99, ovr - 8)))
+    head_acc = get_attr("headingaccuracy", max(45, min(99, ovr - 5)))
+    spass = get_attr("shortpassing", max(50, min(99, ovr - 4)))
+    lpass = get_attr("longpassing", max(45, min(99, ovr - 8)))
+    vision = get_attr("vision", max(45, min(99, ovr - 6)))
+    drib = get_attr("dribbling", max(50, min(99, ovr - 4)))
+    bcontrol = get_attr("ballcontrol", max(50, min(99, ovr - 4)))
+    agil = get_attr("agility", max(50, min(99, ovr - 5)))
+    strength = get_attr("strength", max(50, min(99, ovr - 5)))
+    stam = get_attr("stamina", max(55, min(99, ovr - 3)))
+    jump = get_attr("jumping", max(50, min(99, ovr - 5)))
+    stand_tkl = get_attr("standingtackle", 45)
+    slide_tkl = get_attr("slidingtackle", 40)
+    interc = get_attr("interceptions", 45)
+    def_aware = get_attr("defensiveawareness", 45)
+
     pace = int((sp_speed + accel) / 2)
     shooting = int((finish + spower + lshots) / 3)
     passing = int((spass + lpass + vision) / 3)
@@ -428,15 +547,20 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
     defending = int((stand_tkl + slide_tkl + def_aware + interc) / 4)
     physical = int((strength + stam + jump) / 3)
 
-    # PlayStyles
-    playstyles = decode_playstyles(raw)
+    # 12. PlayStyles Oficiais (Base e PlayStyles+)
+    ps_dict = dict(fcm_p) if fcm_p else {}
+    if live_p:
+        for k in ("trait1", "trait2", "icontrait1", "icontrait2"):
+            if live_p.get(k) is not None:
+                ps_dict[k] = live_p[k]
+    playstyles = decode_playstyles(ps_dict)
 
     return {
         "player_id": player_id,
         "player_name": clean_pname,
         "full_name": clean_fullname,
         "age": calc_age,
-        "birthdate_formatted": "",
+        "birthdate_formatted": birthdate_formatted,
         "position": pos1,
         "secondary_positions": sec_pos,
         "team_id": team_id,
@@ -445,7 +569,7 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
         "overall_rating": ovr,
         "potential": pot,
         "contract_valid_until": contract_until,
-        "join_date_formatted": "",
+        "join_date_formatted": join_date_formatted,
         "nation_team_name": nation_team_name,
         "nationality": nat_display,
         "nationality_id": nat_id,
@@ -459,6 +583,7 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
         "release_clause": r_clause,
         "face_url": f"/api/heads/p{player_id}.png",
         "crest_url": f"/api/crest/l{team_id}.png",
+        "categories": categories,
         "stats": {
             "pace": pace,
             "shooting": shooting,

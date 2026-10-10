@@ -2156,40 +2156,16 @@
         </div>
       </div>
 
-      <!-- 6 Atributos Principais (Ritmo, Finalização, Passe, Drible, Defesa, Físico) -->
-      <div class="psm-stats-hex-section">
-        <div class="psm-section-label"><i data-lucide="gauge"></i> Atributos Oficiais de Desempenho</div>
-        <div class="psm-stats-cards-grid">
-          <div class="psm-stat-card">
-            <span class="psc-lbl">RITMO</span>
-            <span class="psc-val" id="spmStatPace">0</span>
-            <div class="psc-bar"><div class="psc-fill" id="spmStatPaceBar" style="width: 0%;"></div></div>
-          </div>
-          <div class="psm-stat-card">
-            <span class="psc-lbl">FINALIZAÇÃO</span>
-            <span class="psc-val" id="spmStatShooting">0</span>
-            <div class="psc-bar"><div class="psc-fill" id="spmStatShootingBar" style="width: 0%;"></div></div>
-          </div>
-          <div class="psm-stat-card">
-            <span class="psc-lbl">PASSE</span>
-            <span class="psc-val" id="spmStatPassing">0</span>
-            <div class="psc-bar"><div class="psc-fill" id="spmStatPassingBar" style="width: 0%;"></div></div>
-          </div>
-          <div class="psm-stat-card">
-            <span class="psc-lbl">DRIBLE</span>
-            <span class="psc-val" id="spmStatDribbling">0</span>
-            <div class="psc-bar"><div class="psc-fill" id="spmStatDribblingBar" style="width: 0%;"></div></div>
-          </div>
-          <div class="psm-stat-card">
-            <span class="psc-lbl">DEFESA</span>
-            <span class="psc-val" id="spmStatDefending">0</span>
-            <div class="psc-bar"><div class="psc-fill" id="spmStatDefendingBar" style="width: 0%;"></div></div>
-          </div>
-          <div class="psm-stat-card">
-            <span class="psc-lbl">FÍSICO</span>
-            <span class="psc-val" id="spmStatPhysical">0</span>
-            <div class="psc-bar"><div class="psc-fill" id="spmStatPhysicalBar" style="width: 0%;"></div></div>
-          </div>
+      <!-- 7 Categorias Oficiais de Atributos (Ofensivo, Habilidade, Movimentação, Força, Mentalidade, Defesa, Goleiro) -->
+      <div class="psm-categories-section">
+        <div class="psm-categories-topbar">
+          <div class="psm-section-label"><i data-lucide="layers"></i> Categorias de Atributos Oficiais</div>
+          <button type="button" class="btn-secondary btn-xs psm-toggle-all-btn" id="spmToggleAllCatsBtn" onclick="toggleAllCategoryCards()">
+            <i data-lucide="chevrons-up-down"></i> <span id="spmToggleAllText">Recolher Todos</span>
+          </button>
+        </div>
+        <div class="psm-category-cards-grid" id="spmCategoryCardsGrid">
+          <!-- Inserido dinamicamente via JS com suporte a clique para expandir/recolher -->
         </div>
       </div>
 

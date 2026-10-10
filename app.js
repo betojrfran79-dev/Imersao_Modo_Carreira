@@ -2024,43 +2024,63 @@ async function openScoutPlayerModal(playerId) {
       skillsEl.innerHTML = `Fintas: <b>${'⭐'.repeat(sm)} (${sm}/5)</b> • Perna Ruim: <b>${'⭐'.repeat(wf)} (${wf}/5)</b>`;
     }
 
-    // 5. 6 Atributos Oficiais de Desempenho
-    const stats = data.stats || { pace: 70, shooting: 70, passing: 70, dribbling: 70, defending: 70, physical: 70 };
-    const setStat = (valId, barId, score) => {
-      const valEl = document.getElementById(valId);
-      const barEl = document.getElementById(barId);
-      if (valEl) {
-        valEl.textContent = score;
-        valEl.className = `psc-val ${score >= 85 ? 'very-high' : (score >= 78 ? 'high' : '')}`;
-      }
-      if (barEl) {
-        barEl.style.width = `${Math.min(100, Math.max(0, score))}%`;
-        if (score >= 85) barEl.classList.add("gold");
-        else barEl.classList.remove("gold");
-      }
-    };
+    // 5. 7 Categorias Oficiais de Atributos FCM (Ofensivo, Habilidade, Movimentação, Força, Mentalidade, Defesa, Goleiro)
+    const catGrid = document.getElementById("spmCategoryCardsGrid");
+    const toggleAllBtnText = document.getElementById("spmToggleAllText");
+    if (toggleAllBtnText) toggleAllBtnText.textContent = "Recolher Todos";
 
-    setStat("spmStatPace", "spmStatPaceBar", stats.pace || 70);
-    setStat("spmStatShooting", "spmStatShootingBar", stats.shooting || 70);
-    setStat("spmStatPassing", "spmStatPassingBar", stats.passing || 70);
-    setStat("spmStatDribbling", "spmStatDribblingBar", stats.dribbling || 70);
-    setStat("spmStatDefending", "spmStatDefendingBar", stats.defending || 70);
-    setStat("spmStatPhysical", "spmStatPhysicalBar", stats.physical || 70);
+    if (catGrid) {
+      if (data.categories && data.categories.length > 0) {
+        catGrid.innerHTML = data.categories.map(cat => {
+          const badgeColor = getRatingColor(cat.score);
+          const rowsHtml = (cat.attributes || []).map(a => `
+            <div class="psm-subattr-row">
+              <span class="psm-subattr-name">${escapeHtml(a.name)}</span>
+              <b class="psm-subattr-val" style="color: ${getRatingColor(a.value)};">${a.value}</b>
+            </div>
+          `).join('');
 
-    // 6. PlayStyles
+          const iconName = getCategoryIcon(cat.id);
+
+          return `
+            <div class="psm-cat-card" data-cat-id="${cat.id}">
+              <div class="psm-cat-header" onclick="toggleCategoryCard(this)" title="Clique para expandir/recolher">
+                <div class="psm-cat-title-wrap">
+                  <i data-lucide="${iconName}" class="psm-cat-icon"></i>
+                  <span class="psm-cat-title">${escapeHtml(cat.name)}</span>
+                </div>
+                <div class="psm-cat-header-right">
+                  <span class="psm-cat-badge" style="background-color: ${badgeColor};">${cat.score}</span>
+                  <i data-lucide="chevron-down" class="psm-cat-chevron"></i>
+                </div>
+              </div>
+              <div class="psm-cat-body">
+                <div class="psm-subattrs-list">
+                  ${rowsHtml}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        catGrid.innerHTML = `<span style="font-size: 0.85rem; color: var(--text-dim); padding: 10px;">Atributos detalhados não disponíveis.</span>`;
+      }
+    }
+
+    // 6. PlayStyles (Estilos de Jogo Oficiais)
     const playstylesGrid = document.getElementById("spmPlaystylesGrid");
     if (playstylesGrid) {
       if (data.playstyles && data.playstyles.length > 0) {
         playstylesGrid.innerHTML = data.playstyles.map(ps => {
           const isPlus = ps.is_plus;
           return `
-            <span class="psm-playstyle-pill ${isPlus ? 'plus' : ''}">
-              ${isPlus ? '✨' : '🪄'} <b>${escapeHtml(ps.name)}</b>${isPlus ? '<b>+</b>' : ''}
+            <span class="psm-playstyle-pill ${isPlus ? 'plus' : ''}" title="${isPlus ? 'PlayStyle+ (Avançado)' : 'PlayStyle Normal'}">
+              ${isPlus ? '✨' : '🪄'} <b>${escapeHtml(ps.name)}</b>${isPlus ? '<span class="psm-plus-badge">+</span>' : ''}
             </span>
           `;
         }).join('');
       } else {
-        playstylesGrid.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-dim);">Nenhum PlayStyle específico cadastrado para este atleta.</span>`;
+        playstylesGrid.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-dim); font-style: italic;">Nenhum PlayStyle específico cadastrado para este atleta.</span>`;
       }
     }
 
@@ -2070,6 +2090,59 @@ async function openScoutPlayerModal(playerId) {
     console.error("Erro ao abrir ficha do scout:", err);
   }
 }
+
+function getRatingColor(valor) {
+  const v = Number(valor) || 0;
+  if (v >= 90) return "#15803d";
+  if (v >= 85) return "#22c55e";
+  if (v >= 80) return "#84cc16";
+  if (v >= 75) return "#ca8a04";
+  if (v >= 70) return "#e07600";
+  if (v >= 65) return "#ea580c";
+  if (v >= 60) return "#e04f32";
+  return "#c92e22";
+}
+
+function getCategoryIcon(catId) {
+  switch (catId) {
+    case 'ofensivo': return 'crosshair';
+    case 'habilidade': return 'sparkles';
+    case 'movimentacao': return 'zap';
+    case 'forca': return 'dumbbell';
+    case 'mentalidade': return 'brain';
+    case 'defesa': return 'shield';
+    case 'goleiro': return 'hand';
+    default: return 'layers';
+  }
+}
+
+function toggleCategoryCard(headerEl) {
+  const card = headerEl.closest('.psm-cat-card');
+  if (card) {
+    card.classList.toggle('collapsed');
+  }
+}
+window.toggleCategoryCard = toggleCategoryCard;
+
+function toggleAllCategoryCards() {
+  const cards = document.querySelectorAll('#spmCategoryCardsGrid .psm-cat-card');
+  const btnText = document.getElementById('spmToggleAllText');
+  if (!cards.length) return;
+
+  const anyExpanded = Array.from(cards).some(c => !c.classList.contains('collapsed'));
+  cards.forEach(c => {
+    if (anyExpanded) {
+      c.classList.add('collapsed');
+    } else {
+      c.classList.remove('collapsed');
+    }
+  });
+
+  if (btnText) {
+    btnText.textContent = anyExpanded ? 'Expandir Todos' : 'Recolher Todos';
+  }
+}
+window.toggleAllCategoryCards = toggleAllCategoryCards;
 
 window.openPlayerModal = openPlayerModal;
 window.openScoutPlayerModal = openScoutPlayerModal;

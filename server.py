@@ -18,6 +18,7 @@ import zipfile
 import io
 import shutil
 import subprocess
+import random
 import database
 import fcm_resolver
 import updater
@@ -2854,6 +2855,12 @@ if __name__ == "__main__":
     print(f"👉 Acesse no Navegador: http://localhost:{PORT}")
     print(f"==================================================")
     
+    # Atualizar cópia do script Lua na Área de Trabalho se existir
+    try:
+        deploy_scripts_to_all_desktops()
+    except Exception:
+        pass
+
     # Iniciar pré-conversão de minifaces em segundo plano
     threading.Thread(target=preconvert_all_dds_heads, daemon=True).start()
 

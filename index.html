@@ -288,6 +288,44 @@
                 </div>
               </div>
 
+              <!-- ALERTA IMPORTANTE: ATUALIZAÇÕES DO SCRIPT LUA -->
+              <div class="setup-lua-update-alert">
+                <div class="lua-alert-header">
+                  <div class="lua-alert-icon"><i data-lucide="alert-triangle"></i></div>
+                  <div class="lua-alert-title-wrap">
+                    <h4 class="lua-alert-title">⚠️ LEMBRETE: MANTENHA O SCRIPT LUA ATUALIZADO NO LIVE EDITOR</h4>
+                    <span class="lua-alert-subtitle">Sempre que o aplicativo atualizar, atualize também o arquivo na pasta do jogo!</span>
+                  </div>
+                </div>
+                <div class="lua-alert-body">
+                  <p>
+                    Quando você inicia o aplicativo pelo atalho da Área de Trabalho e novas atualizações são baixadas (ou quando for avisado nos vídeos do canal), 
+                    a versão mais recente do arquivo <code>EXTRAIR_DADOS_CARREIRA.lua</code> é gravada na pasta do seu aplicativo.
+                  </p>
+                  <div class="lua-alert-box-notice">
+                    <i data-lucide="shield-alert"></i>
+                    <div>
+                      <strong>Por que é necessário substituir manualmente na pasta do jogo?</strong>
+                      <span>A pasta do EA SPORTS FC (<code>C:\Program Files\...</code>) é protegida pelo sistema operacional Windows contra gravações externas automáticas.</span>
+                    </div>
+                  </div>
+                  <ul class="lua-alert-steps">
+                    <li>
+                      <i data-lucide="check-circle-2"></i>
+                      <span><strong>1. Verifique a pasta do aplicativo:</strong> Localize o arquivo <code>EXTRAIR_DADOS_CARREIRA.lua</code> atualizado na pasta do programa.</span>
+                    </li>
+                    <li>
+                      <i data-lucide="check-circle-2"></i>
+                      <span><strong>2. Copie para a pasta do Live Editor:</strong> Cole e substitua o arquivo em <code>C:\Program Files\EA Games\EA SPORTS FC\Live Editor\lua\scripts\</code></span>
+                    </li>
+                    <li>
+                      <i data-lucide="check-circle-2"></i>
+                      <span><strong>3. Pronto para jogar:</strong> Novas funções, correções de contratos, salários reais e atributos avançados do Scout passam a valer na mesma hora!</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
               <div class="setup-info-box">
                 <div class="info-icon"><i data-lucide="sparkles"></i></div>
                 <div class="info-content">
@@ -2131,6 +2169,10 @@
           <div class="psm-mc-row">
             <span class="psm-lbl">Chegada ao Clube:</span>
             <span class="psm-val" id="spmJoinDate">-</span>
+          </div>
+          <div class="psm-mc-row">
+            <span class="psm-lbl">Salário Atual:</span>
+            <span class="psm-val font-bold text-green" id="spmContractWage">-</span>
           </div>
           <div class="psm-mc-row">
             <span class="psm-lbl">Fim do Contrato:</span>

@@ -2008,6 +2008,11 @@ async function openScoutPlayerModal(playerId) {
     const joinDateEl = document.getElementById("spmJoinDate");
     if (joinDateEl) joinDateEl.textContent = data.join_date_formatted || data.join_date || "Não informado";
 
+    const contractWageEl = document.getElementById("spmContractWage");
+    if (contractWageEl) {
+      contractWageEl.textContent = rawWage > 0 ? `${formatCurrency(rawWage)}/sem` : "A Negociar";
+    }
+
     const contractValidEl = document.getElementById("spmContractValid");
     if (contractValidEl) contractValidEl.textContent = data.contract_valid_until ? `Válido até ${data.contract_valid_until}` : "Sem contrato ativo";
 

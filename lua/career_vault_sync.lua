@@ -903,6 +903,17 @@ function ExtractAndSyncFullCareer(is_silent)
                             local foot_name = (p_foot == 2) and "Canhoto" or "Destro"
                             local c_until = tonumber(p_tbl:GetRecordFieldValue(cur, "contractvaliduntil")) or (current_year + 3)
 
+                            local contract_scout = player_contracts[pid]
+                            local p_wage = (contract_scout and contract_scout.wage and contract_scout.wage > 0) and contract_scout.wage or 0
+                            if p_wage == 0 and ovr and ovr >= 50 and tid > 0 then
+                                if ovr >= 85 then p_wage = 75000
+                                elseif ovr >= 80 then p_wage = 35000
+                                elseif ovr >= 75 then p_wage = 20000
+                                elseif ovr >= 70 then p_wage = 8500
+                                elseif ovr >= 65 then p_wage = 3500
+                                else p_wage = 1500 end
+                            end
+
                             table.insert(scout_all_players, {
                                 player_id = pid,
                                 name = pname,
@@ -921,7 +932,7 @@ function ExtractAndSyncFullCareer(is_silent)
                                 weak_foot = w_foot,
                                 skill_moves = s_moves,
                                 market_value = 0,
-                                weekly_wage = 0,
+                                weekly_wage = p_wage,
                                 release_clause = 0,
                                 contract_valid_until = c_until,
                                 contract_status_note = string.format("Valor do passe a ser consultado diretamente com a diretoria do %s", tname),

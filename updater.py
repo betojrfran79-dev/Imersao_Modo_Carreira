@@ -196,6 +196,18 @@ def update_via_http_zip(remote_info):
             commit_date=remote_info.get("date", ""),
             message=remote_info.get("message", "")
         )
+        # Sincroniza cópia do script Lua no Desktop se a pasta existir
+        try:
+            user_prof = os.environ.get("USERPROFILE", "")
+            for desk_name in ["Desktop", os.path.join("OneDrive", "Desktop")]:
+                target_desk_dir = os.path.join(user_prof, desk_name, "Imersao_Modo_Carreira")
+                if os.path.exists(target_desk_dir):
+                    lua_src = os.path.join(BASE_DIR, "EXTRAIR_DADOS_CARREIRA.lua")
+                    if os.path.exists(lua_src):
+                        shutil.copy2(lua_src, os.path.join(target_desk_dir, "EXTRAIR_DADOS_CARREIRA.lua"))
+        except Exception:
+            pass
+
         return True, f"{updated_count} arquivos atualizados com sucesso."
 
     except Exception as e:

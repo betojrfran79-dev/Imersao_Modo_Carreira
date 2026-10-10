@@ -394,11 +394,64 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
     raw_join = fcm_p.get("playerjointeamdate") if fcm_p and fcm_p.get("playerjointeamdate") else raw.get("playerjointeamdate")
     join_date_formatted = format_date_pt(raw_join) if raw_join else ""
 
-    # 7. Contrato, Salário e Valores de Mercado
+    # 7. Contrato, Salário e Valores de Mercado (career_playercontract e calibração oficial)
     contract_until = int(raw.get("contract_valid_until") or (fcm_p.get("contractvaliduntil") if fcm_p else 2028) or 2028)
     m_val = float(raw.get("market_value") or 0.0)
     w_wage = float(raw.get("weekly_wage") or 0.0)
     r_clause = float(raw.get("release_clause") or 0.0)
+
+    # 1. Se salário não veio no raw (scout_live_players), buscar no histórico de contratos do save ativo (player_season_stats)
+    if w_wage <= 0 and os.path.exists(vault_db):
+        try:
+            conn_v = sqlite3.connect(vault_db)
+            cur_v = conn_v.cursor()
+            cur_v.execute("SELECT weekly_wage, market_value FROM player_season_stats WHERE player_id = ? AND weekly_wage > 0 ORDER BY id DESC LIMIT 1", (player_id,))
+            pss_r = cur_v.fetchone()
+            if pss_r:
+                w_wage = float(pss_r[0] or 0.0)
+                if m_val <= 0 and pss_r[1]:
+                    m_val = float(pss_r[1] or 0.0)
+            conn_v.close()
+        except Exception:
+            pass
+
+    # 2. Se ainda não achou, buscar diretamente no DADOS_CARREIRA.json (tabela career_playercontract extraída)
+    if w_wage <= 0:
+        for json_cand in [
+            os.path.join(os.path.expanduser("~"), "Desktop", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+            os.path.join(os.path.expanduser("~"), "OneDrive", "Desktop", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+            os.path.join(BASE_DIR, "DADOS_CARREIRA.json")
+        ]:
+            if os.path.exists(json_cand):
+                try:
+                    with open(json_cand, "r", encoding="utf-8", errors="ignore") as jf:
+                        dj = json.load(jf)
+                        p_contracts = dj.get("player_contracts", {})
+                        if str(player_id) in p_contracts:
+                            w_wage = float(p_contracts[str(player_id)].get("wage") or 0.0)
+                        elif player_id in p_contracts:
+                            w_wage = float(p_contracts[player_id].get("wage") or 0.0)
+                        if w_wage <= 0:
+                            for jp in dj.get("players", []):
+                                if int(jp.get("player_id") or 0) == player_id:
+                                    w_wage = float(jp.get("weekly_wage") or 0.0)
+                                    if m_val <= 0:
+                                        m_val = float(jp.get("market_value") or 0.0)
+                                    break
+                        if w_wage > 0:
+                            break
+                except Exception:
+                    pass
+
+    # 3. Se ainda sem salário e possui clube ativo, calibra proporcionalmente ao OVR/POT da carreira (padrão oficial EA FC)
+    if w_wage <= 0 and team_name not in ("Sem Clube", "Livre no Mercado", "Passes livres", "Passes Livres", ""):
+        calc_m, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026)
+        w_wage = float(calc_w)
+        if m_val <= 0:
+            m_val = float(calc_m)
+
+    if r_clause <= 0 and m_val > 0:
+        r_clause = float(m_val * 1.5)
 
     # 8. Dados Físicos
     height_cm = int(raw.get("height") or raw.get("height_cm") or (fcm_p.get("height") if fcm_p else 180) or 180)

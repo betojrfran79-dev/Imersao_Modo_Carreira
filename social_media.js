@@ -389,9 +389,11 @@ window.handleManualMediaSelect = async function(event) {
 
   // 1. Preview imediato local (0 ms de espera)
   const localBlobUrl = URL.createObjectURL(file);
+  const serveCaptureUrl = `/api/media/serve-capture?file=${encodeURIComponent(file.name)}`;
   window.SocialStudioState.latestMedia = {
     type: mediaType,
     url: localBlobUrl,
+    persistent_url: serveCaptureUrl,
     filename: file.name,
     size_mb: sizeMb,
     created_at: new Date().toLocaleTimeString('pt-BR'),
@@ -768,6 +770,18 @@ window.handleGenerateMediaContent = async function(event) {
 async function savePostToCareerVault(postData) {
   try {
     const saveId = window.currentSaveId || "carreira_ativa";
+    let persistentMediaUrl = postData.media_url || "";
+    if (persistentMediaUrl.startsWith("blob:")) {
+      const fileName = postData.filename || window.SocialStudioState?.latestMedia?.filename || "";
+      if (fileName) {
+        persistentMediaUrl = `/api/media/serve-capture?file=${encodeURIComponent(fileName)}`;
+      } else if (window.SocialStudioState?.latestMedia?.persistent_url) {
+        persistentMediaUrl = window.SocialStudioState.latestMedia.persistent_url;
+      } else {
+        persistentMediaUrl = "/api/media/serve-capture?file=latest";
+      }
+    }
+
     const payload = {
       save_id: saveId,
       season_year: postData.season_year || "2027",
@@ -777,8 +791,9 @@ async function savePostToCareerVault(postData) {
       author_avatar: postData.author_avatar,
       headline: postData.newspaper ? postData.newspaper.headline : "",
       content: postData.post_text,
-      media_url: postData.media_url,
+      media_url: persistentMediaUrl,
       media_type: postData.media_type,
+      filename: postData.filename || window.SocialStudioState?.latestMedia?.filename || "",
       video_start: postData.video_start,
       video_end: postData.video_end,
       stats: {
@@ -868,19 +883,23 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
   `;
 
   // Mídia anexada (Vídeo em loop ou Imagem)
+  let cleanMediaUrl = mediaUrl || '';
+  if (cleanMediaUrl.startsWith('blob:')) {
+    cleanMediaUrl = '/api/media/serve-capture?file=latest';
+  }
   let mediaHtml = '';
-  if (mediaUrl) {
+  if (cleanMediaUrl) {
     if (mediaType === 'video') {
       mediaHtml = `
         <div class="video-container-trimmed" style="margin-top: 12px; border-radius: 14px; overflow: hidden; background: #000; border: 1px solid rgba(255,255,255,0.12); position: relative;">
-          <video id="renderedTweetVideo" src="${mediaUrl}" muted playsinline autoplay style="width: 100%; max-height: 380px; object-fit: contain; display: block;"></video>
+          <video id="renderedTweetVideo" src="${cleanMediaUrl}" muted playsinline autoplay style="width: 100%; max-height: 380px; object-fit: contain; display: block;" onerror="if(!this.__retried){this.__retried=true; this.src='/api/media/serve-capture?file=latest'; this.load(); this.play().catch(()=>{});}"></video>
           <span style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7); font-size: 11px; padding: 2px 6px; border-radius: 4px; color: #fff;">LOOP</span>
         </div>
       `;
     } else {
       mediaHtml = `
         <div style="margin-top: 12px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); background: #000;">
-          <img src="${mediaUrl}" style="width: 100%; max-height: 380px; object-fit: cover; display: block;" alt="Lance da Partida" />
+          <img src="${cleanMediaUrl}" style="width: 100%; max-height: 380px; object-fit: cover; display: block;" alt="Lance da Partida" />
         </div>
       `;
     }
@@ -1004,18 +1023,23 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
   const dateStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   const journalist = news.journalist || "Redação Siga La Pelota";
 
+  let cleanMediaUrl = mediaUrl || '';
+  if (cleanMediaUrl.startsWith('blob:')) {
+    cleanMediaUrl = '/api/media/serve-capture?file=latest';
+  }
+
   let mediaColumnHtml = '';
-  if (mediaUrl) {
+  if (cleanMediaUrl) {
     if (mediaType === 'video') {
       mediaColumnHtml = `
         <div style="border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 12px;">
-          <video id="renderedNewsVideo" src="${mediaUrl}" muted playsinline autoplay style="width: 100%; max-height: 240px; object-fit: contain; display: block;"></video>
+          <video id="renderedNewsVideo" src="${cleanMediaUrl}" muted playsinline autoplay style="width: 100%; max-height: 240px; object-fit: contain; display: block;" onerror="if(!this.__retried){this.__retried=true; this.src='/api/media/serve-capture?file=latest'; this.load(); this.play().catch(()=>{});}"></video>
         </div>
       `;
     } else {
       mediaColumnHtml = `
         <div style="border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 12px;">
-          <img src="${mediaUrl}" style="width: 100%; max-height: 240px; object-fit: cover; display: block;" alt="Lance Principal" />
+          <img src="${cleanMediaUrl}" style="width: 100%; max-height: 240px; object-fit: cover; display: block;" alt="Lance Principal" />
         </div>
       `;
     }
@@ -1220,18 +1244,22 @@ window.loadSavedSocialPosts = async function() {
 
     grid.innerHTML = posts.map(post => {
       let previewMedia = '';
-      if (post.media_url) {
+      let mUrl = post.media_url || '';
+      if (mUrl.startsWith('blob:')) {
+        mUrl = '/api/media/serve-capture?file=latest';
+      }
+      if (mUrl) {
         if (post.media_type === 'video') {
           previewMedia = `
             <div style="width: 100%; height: 140px; background: #000; border-radius: 8px; overflow: hidden; position: relative;">
-              <video src="${post.media_url}" muted style="width: 100%; height: 100%; object-fit: cover;"></video>
+              <video src="${mUrl}" muted playsinline style="width: 100%; height: 100%; object-fit: cover;" onerror="if(!this.__retried){this.__retried=true; this.src='/api/media/serve-capture?file=latest';}"></video>
               <span style="position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 2px 5px; border-radius: 4px; color: #fff;">VÍDEO</span>
             </div>
           `;
         } else {
           previewMedia = `
             <div style="width: 100%; height: 140px; border-radius: 8px; overflow: hidden;">
-              <img src="${post.media_url}" style="width: 100%; height: 100%; object-fit: cover;" />
+              <img src="${mUrl}" style="width: 100%; height: 100%; object-fit: cover;" />
             </div>
           `;
         }
@@ -1313,9 +1341,14 @@ window.viewSavedPostDetail = function(postId) {
   const clubName = window.cachedDashboardData?.save?.current_team_name || "Madureira";
   const clubCrest = window.cachedDashboardData?.team_crest || null;
 
-  renderTweetCard(data, post.media_url, post.media_type, post.video_start, post.video_end);
+  let activeMediaUrl = post.media_url || '';
+  if (activeMediaUrl.startsWith('blob:')) {
+    activeMediaUrl = '/api/media/serve-capture?file=latest';
+  }
+
+  renderTweetCard(data, activeMediaUrl, post.media_type, post.video_start, post.video_end);
   if (post.newspaper_data) {
-    renderNewspaperCard(post.newspaper_data, post.media_url, post.media_type, post.video_start, post.video_end, clubName, clubCrest);
+    renderNewspaperCard(post.newspaper_data, activeMediaUrl, post.media_type, post.video_start, post.video_end, clubName, clubCrest);
   }
 
   // Alterna para o feed
@@ -1501,21 +1534,48 @@ window.closeCaptureFolderModal = function() {
 };
 
 window.browseCaptureFolderNative = async function() {
+  const input = document.getElementById("inputCaptureFolderPath");
+
+  // 1. Tentar o seletor nativo direto do navegador (File System Access API do Chrome/Edge no Windows)
+  if (window.showDirectoryPicker) {
+    try {
+      const dirHandle = await window.showDirectoryPicker();
+      if (dirHandle && dirHandle.name) {
+        const dName = dirHandle.name.toLowerCase();
+        let resolvedPath = "";
+        if (dName === "captures") {
+          resolvedPath = "C:\\Users\\Roberto\\Videos\\Captures";
+        } else if (dName === "videos" || dName === "vídeos") {
+          resolvedPath = "C:\\Users\\Roberto\\Videos";
+        } else {
+          resolvedPath = `C:\\Users\\Roberto\\Videos\\${dirHandle.name}`;
+        }
+        if (input) input.value = resolvedPath;
+        window.SocialStudioState.captureFolder = resolvedPath;
+        if (window.showToast) window.showToast(`Pasta selecionada: ${dirHandle.name}`, "success");
+        return;
+      }
+    } catch (err) {
+      if (err.name === "AbortError") {
+        return; // Usuário cancelou a janela do Windows
+      }
+      console.warn("showDirectoryPicker:", err);
+    }
+  }
+
+  // 2. Fallback via requisição ao backend
   try {
-    if (window.showToast) window.showToast("Abrindo seletor de pastas...", "info");
     const res = await fetch("/api/media/browse-folder");
     const data = await res.json();
     if (data.status === "success" && data.capture_folder) {
-      const input = document.getElementById("inputCaptureFolderPath");
       if (input) input.value = data.capture_folder;
       window.SocialStudioState.captureFolder = data.capture_folder;
-      loadCaptureFolderBadge();
-      reloadLatestCaptureFile();
-      closeCaptureFolderModal();
-      if (window.showToast) window.showToast("Pasta selecionada: " + data.capture_folder, "success");
+      if (window.showToast) window.showToast("Pasta preenchida: " + data.capture_folder, "success");
+    } else {
+      if (window.showToast) window.showToast("Escolha um dos atalhos rápidos abaixo.", "info");
     }
   } catch (err) {
-    console.warn("Seletor nativo falhou:", err);
+    if (window.showToast) window.showToast("Use os botões de atalho rápido abaixo.", "info");
   }
 };
 
@@ -1525,8 +1585,12 @@ window.setQuickCaptureFolder = function(type) {
 
   if (type === 'win_captures') {
     input.value = "C:\\Users\\Roberto\\Videos\\Captures";
+  } else if (type === 'win_videos') {
+    input.value = "C:\\Users\\Roberto\\Videos";
   } else if (type === 'd_captures') {
     input.value = "D:\\Posts_Jornais_Modo_Carreira";
+  } else if (type === 'app_uploads') {
+    input.value = "uploads";
   }
 };
 

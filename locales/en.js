@@ -79,7 +79,14 @@ window.I18N_LOCALES['en'] = {
     noLastMatch: 'No previous matches recorded.',
     viewFullTable: 'View Full Table',
     viewCalendar: 'View Full Calendar',
-    viewSquad: 'View Full Squad'
+    viewSquad: 'View Full Squad',
+    trophiesLabel: 'TROPHIES',
+    matchesLabel: 'MATCHES PLAYED',
+    winRateLabel: 'WIN RATE (3/1/0)',
+    goalsLabel: 'GOALS SCORED',
+    h2hBtn: 'H2H Head-to-Head',
+    fullCalBtn: 'View Full Calendar',
+    squadHighlights: 'Squad Highlights (Current Season)'
   },
 
   manager: {
@@ -99,7 +106,11 @@ window.I18N_LOCALES['en'] = {
     journey: 'Managerial Journey & Clubs',
     currentClub: 'Current Club',
     tenure: 'Tenure',
-    noTrophies: 'No trophies won yet in this career. Keep fighting for silverware!'
+    noTrophies: 'No trophies won yet in this career. Keep fighting for silverware!',
+    addTrophy: '+ Add Honour/Trophy',
+    editManager: 'Edit Manager',
+    pointsLabel: 'Points Earned',
+    competitionsTitle: 'Competitions Contested & Final Standing'
   },
 
   seasons: {

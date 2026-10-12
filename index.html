@@ -34,7 +34,7 @@
   <!-- Top Navigation & Club Bar -->
   <header class="top-nav">
     <div class="nav-brand">
-      <div class="brand-badge">EA FC</div>
+      <img src="assets/siga_la_pelota_logo.png" alt="Siga La Pelota" class="brand-logo-img">
       <div class="brand-title">
         <span class="brand-main" data-i18n="nav.brandMain">IMERSÃO MODO CARREIRA</span>
         <span class="brand-sub" data-i18n="nav.brandSub">EA SPORTS FC • STATS & IMMERSION ENGINE</span>
@@ -56,20 +56,30 @@
 
     <!-- Live Status & Quick Actions -->
     <div class="nav-actions">
-      <!-- Language Selector Pill -->
-      <div class="lang-selector" id="topLangSelector">
-        <button class="lang-btn active" data-lang="pt" title="Português (Brasil)">
-          <span class="lang-flag">🇧🇷</span>
-          <span class="lang-code">PT</span>
+      <!-- Language Selector Dropdown Menu -->
+      <div class="lang-dropdown-wrapper" id="topLangDropdown">
+        <button class="lang-dropdown-trigger" id="langDropdownTrigger" type="button" aria-haspopup="true" aria-expanded="false" title="Alternar Idioma / Change Language">
+          <span class="lang-flag" id="currentLangFlag">🇧🇷</span>
+          <span class="lang-code" id="currentLangCode">PT</span>
+          <i data-lucide="chevron-down" class="lang-chevron-icon"></i>
         </button>
-        <button class="lang-btn" data-lang="en" title="English">
-          <span class="lang-flag">🇺🇸</span>
-          <span class="lang-code">EN</span>
-        </button>
-        <button class="lang-btn" data-lang="es" title="Español">
-          <span class="lang-flag">🇪🇸</span>
-          <span class="lang-code">ES</span>
-        </button>
+        <div class="lang-dropdown-menu" id="langDropdownMenu">
+          <button class="lang-menu-item active" data-lang="pt" type="button">
+            <span class="lang-flag">🇧🇷</span>
+            <span class="lang-name">Português</span>
+            <span class="lang-subcode">PT-BR</span>
+          </button>
+          <button class="lang-menu-item" data-lang="en" type="button">
+            <span class="lang-flag">🇺🇸</span>
+            <span class="lang-name">English</span>
+            <span class="lang-subcode">EN-US</span>
+          </button>
+          <button class="lang-menu-item" data-lang="es" type="button">
+            <span class="lang-flag">🇪🇸</span>
+            <span class="lang-name">Español</span>
+            <span class="lang-subcode">ES-ES</span>
+          </button>
+        </div>
       </div>
 
       <button class="btn-setup-guide" id="btnOpenSetupGuide" data-i18n-title="nav.guideTitle" title="Guia de Instalação, Pastas, Scripts Lua e Chave de IA">
@@ -472,36 +482,36 @@
         <!-- Welcome Hero & Overview Stats -->
         <div class="dashboard-hero">
           <div class="hero-left">
-            <h1 class="hero-title">Painel do Momento</h1>
-            <p class="hero-subtitle">Visão geral do clube, última partida, destaques do elenco e aproveitamento contínuo.</p>
+            <h1 class="hero-title" data-i18n="dashboard.title">Painel do Momento</h1>
+            <p class="hero-subtitle" data-i18n="dashboard.subtitle">Visão geral do clube, última partida, destaques do elenco e aproveitamento contínuo.</p>
           </div>
           
           <div class="hero-metrics-grid">
             <div class="metric-card">
               <div class="mc-icon"><i data-lucide="award"></i></div>
               <div class="mc-content">
-                <span class="mc-label">TÍTULOS</span>
+                <span class="mc-label" data-i18n="dashboard.trophiesLabel">TÍTULOS</span>
                 <span class="mc-val" id="dashTrophiesVal">0</span>
               </div>
             </div>
             <div class="metric-card">
               <div class="mc-icon"><i data-lucide="shield-check"></i></div>
               <div class="mc-content">
-                <span class="mc-label">JOGOS DISPUTADOS</span>
+                <span class="mc-label" data-i18n="dashboard.matchesLabel">JOGOS DISPUTADOS</span>
                 <span class="mc-val" id="dashTotalGamesVal">0</span>
               </div>
             </div>
             <div class="metric-card highlight">
               <div class="mc-icon"><i data-lucide="percent"></i></div>
               <div class="mc-content">
-                <span class="mc-label">APROVEITAMENTO (3/1/0)</span>
+                <span class="mc-label" data-i18n="dashboard.winRateLabel">APROVEITAMENTO (3/1/0)</span>
                 <span class="mc-val" id="dashAproveitamentoVal">0.0%</span>
               </div>
             </div>
             <div class="metric-card">
               <div class="mc-icon"><i data-lucide="flame"></i></div>
               <div class="mc-content">
-                <span class="mc-label">GOLS MARCADOS</span>
+                <span class="mc-label" data-i18n="dashboard.goalsLabel">GOLS MARCADOS</span>
                 <span class="mc-val" id="dashGoalsForVal">0</span>
               </div>
             </div>
@@ -514,7 +524,7 @@
           <!-- Última Partida Jogada -->
           <div class="glass-card match-card-main">
             <div class="card-header">
-              <div class="ch-title"><i data-lucide="history"></i> Última Partida Disputada</div>
+              <div class="ch-title"><i data-lucide="history"></i> <span data-i18n="dashboard.lastMatch">Última Partida Disputada</span></div>
               <span class="badge-tag" id="lastMatchComp">Competição</span>
             </div>
             
@@ -555,7 +565,7 @@
           <!-- Próximo Confronto / Matchday Preview -->
           <div class="glass-card next-match-card-main" id="dashNextMatchCard">
             <div class="card-header">
-              <div class="ch-title"><i data-lucide="swords"></i> Próximo Confronto (Agenda)</div>
+              <div class="ch-title"><i data-lucide="swords"></i> <span data-i18n="dashboard.nextMatch">Próximo Confronto (Agenda)</span></div>
               <div class="nm-tags" style="display: flex; gap: 0.5rem; align-items: center;">
                 <span class="badge-tag live-badge" id="nmCountdownBadge">Em Breve</span>
                 <span class="badge-tag" id="nmCompTag">Campeonato</span>
@@ -584,20 +594,18 @@
 
             <div class="next-match-actions">
               <button class="btn-action-h2h" id="btnNextMatchH2H" title="Ver Raio-X Histórico contra este adversário">
-                <i data-lucide="swords"></i> Raio-X do Duelo (H2H)
+                <i data-lucide="swords"></i> <span data-i18n="dashboard.h2hBtn">Raio-X do Duelo (H2H)</span>
               </button>
               <button class="btn-action-cal" id="btnNextMatchFullCal" title="Abrir Calendário Completo da Temporada">
-                <i data-lucide="calendar-days"></i> Ver Calendário Completo
+                <i data-lucide="calendar-days"></i> <span data-i18n="dashboard.fullCalBtn">Ver Calendário Completo</span>
               </button>
             </div>
           </div>
 
-
-
           <!-- Destaques do Elenco na Temporada Atual -->
           <div class="glass-card dash-full-width-card" style="grid-column: 1 / -1; margin-top: 0.5rem;">
             <div class="card-header">
-              <div class="ch-title"><i data-lucide="trending-up"></i> Destaques do Elenco (Temporada Atual)</div>
+              <div class="ch-title"><i data-lucide="trending-up"></i> <span data-i18n="dashboard.squadHighlights">Destaques do Elenco (Temporada Atual)</span></div>
             </div>
             <div class="season-leaders-list" id="dashLeadersList">
               <!-- Renderizado dinamicamente -->
@@ -614,15 +622,15 @@
       <section class="tab-pane" id="pane-manager">
         <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
           <div>
-            <h2>Ficha Profissional do Técnico</h2>
-            <p>Aproveitamento contínuo (Vitória = 3 pts, Empate = 1 pt), salário acumulado, competições e galeria de títulos.</p>
+            <h2 data-i18n="manager.title">Ficha Profissional do Técnico</h2>
+            <p data-i18n="manager.subtitle">Aproveitamento contínuo (Vitória = 3 pts, Empate = 1 pt), salário acumulado, competições e galeria de títulos.</p>
           </div>
           <div style="display: flex; gap: 0.5rem; align-items: center;">
             <button class="btn-secondary" id="btnOpenAddTrophyModal" title="Adicionar Troféu ou Título à Sala de Troféus" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
-              <i data-lucide="trophy"></i> + Registrar Conquista
+              <i data-lucide="trophy"></i> <span data-i18n="manager.addTrophy">+ Registrar Conquista</span>
             </button>
             <button class="btn-secondary" id="btnOpenEditManager" title="Alterar Nome e Detalhes do Treinador">
-              <i data-lucide="edit-3"></i> Editar Treinador
+              <i data-lucide="edit-3"></i> <span data-i18n="manager.editManager">Editar Treinador</span>
             </button>
           </div>
         </div>
@@ -683,19 +691,19 @@
             <div class="mp-summary-stats">
               <div class="mps-box">
                 <span class="mps-n" id="mgrV">0</span>
-                <span class="mps-t">Vitórias</span>
+                <span class="mps-t" data-i18n="manager.wins">Vitórias</span>
               </div>
               <div class="mps-box">
                 <span class="mps-n" id="mgrE">0</span>
-                <span class="mps-t">Empates</span>
+                <span class="mps-t" data-i18n="manager.draws">Empates</span>
               </div>
               <div class="mps-box">
                 <span class="mps-n" id="mgrD">0</span>
-                <span class="mps-t">Derrotas</span>
+                <span class="mps-t" data-i18n="manager.losses">Derrotas</span>
               </div>
               <div class="mps-box">
                 <span class="mps-n" id="mgrPts">0</span>
-                <span class="mps-t">Pontos Conquistados</span>
+                <span class="mps-t" data-i18n="manager.pointsLabel">Pontos Conquistados</span>
               </div>
             </div>
           </div>
@@ -703,7 +711,7 @@
           <!-- Galeria de Títulos e Prêmios do Técnico -->
           <div class="glass-card">
             <div class="card-header">
-              <div class="ch-title"><i data-lucide="trophy"></i> Sala de Troféus & Conquistas</div>
+              <div class="ch-title"><i data-lucide="trophy"></i> <span data-i18n="manager.trophies">Sala de Troféus & Conquistas</span></div>
             </div>
             <div class="awards-list" id="mgrAwardsList">
               <!-- Renderizado dinamicamente -->
@@ -715,7 +723,7 @@
         <!-- Competições Disputadas pelo Técnico na Carreira -->
         <div class="glass-card" style="margin-top: 1.5rem;">
           <div class="card-header">
-            <div class="ch-title"><i data-lucide="medal"></i> Competições Disputadas & Desempenho Final</div>
+            <div class="ch-title"><i data-lucide="medal"></i> <span data-i18n="manager.competitionsTitle">Competições Disputadas & Desempenho Final</span></div>
           </div>
           <div class="table-responsive">
             <table class="vault-table" id="mgrCompetitionsTable">
@@ -1669,14 +1677,14 @@
             </div>
 
             <!-- Sub-abas / Filtro de Visualização -->
-            <div class="lang-selector" style="background: rgba(18, 22, 33, 0.8);">
-              <button type="button" class="lang-btn active" id="btnSubTabFeed" onclick="switchSocialSubTab('feed')">
+            <div class="social-subtabs-pill">
+              <button type="button" class="social-subtab-btn active" id="btnSubTabFeed" onclick="switchSocialSubTab('feed')">
                 <i data-lucide="message-square" style="width: 13px; height: 13px;"></i> Feed (X)
               </button>
-              <button type="button" class="lang-btn" id="btnSubTabNews" onclick="switchSocialSubTab('news')">
+              <button type="button" class="social-subtab-btn" id="btnSubTabNews" onclick="switchSocialSubTab('news')">
                 <i data-lucide="newspaper" style="width: 13px; height: 13px;"></i> Capa Jornal
               </button>
-              <button type="button" class="lang-btn" id="btnSubTabHistory" onclick="switchSocialSubTab('history')">
+              <button type="button" class="social-subtab-btn" id="btnSubTabHistory" onclick="switchSocialSubTab('history')">
                 <i data-lucide="history" style="width: 13px; height: 13px;"></i> Histórico (<span id="savedPostsCount">0</span>)
               </button>
             </div>
@@ -3196,10 +3204,12 @@
 
         <!-- Atalhos Rápidos -->
         <div style="margin-top: 10px; margin-bottom: 12px;">
-          <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 6px;">Atalhos comuns:</div>
+          <div style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 6px;">Atalhos comuns no Windows:</div>
           <div style="display: flex; flex-wrap: wrap; gap: 6px;">
             <button type="button" class="btn-quick-val" onclick="setQuickCaptureFolder('win_captures')">🎮 Capturas do Windows (Padrão)</button>
+            <button type="button" class="btn-quick-val" onclick="setQuickCaptureFolder('win_videos')">🎬 Pasta Vídeos (Windows)</button>
             <button type="button" class="btn-quick-val" onclick="setQuickCaptureFolder('d_captures')">💾 D:\Posts_Jornais_Modo_Carreira</button>
+            <button type="button" class="btn-quick-val" onclick="setQuickCaptureFolder('app_uploads')">⚡ uploads (Pasta Local)</button>
           </div>
         </div>
 

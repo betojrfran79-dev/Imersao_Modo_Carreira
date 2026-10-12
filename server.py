@@ -618,26 +618,8 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 return self.send_json({"status": "success", "capture_folder": folder})
 
             if path == "/api/media/browse-folder":
-                selected_folder = None
-                try:
-                    import tkinter as tk
-                    from tkinter import filedialog
-                    root = tk.Tk()
-                    root.withdraw()
-                    root.attributes('-topmost', True)
-                    cur_folder = database.get_capture_folder() or os.path.expanduser("~")
-                    selected_folder = filedialog.askdirectory(
-                        title="Selecione a Pasta de Capturas e Gravações do EA FC",
-                        initialdir=cur_folder
-                    )
-                    root.destroy()
-                except Exception as e:
-                    print("[Server] Erro ao abrir diálogo de pastas do Windows:", e)
-                if selected_folder:
-                    selected_folder = os.path.normpath(selected_folder)
-                    database.set_capture_folder(selected_folder)
-                    return self.send_json({"status": "success", "capture_folder": selected_folder})
-                return self.send_json({"status": "cancelled", "capture_folder": database.get_capture_folder()})
+                folder = database.get_capture_folder() or r"C:\Users\Roberto\Videos\Captures"
+                return self.send_json({"status": "success", "capture_folder": folder})
 
             if path == "/api/media/latest-capture":
                 folder = database.get_capture_folder()
@@ -651,8 +633,29 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 fpath_param = query.get("path", [""])[0]
                 target_path = None
                 folder = database.get_capture_folder()
+
+                if fname == "latest":
+                    latest_obj = media_engine.get_latest_capture_file(folder)
+                    if latest_obj and latest_obj.get("filename"):
+                        fname = latest_obj["filename"]
+
                 if fname:
                     target_path = os.path.join(folder, fname)
+                    if not (target_path and os.path.isfile(target_path)):
+                        # Busca tolerante em pastas conhecidas
+                        candidate_dirs = [folder, os.path.join(os.path.expanduser("~"), "Videos"), UPLOADS_DIR, os.path.join(BASE_DIR, "assets")]
+                        for cd in candidate_dirs:
+                            if cd and os.path.exists(cd):
+                                cp = os.path.join(cd, fname)
+                                if os.path.isfile(cp):
+                                    target_path = cp
+                                    break
+                                for fe in os.listdir(cd):
+                                    if fe.lower() == fname.lower():
+                                        target_path = os.path.join(cd, fe)
+                                        break
+                                if target_path and os.path.isfile(target_path):
+                                    break
                 elif fpath_param:
                     target_path = fpath_param
 

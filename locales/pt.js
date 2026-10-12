@@ -79,7 +79,14 @@ window.I18N_LOCALES['pt'] = {
     noLastMatch: 'Nenhuma partida anterior registrada.',
     viewFullTable: 'Ver Tabela Completa',
     viewCalendar: 'Ver Calendário Completo',
-    viewSquad: 'Ver Elenco Completo'
+    viewSquad: 'Ver Elenco Completo',
+    trophiesLabel: 'TÍTULOS',
+    matchesLabel: 'JOGOS DISPUTADOS',
+    winRateLabel: 'APROVEITAMENTO (3/1/0)',
+    goalsLabel: 'GOLS MARCADOS',
+    h2hBtn: 'Raio-X do Duelo (H2H)',
+    fullCalBtn: 'Ver Calendário Completo',
+    squadHighlights: 'Destaques do Elenco (Temporada Atual)'
   },
 
   manager: {
@@ -99,7 +106,11 @@ window.I18N_LOCALES['pt'] = {
     journey: 'Trajetória & Clubes Dirigidos',
     currentClub: 'Clube Atual',
     tenure: 'Período',
-    noTrophies: 'Nenhum troféu conquistado ainda nesta carreira. Continue buscando a glória!'
+    noTrophies: 'Nenhum troféu conquistado ainda nesta carreira. Continue buscando a glória!',
+    addTrophy: '+ Registrar Conquista',
+    editManager: 'Editar Treinador',
+    pointsLabel: 'Pontos Conquistados',
+    competitionsTitle: 'Competições Disputadas & Desempenho Final'
   },
 
   seasons: {

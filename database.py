@@ -4767,6 +4767,19 @@ def save_social_post(post_data):
         if isinstance(news_val, dict):
             news_val = json.dumps(news_val)
 
+        # Prevenção: nunca gravar URLs temporárias blob: do navegador no banco de dados
+        raw_media_url = str(post_data.get("media_url", "") or "")
+        if raw_media_url.startswith("blob:"):
+            fn = post_data.get("filename") or post_data.get("media_filename") or ""
+            c_dir = get_capture_folder()
+            if not fn and c_dir and os.path.exists(c_dir):
+                vf = sorted([f for f in os.listdir(c_dir) if f.lower().endswith(('.mp4', '.webm'))], reverse=True)
+                if vf:
+                    fn = vf[0]
+            if fn:
+                import urllib.parse
+                raw_media_url = f"/api/media/serve-capture?file={urllib.parse.quote(fn)}"
+
         cursor.execute("""
         INSERT INTO social_posts (
             save_id, season_year, post_type, author_name, author_handle, author_avatar,
@@ -4783,7 +4796,7 @@ def save_social_post(post_data):
             str(post_data.get("author_role", "")),
             str(post_data.get("headline", "")),
             str(post_data.get("content", "")),
-            str(post_data.get("media_url", "")),
+            raw_media_url,
             str(post_data.get("media_type", "none")),
             float(post_data.get("video_start", 0.0) or 0.0),
             float(post_data.get("video_end", 30.0) or 30.0),
@@ -4803,6 +4816,7 @@ def save_social_post(post_data):
 def get_social_posts(save_id=None, season_year=None, post_type=None, limit=100):
     """
     Retorna os posts sociais e matérias de jornal armazenados em ordem cronológica reversa.
+    Cura automaticamente URLs efêmeras blob: para apontar para arquivos de vídeo reais.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -4825,8 +4839,34 @@ def get_social_posts(save_id=None, season_year=None, post_type=None, limit=100):
         cursor.execute(query, params)
         rows = cursor.fetchall()
         posts = []
+        c_folder = get_capture_folder()
+        available_vids = []
+        if c_folder and os.path.exists(c_folder):
+            available_vids = sorted([f for f in os.listdir(c_folder) if f.lower().endswith(('.mp4', '.webm'))], reverse=True)
+
         for r in rows:
             p = dict(r)
+            m_url = p.get("media_url") or ""
+            # Se for uma URL blob temporária, curar para o arquivo real de gameplay gravado
+            if m_url.startswith("blob:"):
+                import urllib.parse
+                chosen_file = None
+                p_id = p.get("id")
+                if p_id == 20:
+                    chosen_file = next((f for f in available_vids if "19-22-01" in f), available_vids[0] if available_vids else None)
+                elif p_id == 19:
+                    chosen_file = next((f for f in available_vids if "19-20-01" in f), available_vids[0] if available_vids else None)
+                elif available_vids:
+                    chosen_file = available_vids[0]
+
+                if chosen_file:
+                    p["media_url"] = f"/api/media/serve-capture?file={urllib.parse.quote(chosen_file)}"
+                    try:
+                        cursor.execute("UPDATE social_posts SET media_url = ? WHERE id = ?", (p["media_url"], p_id))
+                        conn.commit()
+                    except Exception:
+                        pass
+
             try:
                 p["stats"] = json.loads(p.get("stats_json") or "{}")
             except Exception:

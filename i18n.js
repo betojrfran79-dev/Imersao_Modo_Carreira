@@ -167,7 +167,28 @@ class I18nEngine {
   }
 
   updateLanguageButtonsUI() {
-    const buttons = document.querySelectorAll('.lang-btn');
+    // 1. Atualizar gatilho do dropdown
+    const flagEl = document.getElementById('currentLangFlag');
+    const codeEl = document.getElementById('currentLangCode');
+    const flags = { pt: '🇧🇷', en: '🇺🇸', es: '🇪🇸' };
+    const codes = { pt: 'PT', en: 'EN', es: 'ES' };
+
+    if (flagEl) flagEl.textContent = flags[this.currentLanguage] || '🇧🇷';
+    if (codeEl) codeEl.textContent = codes[this.currentLanguage] || 'PT';
+
+    // 2. Atualizar itens do menu do dropdown
+    const menuItems = document.querySelectorAll('.lang-menu-item');
+    menuItems.forEach(item => {
+      const l = item.getAttribute('data-lang');
+      if (l === this.currentLanguage) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+
+    // 3. Suporte retrocompatível a botões .lang-btn caso existam no seletor de topo
+    const buttons = document.querySelectorAll('#topLangSelector .lang-btn, .lang-dropdown-wrapper .lang-btn');
     buttons.forEach(btn => {
       const lang = btn.getAttribute('data-lang');
       if (lang === this.currentLanguage) {
@@ -194,9 +215,40 @@ class I18nEngine {
     this.locales = window.I18N_LOCALES || {};
     document.documentElement.lang = (this.currentLanguage === 'pt' ? 'pt-BR' : (this.currentLanguage === 'en' ? 'en-US' : 'es-ES'));
     
-    // Configurar listeners nos botões da barra superior
-    const buttons = document.querySelectorAll('.lang-btn');
-    buttons.forEach(btn => {
+    // Configurar listeners no Dropdown de idiomas
+    const dropdownWrapper = document.getElementById('topLangDropdown');
+    const trigger = document.getElementById('langDropdownTrigger');
+    if (trigger && dropdownWrapper) {
+      trigger.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdownWrapper.classList.toggle('open');
+        trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+
+      document.addEventListener('click', (e) => {
+        if (!dropdownWrapper.contains(e.target)) {
+          dropdownWrapper.classList.remove('open');
+          trigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
+
+    const menuItems = document.querySelectorAll('.lang-menu-item');
+    menuItems.forEach(item => {
+      item.addEventListener('click', (e) => {
+        e.preventDefault();
+        const selectedLang = item.getAttribute('data-lang');
+        if (selectedLang) {
+          this.setLanguage(selectedLang);
+          if (dropdownWrapper) dropdownWrapper.classList.remove('open');
+          if (trigger) trigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    });
+
+    // Retrocompatibilidade apenas para botões .lang-btn na barra de idioma
+    const legacyButtons = document.querySelectorAll('#topLangSelector .lang-btn, .lang-dropdown-wrapper .lang-btn');
+    legacyButtons.forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         const selectedLang = btn.getAttribute('data-lang');

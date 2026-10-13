@@ -1118,56 +1118,63 @@ def search_scout_players(params, current_year=2026):
         where_clauses.append("leaguename LIKE ?")
         query_args.append(f"%{params['league_query']}%")
 
-    # 2.7 País onde atua o clube (Club Country)
-    club_country = params.get("club_country")
-    if club_country:
-        cc_norm = normalize_text(club_country)
-        if "brasil" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Brasileir%' OR leaguename LIKE '%Carioc%' OR leaguename LIKE '%Paulist%' OR leaguename LIKE '%Acesso%')")
-        elif "argentina" in cc_norm or "argentin" in cc_norm:
-            where_clauses.append("(leaguename = 'LPF' OR leaguename LIKE '%LPF%')")
-        elif "mexico" in cc_norm or "mexic" in cc_norm:
-            where_clauses.append("(leaguename = 'Liga MX' OR leaguename LIKE '%Liga MX%')")
-        elif "uruguai" in cc_norm or "urugua" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%AUF%' OR leaguename LIKE '%Uruguay%' OR leaguename LIKE '%Urugua%')")
-        elif "inglaterra" in cc_norm or "ingles" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Premier%' OR leaguename LIKE '%EFL%' OR leaguename LIKE '%Championship%' OR leaguename LIKE '%League One%' OR leaguename LIKE '%League Two%')")
-        elif "espanha" in cc_norm or "espanhol" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%LALIGA%' OR leaguename LIKE '%Hypermotion%')")
-        elif "italia" in cc_norm or "italiano" in cc_norm:
-            where_clauses.append("((leaguename LIKE '%Serie A%' OR leaguename LIKE '%Enilive%' OR leaguename LIKE '%Serie B%') AND leaguename NOT LIKE '%Brasil%')")
-        elif "alemanha" in cc_norm or "alemao" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Bundesliga%' OR leaguename LIKE '%3. Liga%')")
-        elif "franca" in cc_norm or "frances" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Ligue 1%' OR leaguename LIKE '%Ligue 2%')")
-        elif "portugal" in cc_norm or "portugues" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Liga Portugal%' OR leaguename LIKE '%Primeira Liga%')")
-        elif "holanda" in cc_norm or "paises baixos" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Eredivisie%')")
-        elif "belgica" in cc_norm or "belga" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%1A Pro League%' OR leaguename LIKE '%Pro League%')")
-        elif "turquia" in cc_norm or "turco" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Süper Lig%' OR leaguename LIKE '%Super Lig%')")
-        elif "arabia" in cc_norm or "saudita" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Saudi%' OR leaguename LIKE '%ROSHN%')")
-        elif "estados unidos" in cc_norm or "eua" in cc_norm or "usa" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%MLS%')")
-        elif "escocia" in cc_norm or "escoces" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Scottish%')")
-        elif "suica" in cc_norm or "suico" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Brack%' OR leaguename LIKE '%Super League%')")
-        elif "suecia" in cc_norm or "sueco" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Allsvenskan%')")
-        elif "noruega" in cc_norm or "noruegues" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Eliteserien%')")
-        elif "dinamarca" in cc_norm or "dinamarques" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%3F Superliga%' OR leaguename LIKE '%Superliga%')")
-        elif "polonia" in cc_norm or "polones" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Ekstraklasa%')")
-        elif "irlanda" in cc_norm or "irlandes" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Airtricity%')")
-        elif "sul-americana" in cc_norm or "conmebol" in cc_norm:
-            where_clauses.append("(leaguename LIKE '%Libertadores%' OR leaguename LIKE '%Sudamericana%')")
+    # 2.7 País onde atua o clube (Club Country - suporte a único ou múltiplos países, ex: Brasil OU México)
+    countries_req = params.get("club_countries")
+    if not countries_req and params.get("club_country"):
+        countries_req = [params["club_country"]]
+
+    if countries_req and not params.get("league_name"):
+        c_clauses = []
+        for c_item in countries_req:
+            cc_norm = normalize_text(str(c_item))
+            if "brasil" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Brasileir%' OR leaguename LIKE '%Carioc%' OR leaguename LIKE '%Paulist%' OR leaguename LIKE '%Acesso%')")
+            elif "argentina" in cc_norm or "argentin" in cc_norm:
+                c_clauses.append("(leaguename = 'LPF' OR leaguename LIKE '%LPF%')")
+            elif "mexico" in cc_norm or "mexic" in cc_norm:
+                c_clauses.append("(leaguename = 'Liga MX' OR leaguename LIKE '%Liga MX%')")
+            elif "uruguai" in cc_norm or "urugua" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%AUF%' OR leaguename LIKE '%Uruguay%' OR leaguename LIKE '%Urugua%')")
+            elif "inglaterra" in cc_norm or "ingles" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Premier%' OR leaguename LIKE '%EFL%' OR leaguename LIKE '%Championship%' OR leaguename LIKE '%League One%' OR leaguename LIKE '%League Two%')")
+            elif "espanha" in cc_norm or "espanhol" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%LALIGA%' OR leaguename LIKE '%Hypermotion%')")
+            elif "italia" in cc_norm or "italiano" in cc_norm:
+                c_clauses.append("((leaguename LIKE '%Serie A%' OR leaguename LIKE '%Enilive%' OR leaguename LIKE '%Serie B%') AND leaguename NOT LIKE '%Brasil%')")
+            elif "alemanha" in cc_norm or "alemao" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Bundesliga%' OR leaguename LIKE '%3. Liga%')")
+            elif "franca" in cc_norm or "frances" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Ligue 1%' OR leaguename LIKE '%Ligue 2%')")
+            elif "portugal" in cc_norm or "portugues" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Liga Portugal%' OR leaguename LIKE '%Primeira Liga%')")
+            elif "holanda" in cc_norm or "paises baixos" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Eredivisie%')")
+            elif "belgica" in cc_norm or "belga" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%1A Pro League%' OR leaguename LIKE '%Pro League%')")
+            elif "turquia" in cc_norm or "turco" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Süper Lig%' OR leaguename LIKE '%Super Lig%')")
+            elif "arabia" in cc_norm or "saudita" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Saudi%' OR leaguename LIKE '%ROSHN%')")
+            elif "estados unidos" in cc_norm or "eua" in cc_norm or "usa" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%MLS%')")
+            elif "escocia" in cc_norm or "escoces" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Scottish%')")
+            elif "suica" in cc_norm or "suico" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Brack%' OR leaguename LIKE '%Super League%')")
+            elif "suecia" in cc_norm or "sueco" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Allsvenskan%')")
+            elif "noruega" in cc_norm or "noruegues" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Eliteserien%')")
+            elif "dinamarca" in cc_norm or "dinamarques" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%3F Superliga%' OR leaguename LIKE '%Superliga%')")
+            elif "polonia" in cc_norm or "polones" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Ekstraklasa%')")
+            elif "irlanda" in cc_norm or "irlandes" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Airtricity%')")
+            elif "sul-americana" in cc_norm or "conmebol" in cc_norm:
+                c_clauses.append("(leaguename LIKE '%Libertadores%' OR leaguename LIKE '%Sudamericana%')")
+        if c_clauses:
+            where_clauses.append(f"({' OR '.join(c_clauses)})")
 
     # 3. Overall e Potencial
     if params.get("min_ovr"):
@@ -1937,16 +1944,17 @@ def parse_natural_language_scout_query(user_msg):
     # 0.2 IDENTIFICAÇÃO DE PAÍS ONDE O JOGADOR ATUA (SE NÃO DETECTOU LIGA ESPECÍFICA)
     # =========================================================================
     if not detected_league:
-        all_country_candidates = []
+        matched_countries = []
         for c_id, c_data in COUNTRY_ACTING_MAP.items():
             for kw in c_data["keywords"]:
                 if has_keyword(norm, [kw]):
-                    all_country_candidates.append((len(kw), c_id, c_data, kw))
-        if all_country_candidates:
-            all_country_candidates.sort(key=lambda x: x[0], reverse=True)
-            _, best_c_id, best_c_data, _ = all_country_candidates[0]
-            params["club_country"] = best_c_id
-            params["club_country_name"] = best_c_data["name"]
+                    if c_id not in matched_countries:
+                        matched_countries.append(c_id)
+                    break
+        if matched_countries:
+            params["club_countries"] = matched_countries
+            params["club_country"] = matched_countries[0]
+            params["club_country_name"] = " / ".join([COUNTRY_ACTING_MAP[cid]["name"] for cid in matched_countries])
 
     # =========================================================================
     # 0.3 NACIONALIDADE DE NASCIMENTO (GENTÍLICOS E TERMOS DE CIDADANIA)
@@ -2467,7 +2475,8 @@ Campos aceitos no JSON (inclua apenas os parâmetros solicitados ou fortemente i
 - is_wonderkid: boolean (true se pediu joia, promessa mundial, wonderkid, futuro craque)
 - nationality_name: string com o país de nascimento (ex: 'Brasil', 'Argentina', 'França', 'Inglaterra', 'Espanha', etc.)
 - league_name: string com a liga onde joga (ex: 'Premier League', 'LALIGA', 'Brasileirão', 'Serie A', 'Bundesliga', etc.)
-- club_country: string com o país onde joga caso mencione um país em vez da liga (ex: 'Brasil', 'Espanha', 'Inglaterra')
+- club_country: string com o país onde joga caso mencione apenas um país (ex: 'Brasil', 'Espanha', 'Inglaterra')
+- club_countries: lista de strings com os países onde joga caso mencione um ou mais países (ex: ['Brasil', 'México'])
 - query: string caso o usuário queira buscar um jogador específico pelo nome (ex: 'Endrick', 'Haaland', 'Vini Jr')
 - order_by: ordenação mais lógica para o pedido ('ovr_desc', 'pace_desc', 'finishing_desc', 'passing_desc', 'dribbling_desc', 'defending_desc', 'strength_desc', 'heading_desc', 'pot_desc', 'value_asc')
 - gender: 0 para masculino, 1 para feminino
@@ -2476,7 +2485,8 @@ REGRAS OBRIGATÓRIAS:
 1. Seja tolerante a números falados por extenso ("oitenta e um" = 81, "sub vinte e dois" = max_age: 22, "trinta e dois anos" = 32).
 2. Se o usuário disser "zagueiro rápido", atribua min_pace de pelo menos 78 ou 80 e order_by "pace_desc".
 3. Se pedir "atacante matador", atribua min_finishing de pelo menos 80.
-4. Responda ESTRITAMENTE o JSON sem markdown, sem explicações extras."""
+4. Se o treinador disser "Brasil ou México" ou citar múltiplos países/ligas de atuação, retorne todos na lista 'club_countries' (ex: ["Brasil", "México"]) para busca combinada (OR).
+5. Responda ESTRITAMENTE o JSON sem markdown, sem explicações extras."""
 
     models = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-flash-latest"]
     payload = {
@@ -2592,10 +2602,11 @@ def format_scout_results_verdict(players, custom_name="Carlos Mendes", source="l
         else:
             return f"Professor, aqui é o **{custom_name}**! Analisei a base {src_label} e listei os **{count} melhores jogadores** para o que você pediu. Destaque para **{top_names}**, alvos prioritários para reforçar o time. O relatório completo de cada um está logo abaixo para sua avaliação!"
 
-def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_key="", language="pt"):
+def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_key="", language="pt", manual_filters=None):
     """
     Processa chat de scout completo, combinando Inteligência Artificial Generativa (Gemini)
-    com busca local em tempo real no banco do jogo e fallback offline robusto.
+    com busca local em tempo real no banco do jogo e fallback offline robusto,
+    e combinando os parâmetros de voz com os filtros manuais ativos da tela.
     """
     lang = (language or "pt").lower()
     save_id = "carreira_ativa"
@@ -2636,6 +2647,16 @@ def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_
         normalized_query = normalize_spoken_numbers(user_msg)
         params = parse_natural_language_scout_query(normalized_query)
         params["offline_fallback"] = True
+
+    # 2.1 Combinação com Filtros Manuais preenchidos na interface
+    if manual_filters and isinstance(manual_filters, dict):
+        for mk, mv in manual_filters.items():
+            if mv is not None and mv != "":
+                # Se o filtro manual foi preenchido e não foi sobreposto com valor diferente na voz
+                if mk not in params or params[mk] is None or params[mk] == "" or (isinstance(params[mk], list) and len(params[mk]) == 0):
+                    params[mk] = mv
+                elif mk == "positions" and isinstance(mv, list) and len(mv) > 0 and not params.get("positions"):
+                    params["positions"] = mv
 
     params["ai_powered"] = ai_engine_used
     criteria_list = build_criteria_summary(params, language=lang)

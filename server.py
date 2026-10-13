@@ -607,7 +607,27 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 fpath = os.path.join(UPLOADS_DIR, fname)
                 return self.serve_image(fpath)
 
-            # 0.2 Mídias Sociais, Feed de Notícias & Capturas de Gameplay
+            # 0.2 Divisões de Base & Transição (Lucas Valença)
+            if path == "/api/youth/players":
+                try:
+                    import youth_academy_engine
+                    y_players = youth_academy_engine.load_youth_players()
+                    return self.send_json({"ok": True, "players": y_players, "total": len(y_players)})
+                except Exception as err:
+                    return self.send_json({"ok": False, "error": str(err)}, 500)
+
+            if path == "/api/youth/evolution":
+                try:
+                    import youth_academy_engine
+                    pid = query.get("player_id", [None])[0]
+                    if pid:
+                        res = youth_academy_engine.get_youth_evolution(pid, save_id)
+                        return self.send_json(res)
+                    return self.send_json({"ok": False, "error": "ID não informado"}, 400)
+                except Exception as err:
+                    return self.send_json({"ok": False, "error": str(err)}, 500)
+
+            # 0.3 Mídias Sociais, Feed de Notícias & Capturas de Gameplay
             if path == "/api/social-posts":
                 post_type = query.get("post_type", [None])[0]
                 posts = database.get_social_posts(save_id, season_year, post_type)
@@ -1273,6 +1293,29 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         threading.Thread(target=_bg_scout_sync, daemon=True).start()
                         scout_count = 1
 
+                    # Sincronizar Jovens da Base da Academia (career_youthplayers)
+                    y_players = payload.get("youth_players")
+                    if not y_players and found_dir:
+                        y_file = os.path.join(found_dir, "BASE_JOVENS_EXTRAIDA.json")
+                        if not os.path.exists(y_file):
+                            y_file = os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "BASE_JOVENS_EXTRAIDA.json")
+                        if os.path.exists(y_file):
+                            try:
+                                with open(y_file, "r", encoding="utf-8", errors="ignore") as yf:
+                                    y_data = json.load(yf)
+                                    y_players = y_data.get("players", [])
+                            except Exception as ye:
+                                print("[YOUTH] Aviso ao ler BASE_JOVENS_EXTRAIDA:", ye)
+
+                    if y_players:
+                        try:
+                            import youth_academy_engine
+                            for yp in y_players:
+                                fp = youth_academy_engine.format_youth_player(yp)
+                                youth_academy_engine.save_youth_snapshot(fp, save_id)
+                        except Exception as ye:
+                            print("[YOUTH] Erro ao sincronizar snapshot de jovens:", ye)
+
                 return self.send_json({
                     "status": "success",
                     "message": "Dados reais do jogo importados com sucesso da pasta Dados_Carreira_FC!",
@@ -1566,6 +1609,16 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 payload = {}
 
             save_id = payload.get("save_id", "carreira_ativa")
+
+            # --- DIVISÕES DE BASE & TRANSIÇÃO (LUCAS VALENÇA) ---
+            if path == "/api/youth/compare":
+                try:
+                    import youth_academy_engine
+                    y_id = payload.get("youth_player_id")
+                    res = youth_academy_engine.compare_youth_with_first_team(y_id)
+                    return self.send_json(res)
+                except Exception as err:
+                    return self.send_json({"ok": False, "error": str(err)}, 500)
 
             # --- MÍDIAS SOCIAIS & REPERCUSSÃO DA CARREIRA ---
             if path == "/api/social-posts":
@@ -1945,6 +1998,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 user_msg = payload.get("message", "")
                 persona_id = payload.get("persona_id", "carlos")
                 language = str(payload.get("language", "pt")).lower()
+                manual_filters = payload.get("manual_filters")
                 gemini_key = payload.get("gemini_key") or load_env().get("GEMINI_API_KEY", "")
                 save_ctx = {
                     "save_id": save_id,
@@ -1952,7 +2006,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     "scout_role": payload.get("scout_role"),
                     "scout_avatar": payload.get("scout_avatar")
                 }
-                res = fcm_resolver.process_scout_chat(user_msg, persona_id, save_ctx, gemini_key, language=language)
+                res = fcm_resolver.process_scout_chat(user_msg, persona_id, save_ctx, gemini_key, language=language, manual_filters=manual_filters)
                 return self.send_json(res)
 
             if path == "/api/scout/sync_live_players":
@@ -2648,6 +2702,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                 user_msg = str(payload.get("message", "")).strip()
                 persona_id = str(payload.get("persona_id", "carlos")).strip()
                 language = str(payload.get("language", "pt")).lower()
+                manual_filters = payload.get("manual_filters")
                 user_key = payload.get("gemini_key", "") or load_env().get("GEMINI_API_KEY", "")
                 save_ctx = {
                     "save_id": save_id,
@@ -2655,7 +2710,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                     "scout_role": payload.get("scout_role"),
                     "scout_avatar": payload.get("scout_avatar")
                 }
-                chat_res = fcm_resolver.process_scout_chat(user_msg, persona_id, save_ctx, user_key, language=language)
+                chat_res = fcm_resolver.process_scout_chat(user_msg, persona_id, save_ctx, user_key, language=language, manual_filters=manual_filters)
                 return self.send_json(chat_res)
 
             if path == "/api/scout/search_offline_fallback":

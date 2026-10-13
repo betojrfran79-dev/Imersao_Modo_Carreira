@@ -648,6 +648,109 @@ local function ExtractMemoryTransfers(user_team_id, cur_date)
 end
 
 -- ==============================================================================
+-- 🌟 EXTRAÇÃO COMPLETA DA ACADEMIA DE BASE (CAREER_YOUTHPLAYERS)
+-- ==============================================================================
+local function ExtractYouthAcademyPlayers()
+    local extracted = {}
+    pcall(function()
+        local y_tbl = LE.db:GetTable("career_youthplayers")
+        if not y_tbl then return end
+        local p_tbl = LE.db:GetTable("players")
+        if not p_tbl then return end
+        local h_tbl = LE.db:GetTable("career_youthplayerhistory")
+
+        local youth_history = {}
+        if h_tbl then
+            local h_rec = h_tbl:GetFirstRecord()
+            while h_rec > 0 do
+                local h_pid = h_tbl:GetRecordFieldValue(h_rec, "playerid") or 0
+                if h_pid > 0 then
+                    youth_history[h_pid] = {
+                        appearances = h_tbl:GetRecordFieldValue(h_rec, "appearances") or 0,
+                        goals = h_tbl:GetRecordFieldValue(h_rec, "goals") or 0
+                    }
+                end
+                h_rec = h_tbl:GetNextValidRecord()
+            end
+        end
+
+        local players_map = {}
+        local p_rec = p_tbl:GetFirstRecord()
+        while p_rec > 0 do
+            local pid = p_tbl:GetRecordFieldValue(p_rec, "playerid") or 0
+            if pid > 0 then players_map[pid] = p_rec end
+            p_rec = p_tbl:GetNextValidRecord()
+        end
+
+        local function get_pos_name(pos_code)
+            local map = {
+                [0] = "GK", [2] = "RWB", [3] = "RB", [4] = "RCB", [5] = "CB", [6] = "LCB",
+                [7] = "LB", [8] = "LWB", [9] = "RDM", [10] = "CDM", [11] = "LDM",
+                [12] = "RM", [13] = "RCM", [14] = "CM", [15] = "LCM", [16] = "LM",
+                [17] = "RAM", [18] = "CAM", [19] = "LAM", [20] = "RF", [21] = "CF",
+                [22] = "LF", [23] = "RW", [24] = "RS", [25] = "ST", [26] = "LS", [27] = "LW"
+            }
+            return map[pos_code] or "ATA"
+        end
+
+        local y_rec = y_tbl:GetFirstRecord()
+        while y_rec > 0 do
+            local pid = y_tbl:GetRecordFieldValue(y_rec, "playerid") or 0
+            if pid > 0 then
+                local pr = players_map[pid]
+                local pname = GetPlayerName(pid)
+                if not pname or pname == "" or pname:find("^%*") then
+                    pname = string.format("Jovem #%d", pid)
+                end
+
+                local p_data = {
+                    playerid = pid,
+                    name = pname,
+                    potentialvariance = y_tbl:GetRecordFieldValue(y_rec, "potentialvariance") or 0,
+                    monthsinsquad = y_tbl:GetRecordFieldValue(y_rec, "monthsinsquad") or 0,
+                    playertier = y_tbl:GetRecordFieldValue(y_rec, "playertier") or 0,
+                    swinglowpotential = y_tbl:GetRecordFieldValue(y_rec, "swinglowpotential") or 0,
+                    history = youth_history[pid] or { appearances = 0, goals = 0 },
+                    attributes = {}
+                }
+
+                if pr then
+                    p_data.overall = p_tbl:GetRecordFieldValue(pr, "overallrating") or 0
+                    p_data.potential = p_tbl:GetRecordFieldValue(pr, "potential") or 0
+                    local pos_code = p_tbl:GetRecordFieldValue(pr, "preferredposition1") or 25
+                    p_data.position = get_pos_name(pos_code)
+                    local p_foot = p_tbl:GetRecordFieldValue(pr, "preferredfoot") or 1
+                    p_data.preferred_foot = (p_foot == 2) and "Canhoto" or "Destro"
+                    p_data.weak_foot = p_tbl:GetRecordFieldValue(pr, "weakfootabilitytypecode") or 3
+                    local raw_sm = p_tbl:GetRecordFieldValue(pr, "skillmoves") or 0
+                    p_data.skill_moves = (raw_sm < 5) and (raw_sm + 1) or raw_sm
+                    p_data.height = p_tbl:GetRecordFieldValue(pr, "height") or 0
+                    p_data.weight = p_tbl:GetRecordFieldValue(pr, "weight") or 0
+                    p_data.birthdate_raw = p_tbl:GetRecordFieldValue(pr, "birthdate") or 0
+
+                    local attr_fields = {
+                        "finishing", "shotpower", "longshots", "volleys", "penalties", "freekickaccuracy",
+                        "headingaccuracy", "shortpassing", "longpassing", "crossing", "curve", "vision",
+                        "ballcontrol", "dribbling", "defensiveawareness", "standingtackle", "slidingtackle",
+                        "interceptions", "acceleration", "sprintspeed", "agility", "balance", "jumping",
+                        "stamina", "strength", "reactions", "aggression", "composure", "positioning",
+                        "gkdiving", "gkhandling", "gkkicking", "gkpositioning", "gkreflexes"
+                    }
+
+                    for _, attr in ipairs(attr_fields) do
+                        p_data.attributes[attr] = p_tbl:GetRecordFieldValue(pr, attr) or 50
+                    end
+                end
+
+                table.insert(extracted, p_data)
+            end
+            y_rec = y_tbl:GetNextValidRecord()
+        end
+    end)
+    return extracted
+end
+
+-- ==============================================================================
 -- 🚀 EXTRAÇÃO E SINCRONIZAÇÃO MASTER
 -- ==============================================================================
 function ExtractAndSyncFullCareer(is_silent)
@@ -1279,6 +1382,34 @@ function ExtractAndSyncFullCareer(is_silent)
                 return (a.gregorian_days or a.raw_date or 0) < (b.gregorian_days or b.raw_date or 0)
             end)
             for idx, u in ipairs(payload.upcoming_matches) do u.ordem = idx end
+        end
+    end)
+
+    -- 7. Extração das Joias da Base da Academia (career_youthplayers)
+    payload.youth_players = ExtractYouthAcademyPlayers()
+    LOGGER:LogInfo(string.format("[Career Vault] 🌟 Joias da Academia de Base Extraídas: %d", #payload.youth_players))
+
+    -- Exportar também o arquivo standalone BASE_JOVENS_EXTRAIDA.json
+    pcall(function()
+        local y_export = {
+            save_id = payload.save_id,
+            team_name = payload.team_name,
+            extracted_at = os.date("%Y-%m-%d %H:%M:%S"),
+            total_players = #payload.youth_players,
+            players = payload.youth_players
+        }
+        local y_str = json.encode(y_export)
+        local y_files = {
+            string.format("%s\\Desktop\\BASE_JOVENS_EXTRAIDA.json", userprofile),
+            string.format("%s\\BASE_JOVENS_EXTRAIDA.json", target_folder),
+            "BASE_JOVENS_EXTRAIDA.json"
+        }
+        for _, yf in ipairs(y_files) do
+            local yf_handle = io.open(yf, "w+")
+            if yf_handle then
+                yf_handle:write(y_str)
+                yf_handle:close()
+            end
         end
     end)
 

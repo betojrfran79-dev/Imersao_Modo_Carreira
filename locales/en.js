@@ -35,6 +35,7 @@ window.I18N_LOCALES['en'] = {
     seasons: 'Seasons History',
     calendar: 'Calendar & Fixtures',
     squad: 'Squad & Players',
+    youth: 'Youth Academy',
     transfers: 'Transfers & Market',
     scout: 'Scouting Hub',
     finances: 'Club Finances',

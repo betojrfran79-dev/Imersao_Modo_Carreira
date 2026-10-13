@@ -5831,6 +5831,89 @@ window.editScoutPrompt = function(msgText) {
 // Objeto global de cache para transferir parâmetros de pesquisa com segurança
 window._scoutQueryCache = {};
 
+// Coleta os filtros manuais atualmente preenchidos na tela do Scout para combinar com a voz
+function getActiveManualScoutFilters() {
+  const getVal = (id) => {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : "";
+  };
+  const getNum = (id) => {
+    const v = getVal(id);
+    return v !== "" ? Number(v) : null;
+  };
+
+  const filters = {};
+  const nameVal = getVal("filterScoutName");
+  if (nameVal) filters.query = nameVal;
+
+  const posVal = getVal("filterScoutPos");
+  if (posVal) filters.positions = [posVal];
+
+  const natVal = getVal("filterScoutNationality");
+  if (natVal) filters.nationality_id = Number(natVal);
+
+  const genderVal = getVal("filterScoutGender");
+  if (genderVal !== "") filters.gender = Number(genderVal);
+
+  const minOvr = getNum("filterScoutMinOvr");
+  if (minOvr !== null) filters.min_ovr = minOvr;
+  const maxOvr = getNum("filterScoutMaxOvr");
+  if (maxOvr !== null) filters.max_ovr = maxOvr;
+
+  const minPot = getNum("filterScoutMinPot");
+  if (minPot !== null) filters.min_pot = minPot;
+  const maxPot = getNum("filterScoutMaxPot");
+  if (maxPot !== null) filters.max_pot = maxPot;
+
+  const minAge = getNum("filterScoutMinAge");
+  if (minAge !== null) filters.min_age = minAge;
+  const maxAge = getNum("filterScoutMaxAge");
+  if (maxAge !== null) filters.max_age = maxAge;
+
+  const minPace = getNum("filterScoutMinPace");
+  if (minPace !== null) filters.min_pace = minPace;
+  const maxPace = getNum("filterScoutMaxPace");
+  if (maxPace !== null) filters.max_pace = maxPace;
+
+  const minFin = getNum("filterScoutMinFinishing");
+  if (minFin !== null) filters.min_finishing = minFin;
+  const maxFin = getNum("filterScoutMaxFinishing");
+  if (maxFin !== null) filters.max_finishing = maxFin;
+
+  const minPass = getNum("filterScoutMinPassing");
+  if (minPass !== null) filters.min_passing = minPass;
+  const maxPass = getNum("filterScoutMaxPassing");
+  if (maxPass !== null) filters.max_passing = maxPass;
+
+  const minDrib = getNum("filterScoutMinDribbling");
+  if (minDrib !== null) filters.min_dribbling = minDrib;
+  const maxDrib = getNum("filterScoutMaxDribbling");
+  if (maxDrib !== null) filters.max_dribbling = maxDrib;
+
+  const minDef = getNum("filterScoutMinDefending");
+  if (minDef !== null) filters.min_defending = minDef;
+  const maxDef = getNum("filterScoutMaxDefending");
+  if (maxDef !== null) filters.max_defending = maxDef;
+
+  const minStr = getNum("filterScoutMinStrength");
+  if (minStr !== null) filters.min_strength = minStr;
+  const maxStr = getNum("filterScoutMaxStrength");
+  if (maxStr !== null) filters.max_strength = maxStr;
+
+  const minHead = getNum("filterScoutMinHeading");
+  if (minHead !== null) filters.min_heading = minHead;
+  const maxHead = getNum("filterScoutMaxHeading");
+  if (maxHead !== null) filters.max_heading = maxHead;
+
+  const maxPrice = getNum("filterScoutMaxPrice");
+  if (maxPrice !== null) filters.max_price = maxPrice;
+
+  const isWonderkid = document.getElementById("filterScoutWonderkid")?.checked;
+  if (isWonderkid) filters.is_wonderkid = true;
+
+  return filters;
+}
+
 async function sendScoutChatMessage(userMsg) {
   if (!userMsg || isScoutSearching) return;
   isScoutSearching = true;
@@ -5878,7 +5961,9 @@ async function sendScoutChatMessage(userMsg) {
   }
 
   try {
-    // Consulta direta e instantânea na base de dados local
+    const manualFilters = getActiveManualScoutFilters();
+
+    // Consulta direta e instantânea na base de dados local combinando voz com filtros manuais
     const resp = await fetch(`${API_BASE}/scout/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -5889,6 +5974,7 @@ async function sendScoutChatMessage(userMsg) {
         scout_name: scoutSettingsCache.scout_name,
         scout_role: scoutSettingsCache.scout_role,
         scout_avatar: scoutSettingsCache.scout_avatar,
+        manual_filters: manualFilters,
         language: window.i18n ? window.i18n.getLanguage() : "pt"
       })
     });
@@ -6579,6 +6665,7 @@ function switchTab(tabTarget) {
   if (tabTarget === "transfers") loadTransfersData();
   if (tabTarget === "finances") loadFinancesData();
   if (tabTarget === "squad") loadSquadData();
+  if (tabTarget === "youth" && typeof window.reloadYouthAcademyData === "function") window.reloadYouthAcademyData();
   if (tabTarget === "manager") loadManagerData();
   if (tabTarget === "seasons") loadSeasonsList();
   if (tabTarget === "calendar") loadCalendarData();

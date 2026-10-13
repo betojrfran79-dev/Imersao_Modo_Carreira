@@ -23,6 +23,9 @@
   <!-- html2canvas CDN (Exportação de cards e capas de jornais em imagem PNG) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
+  <!-- Chart.js CDN (Gráficos Radar e Barras Comparativas) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <!-- i18n Locales & Engine -->
   <script src="locales/pt.js"></script>
   <script src="locales/en.js"></script>
@@ -137,6 +140,10 @@
         <button class="nav-item" data-tab="squad">
           <i data-lucide="users"></i>
           <span data-i18n="menu.squad">Elenco & Atletas</span>
+        </button>
+        <button class="nav-item" data-tab="youth">
+          <i data-lucide="graduation-cap"></i>
+          <span data-i18n="menu.youth">Divisões de Base</span>
         </button>
         <button class="nav-item" data-tab="transfers">
           <i data-lucide="arrow-left-right"></i>
@@ -925,6 +932,191 @@
                 <!-- Preenchido via JS -->
               </tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ======================================================== -->
+      <!-- ABA: DIVISÕES DE BASE & TRANSIÇÃO (LUCAS VALENÇA)        -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-youth">
+        <!-- Banner de Apresentação de Lucas Valença -->
+        <div class="youth-hero-banner">
+          <div class="youth-scout-intro">
+            <div class="youth-scout-avatar-wrap">
+              <img src="/assets/scout_lucas.png" onerror="this.src='assets/heads/notfound.png'" alt="Lucas Valença" class="youth-scout-img">
+              <span class="youth-scout-badge-online">CT ONLINE</span>
+            </div>
+            <div class="youth-scout-text">
+              <div class="youth-scout-title-row">
+                <h2>Lucas Valença <span class="youth-specialty-pill"><i data-lucide="sparkles"></i> Especialista em Joias & Base</span></h2>
+              </div>
+              <p class="youth-scout-desc">
+                Monitoramento das promessas da academia do clube, fichas completas com atributos reais, comparação tática com os profissionais e parecer de transição.
+              </p>
+            </div>
+          </div>
+          <div class="youth-hero-actions">
+            <button type="button" class="btn-secondary btn-sm" onclick="reloadYouthAcademyData()">
+              <i data-lucide="refresh-cw"></i> Recarregar Base
+            </button>
+          </div>
+        </div>
+
+        <!-- Layout em 2 Colunas: Garotos da Base (Esq) e Painel Principal (Dir) -->
+        <div class="youth-layout-grid">
+          <!-- Coluna Esquerda: Garotos da Base -->
+          <div class="youth-list-sidebar">
+            <div class="youth-section-title">
+              <i data-lucide="graduation-cap"></i> Promessas da Academia (<span id="youthTotalCount">0</span>)
+            </div>
+            <div class="youth-cards-scroll" id="youthPlayersList">
+              <!-- Preenchido dinamicamente via JS -->
+            </div>
+          </div>
+
+          <!-- Coluna Direita: Ficha Técnica 100% Completa & Comparativo -->
+          <div class="youth-main-panel" id="youthMainPanel">
+            <!-- Placeholder Inicial -->
+            <div class="youth-empty-placeholder" id="youthEmptyPlaceholder">
+              <i data-lucide="graduation-cap" style="width: 56px; height: 56px; color: var(--accent-gold); opacity: 0.7;"></i>
+              <h3>Selecione um Atleta da Base</h3>
+              <p>Clique em uma promessa da lista ao lado para abrir a ficha técnica 100% completa e solicitar o parecer de transição de Lucas Valença.</p>
+            </div>
+
+            <!-- Ficha Completa do Jovem -->
+            <div class="youth-profile-container" id="youthProfileContainer" style="display: none;">
+              <div class="youth-profile-card">
+                <div class="psm-header youth-custom-header">
+                  <div class="psm-avatar-container">
+                    <img id="yProfileFace" class="psm-face" src="assets/heads/notfound.png" alt="Foto Jovem">
+                  </div>
+                  <div class="psm-identity">
+                    <div class="psm-title-row">
+                      <h2 class="psm-name" id="yProfileName">Nome do Jovem</h2>
+                      <span class="psm-id-tag" id="yProfileIdTag">ID #0</span>
+                    </div>
+                    <div class="psm-badges-row">
+                      <span class="badge-tag" id="yProfilePosition">ME</span>
+                      <span class="badge-ovr" id="yProfileOvr">OVR 57</span>
+                      <span class="badge-pot" id="yProfilePot">POT 79</span>
+                      <span class="badge-tag" id="yProfileAge">17 anos</span>
+                      <span class="badge-tag" id="yProfileFoot">Canhoto</span>
+                    </div>
+                  </div>
+                  <div class="psm-header-actions">
+                    <button type="button" class="btn-primary" id="btnRunYouthCompare" onclick="runYouthComparison()">
+                      <i data-lucide="scale"></i> Comparar com Elenco & Parecer
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 3 Colunas de Dados Biográficos e Físicos -->
+                <div class="psm-meta-grid" style="margin-top: 1rem;">
+                  <div class="psm-meta-card">
+                    <div class="psm-mc-title"><i data-lucide="activity"></i> Perfil Físico</div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Altura / Peso:</span><span class="psm-val" id="yProfilePhys">-</span></div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Pé Preferido:</span><span class="psm-val" id="yProfilePerna">-</span></div>
+                  </div>
+                  <div class="psm-meta-card">
+                    <div class="psm-mc-title"><i data-lucide="award"></i> Habilidades Técnicas</div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Fintas:</span><span class="psm-val" id="yProfileSkills">-</span></div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Perna Ruim:</span><span class="psm-val" id="yProfileWeakFoot">-</span></div>
+                  </div>
+                  <div class="psm-meta-card">
+                    <div class="psm-mc-title"><i data-lucide="calendar"></i> Academia do Clube</div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Tempo na Base:</span><span class="psm-val" id="yProfileMonths">-</span></div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Vínculo:</span><span class="psm-val font-bold text-green">Contrato de Formação</span></div>
+                  </div>
+                </div>
+
+                <!-- 7 Categorias Oficiais com TODOS os Atributos Reais -->
+                <div class="psm-categories-section" style="margin-top: 1.25rem;">
+                  <div class="psm-categories-topbar">
+                    <div class="psm-section-label"><i data-lucide="layers"></i> Categorias de Atributos Oficiais</div>
+                    <button type="button" class="btn-secondary btn-xs psm-toggle-all-btn" onclick="toggleAllYouthCategoryCards()">
+                      <i data-lucide="chevrons-up-down"></i> <span id="yToggleAllText">Recolher Todos</span>
+                    </button>
+                  </div>
+                  <div class="psm-category-cards-grid" id="yCategoryCardsGrid">
+                    <!-- Inserido dinamicamente via JS -->
+                  </div>
+                </div>
+
+                <!-- Gráfico de Evolução Temporal das 7 Categorias Oficiais (Line Chart) -->
+                <div class="youth-evolution-section" id="youthEvolutionSection" style="margin-top: 1.5rem;">
+                  <div class="youth-chart-box">
+                    <div class="youth-chart-header">
+                      <div>
+                        <h4><i data-lucide="trending-up"></i> Histórico de Crescimento no CT (7 Categorias)</h4>
+                        <span class="text-dim" style="font-size: 0.8rem;">Monitoramento contínuo da evolução técnica, física e mental do atleta a cada extração</span>
+                      </div>
+                      <div class="youth-comp-badge" style="color: #10b981; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.1);">
+                        <i data-lucide="database"></i> Snapshots Registrados
+                      </div>
+                    </div>
+                    <div style="position: relative; height: 260px; max-height: 280px; width: 100%;">
+                      <canvas id="youthEvolutionLineChart"></canvas>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- SEÇÃO DO COMPARATIVO E PARECER DE TRANSIÇÃO (Exibida sob demanda) -->
+                <div class="youth-comparison-section" id="youthComparisonSection" style="display: none; margin-top: 2rem;">
+                  <div class="youth-comp-topbar">
+                    <div class="youth-comp-title">
+                      <i data-lucide="git-compare"></i> Comparativo Tático: Jovem da Base vs Time Principal
+                    </div>
+                    <span class="youth-comp-badge" id="youthCompRivalsCount">Buscando concorrentes...</span>
+                  </div>
+
+                  <!-- Gráfico Comparativo Geral com TODOS os jogadores da mesma posição -->
+                  <div class="youth-chart-box">
+                    <div class="youth-chart-header">
+                      <h4>Raio-X da Posição: Multi-Camadas (Todos os Atletas da Posição)</h4>
+                      <span class="text-dim" style="font-size: 0.8rem;">Gráfico comparativo interativo</span>
+                    </div>
+                    <div style="position: relative; height: 360px; max-height: 380px; width: 100%;">
+                      <canvas id="youthRadarChart"></canvas>
+                    </div>
+                  </div>
+
+                  <!-- Parecer Técnico Estruturado de Lucas Valença -->
+                  <div class="youth-verdict-card" id="youthVerdictCard">
+                    <div class="youth-verdict-header">
+                      <div class="youth-verdict-author">
+                        <img src="/assets/scout_lucas.png" onerror="this.src='assets/heads/notfound.png'" alt="Lucas Valença" class="yv-author-img">
+                        <div>
+                          <h4>Parecer de Transição de Base</h4>
+                          <span>Lucas Valença • Olheiro Chefe de Formação</span>
+                        </div>
+                      </div>
+                      <div class="youth-status-pill" id="yVerdictStatusPill">
+                        <!-- Status Badge -->
+                      </div>
+                    </div>
+                    <div class="youth-verdict-body">
+                      <p class="youth-verdict-text" id="yVerdictText">Carregando análise técnica...</p>
+                      <div class="youth-verdict-grid">
+                        <div class="yv-mini-card">
+                          <span class="yv-label">Vantagens Imediatas:</span>
+                          <div class="yv-value text-green" id="yVerdictAdv">-</div>
+                        </div>
+                        <div class="yv-mini-card">
+                          <span class="yv-label">Pontos de Atenção:</span>
+                          <div class="yv-value text-gold" id="yVerdictDisadv">-</div>
+                        </div>
+                        <div class="yv-mini-card">
+                          <span class="yv-label">Projeção de Teto:</span>
+                          <div class="yv-value" id="yVerdictCeiling">-</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -1799,7 +1991,7 @@
                   <span style="font-size: 0.78rem; color: var(--neon-blue); font-weight: 700;">
                     <i data-lucide="scissors" style="width: 13px; height: 13px;"></i> Trimmer de Vídeo (O clipe cortado roda em loop na matéria / post)
                   </span>
-                  <span id="videoDurationLabel" style="font-size: 0.75rem; color: var(--text-dim);">Duração máx: 30s</span>
+                  <span id="videoDurationLabel" style="font-size: 0.75rem; color: var(--text-dim);">Corte permitido: 1s a 60s</span>
                 </div>
 
                 <div style="position: relative; max-width: 480px; margin: 0 auto; width: 100%; border-radius: 8px; overflow: hidden; background: #000; border: 1px solid rgba(255,255,255,0.1);">
@@ -1813,12 +2005,12 @@
                     <input type="number" id="socialTrimStart" min="0" step="0.1" value="0" class="vault-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;" oninput="validateSocialTrim()">
                   </div>
                   <div>
-                    <label style="font-size: 0.72rem; color: var(--text-dim); display: block; margin-bottom: 2px;">Fim do Corte (s) - máx +30s</label>
-                    <input type="number" id="socialTrimEnd" min="0.1" step="0.1" value="30" class="vault-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;" oninput="validateSocialTrim()">
+                    <label style="font-size: 0.72rem; color: var(--text-dim); display: block; margin-bottom: 2px;">Fim do Corte (s) - máx 60s</label>
+                    <input type="number" id="socialTrimEnd" min="1" step="0.1" value="30" class="vault-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;" oninput="validateSocialTrim()">
                   </div>
                 </div>
                 <div id="socialTrimWarning" style="color: var(--neon-red); font-size: 0.72rem; text-align: center; display: none;">
-                  O trecho cortado deve ter no máximo 30 segundos!
+                  O corte deve ter entre 1 e 60 segundos!
                 </div>
               </div>
 
@@ -1836,7 +2028,7 @@
               <!-- Opção de Escolher Outro Arquivo Manualmente + Botão de Descartar -->
               <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                  <label style="font-size: 0.75rem; color: var(--text-dim); font-weight: 600;">Carregar outro print ou vídeo:</label>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); font-weight: 600;">Carregar outro print ou vídeo (máx 300 MB):</label>
                   <input type="file" id="socialManualFileInput" accept="image/*,video/*" onchange="handleManualMediaSelect(event)" style="font-size: 0.78rem; color: var(--text-dim);">
                 </div>
                 <button type="button" class="btn-xs btn-secondary" id="btnClearMediaSelection" onclick="clearSelectedMedia()" style="display: none; color: var(--neon-red); border-color: rgba(255,75,75,0.3);">
@@ -3228,6 +3420,8 @@
 
   <!-- Social Media & Press Studio Module -->
   <script src="social_media.js?v=1.0"></script>
+  <!-- Youth Academy & Transition Engine -->
+  <script src="youth_academy.js?v=1.0"></script>
   <!-- Main JavaScript Application -->
   <script src="app.js?v=4.3"></script>
 </body>

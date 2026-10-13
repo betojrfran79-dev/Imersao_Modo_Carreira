@@ -4496,42 +4496,49 @@ def search_live_scout_players(save_id, params):
                 where_clauses.append("(league_name LIKE ?)")
                 query_args.append(f"%{league_req}%")
 
-        # 3.1 País de Atuação dos Clubes
-        country_req = params.get("club_country")
-        if country_req and not league_req:
-            c_lower = country_req.lower()
-            if "brasil" in c_lower:
-                where_clauses.append("(league_name LIKE '%Brasil%' OR league_name LIKE '%Série%' OR league_name LIKE '%Acesso%')")
-            elif "argentina" in c_lower:
-                where_clauses.append("(league_name LIKE '%LPF%' OR league_name LIKE '%Liga Profesional%' OR league_name LIKE '%Argentina%')")
-            elif "mexico" in c_lower:
-                where_clauses.append("(league_name LIKE '%Liga MX%' OR league_name LIKE '%BBVA MX%' OR league_name LIKE '%México%' OR league_name LIKE '%Mexico%')")
-            elif "uruguai" in c_lower:
-                where_clauses.append("(league_name LIKE '%AUF%' OR league_name LIKE '%Uruguay%' OR league_name LIKE '%Urugua%')")
-            elif "inglaterra" in c_lower:
-                where_clauses.append("(league_name LIKE '%Premier%' OR league_name LIKE '%Championship%' OR league_name LIKE '%League One%' OR league_name LIKE '%League Two%')")
-            elif "espanha" in c_lower:
-                where_clauses.append("(league_name LIKE '%LALIGA%' OR league_name LIKE '%La Liga%' OR league_name LIKE '%HYPERMOTION%')")
-            elif "alemanha" in c_lower:
-                where_clauses.append("(league_name LIKE '%Bundesliga%')")
-            elif "italia" in c_lower:
-                where_clauses.append("((league_name LIKE '%Serie A%' OR league_name LIKE '%Serie BKT%' OR league_name LIKE '%Enilive%') AND league_name NOT LIKE '%Brasil%')")
-            elif "franca" in c_lower:
-                where_clauses.append("(league_name LIKE '%Ligue 1%' OR league_name LIKE '%Ligue 2%')")
-            elif "portugal" in c_lower:
-                where_clauses.append("(league_name LIKE '%Portugal%' OR league_name LIKE '%Betclic%' OR league_name LIKE '%Primeira Liga%')")
-            elif "arabia" in c_lower:
-                where_clauses.append("(league_name LIKE '%Saudi%' OR league_name LIKE '%Roshn%')")
-            elif "estados unidos" in c_lower or "eua" in c_lower:
-                where_clauses.append("(league_name LIKE '%MLS%')")
-            elif "holanda" in c_lower:
-                where_clauses.append("(league_name LIKE '%Eredivisie%')")
-            elif "belgica" in c_lower:
-                where_clauses.append("(league_name LIKE '%Pro League%' OR league_name LIKE '%Jupiler%')")
-            elif "turquia" in c_lower:
-                where_clauses.append("(league_name LIKE '%Süper Lig%' OR league_name LIKE '%Super Lig%')")
-            elif "escocia" in c_lower:
-                where_clauses.append("(league_name LIKE '%Premiership%')")
+        # 3.1 País de Atuação dos Clubes (Suporte a múltiplos países, ex: Brasil OU México)
+        countries_req = params.get("club_countries")
+        if not countries_req and params.get("club_country"):
+            countries_req = [params["club_country"]]
+
+        if countries_req and not league_req:
+            c_clauses = []
+            for c_item in countries_req:
+                c_lower = str(c_item).lower()
+                if "brasil" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Brasil%' OR league_name LIKE '%Série%' OR league_name LIKE '%Acesso%')")
+                elif "argentina" in c_lower:
+                    c_clauses.append("(league_name LIKE '%LPF%' OR league_name LIKE '%Liga Profesional%' OR league_name LIKE '%Argentina%')")
+                elif "mexico" in c_lower or "méxico" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Liga MX%' OR league_name LIKE '%BBVA MX%' OR league_name LIKE '%México%' OR league_name LIKE '%Mexico%')")
+                elif "uruguai" in c_lower:
+                    c_clauses.append("(league_name LIKE '%AUF%' OR league_name LIKE '%Uruguay%' OR league_name LIKE '%Urugua%')")
+                elif "inglaterra" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Premier%' OR league_name LIKE '%Championship%' OR league_name LIKE '%League One%' OR league_name LIKE '%League Two%')")
+                elif "espanha" in c_lower:
+                    c_clauses.append("(league_name LIKE '%LALIGA%' OR league_name LIKE '%La Liga%' OR league_name LIKE '%HYPERMOTION%')")
+                elif "alemanha" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Bundesliga%')")
+                elif "italia" in c_lower:
+                    c_clauses.append("((league_name LIKE '%Serie A%' OR league_name LIKE '%Serie BKT%' OR league_name LIKE '%Enilive%') AND league_name NOT LIKE '%Brasil%')")
+                elif "franca" in c_lower or "frança" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Ligue 1%' OR league_name LIKE '%Ligue 2%')")
+                elif "portugal" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Portugal%' OR league_name LIKE '%Betclic%' OR league_name LIKE '%Primeira Liga%')")
+                elif "arabia" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Saudi%' OR league_name LIKE '%Roshn%')")
+                elif "estados unidos" in c_lower or "eua" in c_lower:
+                    c_clauses.append("(league_name LIKE '%MLS%')")
+                elif "holanda" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Eredivisie%')")
+                elif "belgica" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Pro League%' OR league_name LIKE '%Jupiler%')")
+                elif "turquia" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Süper Lig%' OR league_name LIKE '%Super Lig%')")
+                elif "escocia" in c_lower:
+                    c_clauses.append("(league_name LIKE '%Premiership%')")
+            if c_clauses:
+                where_clauses.append(f"({' OR '.join(c_clauses)})")
 
         # 3.2 Nacionalidade do Atleta
         if params.get("nationality_id"):

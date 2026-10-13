@@ -35,6 +35,7 @@ window.I18N_LOCALES['es'] = {
     seasons: 'Historial de Temporadas',
     calendar: 'Calendario y Partidos',
     squad: 'Plantilla y Jugadores',
+    youth: 'Divisiones Juveniles',
     transfers: 'Fichajes y Mercado',
     scout: 'Equipo de Ojeadores',
     finances: 'Finanzas del Club',

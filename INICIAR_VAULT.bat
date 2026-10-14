@@ -87,7 +87,12 @@ echo.
 
 :: 4. Checagem de Atualizacoes Automaticas (Git ou Download Direto Inteligente)
 echo [Atualizacoes] Verificando se ha novas versoes no GitHub...
-"%PYTHON_EXE%" updater.py
+if not exist "updater.py" (
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object Net.WebClient).DownloadFile('https://raw.githubusercontent.com/betojrfran79-dev/Imersao_Modo_Carreira/main/updater.py', 'updater.py')" >nul 2>&1
+)
+if exist "updater.py" (
+    "%PYTHON_EXE%" updater.py
+)
 echo.
 
 echo Iniciando servidor e abrindo aplicacao...

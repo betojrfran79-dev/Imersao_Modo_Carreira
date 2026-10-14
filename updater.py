@@ -50,6 +50,8 @@ PROTECTED_PREFIXES = (
     "uploads\\",
     "scratch/",
     "scratch\\",
+    "scripts_LE_Exemplos/",
+    "scripts_LE_Exemplos\\",
     ".git/",
     ".git\\"
 )
@@ -184,11 +186,13 @@ def update_via_http_zip(remote_info):
 
                 # Extrai o arquivo com segurança
                 dest_path = os.path.join(BASE_DIR, rel_path)
-                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-
-                with z.open(member) as source_file, open(dest_path, "wb") as target_file:
-                    shutil.copyfileobj(source_file, target_file)
-                updated_count += 1
+                try:
+                    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                    with z.open(member) as source_file, open(dest_path, "wb") as target_file:
+                        shutil.copyfileobj(source_file, target_file)
+                    updated_count += 1
+                except Exception as file_err:
+                    pass
 
         # Salva o novo hash da versão
         save_local_version_info(

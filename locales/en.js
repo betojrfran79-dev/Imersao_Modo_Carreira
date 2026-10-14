@@ -203,8 +203,11 @@ window.I18N_LOCALES['en'] = {
     subtitle: 'The pantheon of immortal club legends, all-time record breakers, and historic squad.',
     allTimeTopScorer: 'All-Time Top Scorer',
     allTimeTopAssists: 'All-Time Assist Leader',
+    allTimeTopContrib: 'All-Time Goal Contributions Leader (G+A)',
     allTimeMostMatches: 'Appearance Record Holder',
-    legendaryXI: 'Immortal Squad (All-Time XI)'
+    allTimeCleanSheets: 'All-Time Clean Sheet Leader',
+    legendaryXI: 'Immortal Squad (All-Time XI)',
+    goldCardsTitle: 'Historic Gold Icon Cards'
   },
 
   h2h: {

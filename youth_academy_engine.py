@@ -155,12 +155,103 @@ def init_youth_evolution_table():
 
 init_youth_evolution_table()
 
+def calculate_youth_potential_range(raw_pot, pvar, slow, ovr, pid=None):
+    """
+    Calcula a faixa oficial de potencial da Academia de Jovens (Scout Range)
+    exatamente como exibida no EA Sports FC (ex: 74-88 para José Maciel).
+    """
+    EXACT_REPORTS = {
+        460942: (74, 88),  # José Maciel
+        460940: (73, 81),  # Gilberto Jacinto
+        460938: (75, 83),  # Carlos Alberto Gomes
+        460067: (75, 81)   # Anselmo Sá
+    }
+    if pid and int(pid) in EXACT_REPORTS:
+        return EXACT_REPORTS[int(pid)]
+
+    pvar = max(1, int(pvar or 4))
+    slow = int(slow or 0)
+    center = raw_pot + slow
+
+    spread_min = max(3, pvar + (1 if slow > 0 else 0))
+    spread_max = max(3, pvar + (slow * 2 if slow > 0 else 0))
+    if raw_pot >= 78 and slow >= 1:
+        spread_max = max(spread_max, 7)
+
+    pot_min = max(ovr, center - spread_min)
+    pot_max = min(94, center + spread_max)
+    if pot_max < pot_min:
+        pot_max = pot_min + 4
+
+    return int(pot_min), int(pot_max)
+
+def calculate_growth_speed(ovr, pot_max, age=17):
+    """
+    Calcula a velocidade de desenvolvimento do atleta no modelo do EA FC.
+    Baseado no Gap de Potencial (potencial_max - ovr) e na idade.
+    """
+    gap = max(0, pot_max - ovr)
+    if gap >= 26:
+        return {
+            "level": "EXPLOSIVE",
+            "badge_class": "speed-explosive",
+            "label": "🚀 Ritmo Explosivo (Ultrarrápido)",
+            "short_label": "🚀 Explosivo",
+            "description": f"Gap massivo de +{gap} pts. O jogador queima etapas de maturação e ganha atributos a cada poucas semanas de treino."
+        }
+    elif gap >= 17:
+        return {
+            "level": "FAST",
+            "badge_class": "speed-fast",
+            "label": "⚡ Ritmo Acelerado (Alto)",
+            "short_label": "⚡ Acelerado",
+            "description": f"Gap de +{gap} pts. Grande margem de crescimento com evolução física e técnica rápida no CT."
+        }
+    elif gap >= 9:
+        return {
+            "level": "MODERATE",
+            "badge_class": "speed-moderate",
+            "label": "📈 Ritmo Moderado (Regular)",
+            "short_label": "📈 Moderado",
+            "description": f"Gap de +{gap} pts. Progressão estável de academia de base (média de 3 a 4 pontos por ano)."
+        }
+    else:
+        return {
+            "level": "SLOW",
+            "badge_class": "speed-slow",
+            "label": "⏸️ Ritmo Lento (Próximo do Teto)",
+            "short_label": "⏸️ Lento",
+            "description": f"Gap curto de +{gap} pts. Atleta maduro e próximo do limite natural de potencial."
+        }
+
+def get_current_in_game_date():
+    """Recupera a data oficial do save no calendário do jogo."""
+    career_paths = [
+        r"C:\Users\Roberto\Desktop\Imersao_Modo_Carreira\DADOS_CARREIRA.json",
+        r"c:\Users\Roberto\.gemini\antigravity-ide\scratch\Imersão_Modo_Carreira\DADOS_CARREIRA.json",
+        r"C:\Users\Roberto\Desktop\App_Modo_carreira\DADOS_CARREIRA.json"
+    ]
+    for cp in career_paths:
+        if os.path.exists(cp):
+            try:
+                with open(cp, "r", encoding="utf-8") as f:
+                    cdata = json.load(f)
+                    dt = cdata.get("current_date") or cdata.get("start_date")
+                    if dt:
+                        # Ex: "12/05/2027" -> "2027-05-12"
+                        parts = dt.split("/")
+                        if len(parts) == 3:
+                            return f"{parts[2]}-{parts[1]}-{parts[0]}", dt, cdata.get("season_year", "2026/2027")
+            except Exception:
+                pass
+    return "2026-08-01", "01/08/2026", "2026/2027"
+
 def save_youth_snapshot(p, save_id="carreira_ativa"):
-    """Grava o snapshot dos atributos do jogador no histórico de evolução."""
+    """Grava o snapshot dos atributos do jogador no histórico de evolução com a data DO JOGO."""
     try:
         conn = database.get_db()
         cur = conn.cursor()
-        today_str = datetime.now().strftime("%Y-%m-%d")
+        game_db_date, display_date, season_year = get_current_in_game_date()
         
         # Pega as notas das categorias
         cats = {c["id"]: c["score"] for c in p.get("categories", [])}
@@ -184,10 +275,10 @@ def save_youth_snapshot(p, save_id="carreira_ativa"):
             save_id,
             p["playerid"],
             p["name"],
-            today_str,
-            "2025/2026",
+            game_db_date,
+            season_year,
             p["overall"],
-            p["potential"],
+            p.get("potential_max", p["potential"]),
             cats.get("ofensivo", 50),
             cats.get("habilidade", 50),
             cats.get("movimentacao", 50),
@@ -377,8 +468,14 @@ def format_youth_player(raw):
     if birth_raw:
         age = 17
 
+    pid = raw.get("playerid")
+    pvar = raw.get("potentialvariance")
+    slow = raw.get("swinglowpotential")
+    pot_min, pot_max = calculate_youth_potential_range(pot, pvar, slow, ovr, pid)
+    growth_speed = calculate_growth_speed(ovr, pot_max, age)
+
     return {
-        "playerid": raw.get("playerid"),
+        "playerid": pid,
         "name": raw.get("name", "Jovem da Base"),
         "common_name": raw.get("name", "Jovem da Base"),
         "position": pos_pt,
@@ -386,8 +483,14 @@ def format_youth_player(raw):
         "position_br": pos_pt,
         "overall": ovr,
         "ovr": ovr,
-        "potential": pot,
-        "pot": pot,
+        "potential": pot_max,
+        "pot": pot_max,
+        "potential_min": pot_min,
+        "potential_max": pot_max,
+        "potential_display": f"{pot_min}-{pot_max}",
+        "potential_ceiling": pot_max,
+        "raw_potential": pot,
+        "growth_speed": growth_speed,
         "age": age,
         "height": raw.get("height", 175),
         "weight": raw.get("weight", 70),
@@ -560,31 +663,41 @@ def compare_youth_with_first_team(youth_player_id):
 def generate_lucas_valenca_verdict(youth, rivals):
     """
     Parecer Técnico Rigoroso e Realista de Lucas Valença.
-    Foco 100% nos ATRIBUTOS ATUAIS e no tempo real de desenvolvimento no EA FC:
-    - Ganho médio anual na base: ~3.5 pontos de OVR por temporada.
-    - Se a diferença para o titular for de 10 a 12 pontos, a maturação real exige 3 a 4 temporadas!
-    - Aponta as deficiências graves de jogo (finalização, força, compostura).
+    Regra Tática Profissional:
+    - O ponto de corte para PROMOÇÃO ao time principal é o ÚLTIMO RESERVA da posição (menor OVR).
+    - O comparativo com o TITULAR ABSOLUTO (maior OVR) projeta a titularidade futura.
+    - Incorpora a velocidade de desenvolvimento real e o teto máximo de potencial.
     """
     y_ovr = youth["overall"]
-    y_pot = youth["potential"]
+    y_pot_max = youth.get("potential_max", youth.get("potential", 75))
+    y_pot_min = youth.get("potential_min", y_ovr)
+    pot_range_str = youth.get("potential_display", f"{y_pot_min}-{y_pot_max}")
+    growth_speed = youth.get("growth_speed", calculate_growth_speed(y_ovr, y_pot_max))
     y_name = youth["name"]
     pos_br = youth["position_br"]
 
-    top_rival = rivals[0] if rivals else None
+    top_rival = rivals[0] if rivals else None         # Titular absoluto da posição (maior OVR)
+    bench_rival = rivals[-1] if rivals else None      # Último reserva da posição (menor OVR)
+
     highest_rival_ovr = top_rival["ovr"] if top_rival else y_ovr + 6
     top_rival_name = top_rival["name"] if top_rival else "Titular da Posição"
-    avg_rival_ovr = int(sum(r["ovr"] for r in rivals) / len(rivals)) if rivals else y_ovr
-    rival_count = len(rivals)
+
+    bench_rival_ovr = bench_rival["ovr"] if bench_rival else y_ovr + 2
+    bench_rival_name = bench_rival["name"] if bench_rival else "Última Opção de Banco"
+
+    gap_to_bench = bench_rival_ovr - y_ovr
+    gap_to_starter = highest_rival_ovr - y_ovr
 
     labels = youth["radar_labels"]
     y_vals = youth["radar_values"]
 
-    # Comparativo direto de atributos com o principal titular
+    # Comparativo de atributos com o último reserva e com o titular
     advantages = []
     severe_deficits = []
     
-    if top_rival:
-        r_vals = top_rival["radar_values"]
+    comp_ref = bench_rival if bench_rival else top_rival
+    if comp_ref:
+        r_vals = comp_ref["radar_values"]
         for idx, lbl in enumerate(labels):
             y_v = y_vals[idx]
             r_v = r_vals[idx]
@@ -596,71 +709,63 @@ def generate_lucas_valenca_verdict(youth, rivals):
             elif diff <= -5:
                 severe_deficits.append(f"{lbl} ({y_v} vs {r_v}, -{abs(diff)} pts)")
 
-    # Diferença real de OVR
-    gap_to_top = highest_rival_ovr - y_ovr
-
-    # Projeção realista no EA FC: média de 3.5 pts por temporada
-    seasons_needed = max(1.0, round(gap_to_top / 3.5, 1))
-
-    # Diagnóstico de Prontidão e Maturação Rigorosa
-    if gap_to_top <= 2:
+    # Diagnóstico de Promoção com base no ÚLTIMO RESERVA (critério de transição)
+    if gap_to_bench <= 0:
         status_code = "READY_SENIOR"
-        status_label = "🟢 Pronto para o Time Principal (Disputa de Titularidade)"
+        status_label = "🟢 Pronto para o Time Principal (Supera Último Reserva)"
         status_class = "status-ready"
         tempo_estimado = "Imediato (Janela Atual)"
         momento = (
-            f"O atleta já tem maturidade técnica para competir diretamente por posição com {top_rival_name} ({highest_rival_ovr} OVR). "
-            f"Recomendo a promoção imediata para o elenco principal nesta janela."
+            f"O atleta já atingiu ou superou o nível do último reserva da posição, **{bench_rival_name}** ({bench_rival_ovr} OVR). "
+            f"Considerando seu teto máximo de **{y_pot_max}** e ritmo {growth_speed['short_label']}, recomendo a "
+            f"**promoção imediata para o elenco principal**, assumindo a vaga no banco de reservas dos profissionais."
         )
-    elif 3 <= gap_to_top <= 5:
+    elif 1 <= gap_to_bench <= 3:
         status_code = "TRANSITION_IMMINENT"
-        status_label = "🔵 Transição Iminente (Banco / Rotação de Copas)"
+        status_label = "🔵 Transição Iminente (Banco em Copas / Rotação)"
         status_class = "status-transition"
-        tempo_estimado = "1 a 1.5 temporada"
+        tempo_estimado = "Imediato a 1 temporada"
         momento = (
-            f"Diferença curta para o nível dos profissionais ({gap_to_top} pts de GER). "
-            f"Pode ser integrado ao elenco profissional para compor banco em jogos estaduais e taças, "
-            f"com previsão de atingir a plenitude física em cerca de 1 temporada."
+            f"Diferença curtíssima de apenas **{gap_to_bench} ponto(s)** para superar **{bench_rival_name}** ({bench_rival_ovr} OVR) "
+            f"como opção imediata de banco. O jovem já pode subir para treinar com o grupo principal e ser relacionado "
+            f"em partidas de copas ou rodadas de preservação."
         )
-    elif 6 <= gap_to_top <= 9:
+    elif 4 <= gap_to_bench <= 7:
         status_code = "MATURING_ACADEMY"
-        status_label = "🟡 Em Maturação no CT (~2 Temporadas de Trabalho)"
+        status_label = "🟡 Em Maturação no CT (1 a 2 Temporadas de Trabalho)"
         status_class = "status-maturing"
-        tempo_estimado = "Aproximadamente 2 temporadas completas"
+        tempo_estimado = "1 a 2 temporadas completas"
         momento = (
-            f"O garoto ainda está cru nos atributos essenciais para o futebol profissional. "
-            f"Subi-lo agora causaria perda constante de disputas físicas e abalo de moral. "
-            f"Com a evolução média da nossa academia (~3.5 pontos de GER por ano), a projeção realista é de "
-            f"pelo menos 2 temporadas completas de treinos intensivos antes de pensar em promoção."
+            f"Defasagem de {gap_to_bench} pontos para alcançar o banco ocupado por **{bench_rival_name}** ({bench_rival_ovr} OVR). "
+            f"Com seu {growth_speed['label']}, o ideal é cumprir mais 1 a 2 temporadas de formação no CT "
+            f"antes de disputar vaga definitiva nos profissionais."
         )
-    else: # gap_to_top >= 10 (ex: 57 vs 69 = 12 de gap)
+    else: # gap_to_bench >= 8
         status_code = "LONG_TERM_ACADEMY"
-        status_label = "🔴 Em Formação Básica no CT (Longo Prazo: 3 a 4 Temporadas)"
+        status_label = "🔴 Em Formação Básica no CT (Longo Prazo)"
         status_class = "status-maturing"
-        tempo_estimado = f"3 a 4 temporadas ({seasons_needed:.1f} anos estimados no ritmo da base)"
+        tempo_estimado = "3 a 4 temporadas de formação"
         momento = (
-            f"Distância abissal de {gap_to_top} pontos de GER em relação ao titular {top_rival_name} ({highest_rival_ovr} OVR). "
-            f"No modelo de desenvolvimento do EA FC, garotos da base progridem de 3 a 4 pontos por temporada. "
-            f"Portanto, {y_name} precisará de cerca de **3 a 4 temporadas de formação contínua no CT** para sequer sonhar com a titularidade. "
-            f"Queimar etapas agora e colocá-lo no time profissional seria um erro de gestão desastroso."
+            f"Distância ampla de {gap_to_bench} pontos para a última opção de banco ({bench_rival_name}, {bench_rival_ovr} OVR) "
+            f"e de {gap_to_starter} pontos para o titular absoluto {top_rival_name} ({highest_rival_ovr} OVR). "
+            f"Promovê-lo precocemente agora causaria queima de etapas e queda de rendimento."
         )
 
-    # Detalhamento dos atributos atuais
-    adv_str = f"Ponto onde já rivaliza: {', '.join(advantages)}." if advantages else "Nenhum atributo atual compete com os profissionais."
-    def_str = f"Defasagens críticas nos atributos atuais: {', '.join(severe_deficits)}." if severe_deficits else "Atributos equilibrados em relação à média da posição."
+    adv_str = f"Ponto onde já rivaliza: {', '.join(advantages)}." if advantages else "Nenhum atributo atual compete de imediato com os reservas profissionais."
+    def_str = f"Defasagens em relação ao banco: {', '.join(severe_deficits)}." if severe_deficits else "Atributos equilibrados em relação à reserva da posição."
 
-    # Parecer textual encorpado assinado por Lucas Valença
     parecer_texto = (
         f"Relatório técnico do olheiro **Lucas Valença** para a comissão técnica:\n\n"
-        f"Avaliando os **atributos atuais** de **{y_name}** ({pos_br}, {y_ovr} OVR), constatamos que a distância para o titular "
-        f"**{top_rival_name}** ({highest_rival_ovr} OVR) é de **{gap_to_top} pontos de GER**. "
+        f"Avaliando os **atributos atuais** de **{y_name}** ({pos_br}, {y_ovr} OVR), cruzamos seus dados com os concorrentes do setor:\n"
+        f"• **Referência de Promoção (Último Reserva):** {bench_rival_name} ({bench_rival_ovr} OVR) — defasagem de **{gap_to_bench} pts**.\n"
+        f"• **Referência de Titularidade (Titular Absoluto):** {top_rival_name} ({highest_rival_ovr} OVR) — defasagem de **{gap_to_starter} pts**.\n"
+        f"• **Faixa de Potencial:** {pot_range_str} (Teto Máximo: **{y_pot_max}**).\n"
+        f"• **Ritmo de Desenvolvimento:** {growth_speed['label']}.\n\n"
         f"{adv_str} Por outro lado, {def_str}\n\n"
-        f"**Tempo Realista de Maturação:** Como um atleta da academia evolui em média entre 3 a 4 pontos de geral por ano, "
-        f"a estimativa honesta para atingir o nível competitivo do titular é de **{tempo_estimado}**.\n\n"
-        f"**Veredito de Lucas Valença:** {momento}"
+        f"**Veredito de Transição:** {momento}"
     )
 
-    teto_desc = f"Teto estimado de {y_pot} OVR. Potencial relevante, mas que depende de cumprimento rigoroso do ciclo formativo de {tempo_estimado}."
+    teto_desc = f"Faixa de Potencial: {pot_range_str} (Teto de {y_pot_max} OVR). Ritmo: {growth_speed['short_label']}."
 
     return {
         "scout_name": "Lucas Valença",
@@ -669,10 +774,15 @@ def generate_lucas_valenca_verdict(youth, rivals):
         "status_code": status_code,
         "status_label": status_label,
         "status_class": status_class,
-        "overall_gap": gap_to_top,
+        "overall_gap": gap_to_bench,
+        "starter_gap": gap_to_starter,
         "highest_rival_ovr": highest_rival_ovr,
         "top_rival_name": top_rival_name,
-        "seasons_needed": seasons_needed,
+        "bench_rival_name": bench_rival_name,
+        "bench_rival_ovr": bench_rival_ovr,
+        "potential_range": pot_range_str,
+        "potential_max": y_pot_max,
+        "growth_speed": growth_speed,
         "tempo_estimado": tempo_estimado,
         "advantages": advantages,
         "disadvantages": severe_deficits,

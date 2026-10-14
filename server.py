@@ -889,6 +889,11 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     next_match["away_crest"] = fcm_resolver.get_crest_image_path_or_url(next_match.get("visitante_id", 0))
                     next_match["opponent_crest"] = fcm_resolver.get_crest_image_path_or_url(next_match.get("adversario_id", 0))
 
+                mgr_avatar_file = f"manager_{save_id}.png"
+                if os.path.exists(os.path.join(UPLOADS_DIR, mgr_avatar_file)):
+                    save_data["avatar_url"] = f"/uploads/{mgr_avatar_file}"
+                    manager_stats["avatar_url"] = f"/uploads/{mgr_avatar_file}"
+
                 return self.send_json({
                     "save": save_data,
                     "active_season": active_season,
@@ -903,6 +908,9 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             # 5. API Manager (Carreira do Técnico)
             if path == "/api/manager":
                 stats = database.get_manager_career_stats(save_id)
+                mgr_avatar_file = f"manager_{save_id}.png"
+                if (not stats.get("avatar_url")) and os.path.exists(os.path.join(UPLOADS_DIR, mgr_avatar_file)):
+                    stats["avatar_url"] = f"/uploads/{mgr_avatar_file}"
                 for c in stats["clubs_coached"]:
                     c["crest_url"] = fcm_resolver.get_crest_image_path_or_url(c["team_id"])
                 return self.send_json(stats)
@@ -941,18 +949,21 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     p["face_url"] = fcm_resolver.get_head_image_path_or_url(p["player_id"])
                 return self.send_json(data)
 
-            # 10. API Hall of Fame (com Aposentados e Prêmios Individuais)
+            # 10. API Hall of Fame (com Aposentados, Prêmios e Cartinhas FUT Silver & Gold)
             if path == "/api/hall-of-fame":
                 hof = database.get_hall_of_fame(save_id)
-                for cat in ["top_scorers", "top_appearances", "top_assists", "top_goalkeepers"]:
-                    for p in hof[cat]:
+                for cat in ["top_scorers", "top_appearances", "top_assists", "top_contributions", "top_goalkeepers"]:
+                    for idx, p in enumerate(hof.get(cat, [])):
                         p["face_url"] = fcm_resolver.get_head_image_path_or_url(p["player_id"])
+                        if idx == 0:
+                            p["fut_card"] = database.get_player_fut_card_data(p["player_id"], p.get("overall_rating", 75), p.get("position", "ATA"))
                 
-                for a in hof["player_awards"]:
+                for a in hof.get("player_awards", []):
                     a["face_url"] = fcm_resolver.get_head_image_path_or_url(a["player_id"])
 
-                for r in hof["retired_legends"]:
+                for r in hof.get("retired_legends", []):
                     r["face_url"] = fcm_resolver.get_head_image_path_or_url(r["player_id"])
+                    r["fut_card"] = database.get_player_fut_card_data(r["player_id"], r.get("overall_rating", 82), r.get("position", "ATA"))
 
                 return self.send_json(hof)
 

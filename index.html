@@ -1025,8 +1025,9 @@
                   </div>
                   <div class="psm-meta-card">
                     <div class="psm-mc-title"><i data-lucide="calendar"></i> Academia do Clube</div>
-                    <div class="psm-mc-row"><span class="psm-lbl">Tempo na Base:</span><span class="psm-val" id="yProfileMonths">-</span></div>
-                    <div class="psm-mc-row"><span class="psm-lbl">Vínculo:</span><span class="psm-val font-bold text-green">Contrato de Formação</span></div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Faixa de Potencial:</span><span class="psm-val font-bold text-gold" id="yProfilePotRange">-</span></div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Ritmo de Evolução:</span><span class="psm-val font-bold text-green" id="yProfileGrowthSpeed">-</span></div>
+                    <div class="psm-mc-row"><span class="psm-lbl">Tempo no CT:</span><span class="psm-val" id="yProfileMonths">-</span></div>
                   </div>
                 </div>
 
@@ -1317,51 +1318,62 @@
           </div>
         </div>
 
-        <!-- Pódios dos Maiores Artilheiros -->
-        <div class="hof-category-section">
-          <div class="hof-cat-title"><i data-lucide="flame"></i> Maiores Artilheiros de Todos os Tempos</div>
-          <div class="podium-grid" id="hofTopScorersGrid">
-            <!-- Cards de Artilheiros -->
-          </div>
-        </div>
-
-        <!-- Grid de Outros Recordes: Mais Jogos, Garçons e Paredões -->
-        <div class="dash-grid-3" style="margin-top: 2rem;">
-          <div class="glass-card">
+        <!-- Grid das 5 Categorias Históricas com Cartinhas Prateadas FUT -->
+        <div class="hof-records-grid" style="margin-top: 1.5rem;">
+          <!-- 1. Artilheiros -->
+          <div class="glass-card hof-column-card">
             <div class="card-header">
-              <div class="ch-title"><i data-lucide="shield"></i> Mais Jogos na História</div>
+              <div class="ch-title"><i data-lucide="flame"></i> Maiores Artilheiros</div>
             </div>
-            <div class="rank-list" id="hofAppearancesList">
-              <!-- Lista de mais jogos -->
-            </div>
+            <div class="hof-card-lead-wrap" id="hofScorerCardLead"></div>
+            <div class="rank-list" id="hofTopScorersList"></div>
           </div>
 
-          <div class="glass-card">
+          <!-- 2. Garçons (Assistências) -->
+          <div class="glass-card hof-column-card">
             <div class="card-header">
               <div class="ch-title"><i data-lucide="sparkles"></i> Maiores Garçons</div>
             </div>
-            <div class="rank-list" id="hofAssistsList">
-              <!-- Lista de assistências -->
-            </div>
+            <div class="hof-card-lead-wrap" id="hofAssistCardLead"></div>
+            <div class="rank-list" id="hofAssistsList"></div>
           </div>
 
-          <div class="glass-card">
+          <!-- 3. Participações em Gols (G+A) -->
+          <div class="glass-card hof-column-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="zap"></i> Participação em Gols (G+A)</div>
+            </div>
+            <div class="hof-card-lead-wrap" id="hofContribCardLead"></div>
+            <div class="rank-list" id="hofContribList"></div>
+          </div>
+
+          <!-- 4. Mais Jogos -->
+          <div class="glass-card hof-column-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="shield"></i> Mais Jogos</div>
+            </div>
+            <div class="hof-card-lead-wrap" id="hofAppsCardLead"></div>
+            <div class="rank-list" id="hofAppearancesList"></div>
+          </div>
+
+          <!-- 5. Paredões (Clean Sheets) -->
+          <div class="glass-card hof-column-card">
             <div class="card-header">
               <div class="ch-title"><i data-lucide="hand-metal"></i> Paredões (Clean Sheets)</div>
             </div>
-            <div class="rank-list" id="hofGoalkeepersList">
-              <!-- Lista de goleiros -->
-            </div>
+            <div class="hof-card-lead-wrap" id="hofGkCardLead"></div>
+            <div class="rank-list" id="hofGoalkeepersList"></div>
           </div>
         </div>
 
-        <!-- Seção: Ídolos Eternos Aposentados no Clube -->
+        <!-- Seção: Ídolos Eternos Aposentados no Clube (Cartas Douradas FUT) -->
         <div class="glass-card" style="margin-top: 2rem;">
-          <div class="card-header">
-            <div class="ch-title"><i data-lucide="heart-handshake"></i> Ídolos que Penduraram as Chuteiras no Clube</div>
+          <div class="card-header flex-between" style="flex-wrap: wrap; gap: 0.5rem;">
+            <div class="ch-title"><i data-lucide="crown"></i> Galeria dos Ídolos Eternos (Aposentados no Clube)</div>
+            <span class="badge-tag gold" style="font-weight: 700; font-size: 0.72rem; letter-spacing: 0.5px;">CARTAS DOURADAS HISTÓRICAS</span>
           </div>
           <div class="retired-legends-grid" id="hofRetiredLegendsGrid">
-            <!-- Cards de aposentados -->
+            <!-- Cards Dourados estilo Ultimate Team -->
           </div>
         </div>
 

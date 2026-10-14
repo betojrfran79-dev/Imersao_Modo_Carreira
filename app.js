@@ -1597,6 +1597,54 @@ async function loadFinancesData(seasonYear = null) {
 }
 
 // -------------------------------------------------------------
+// Helper: Gerador de Cartinha estilo EA FC Ultimate Team (Silver & Gold)
+function generateFutCardHtml(player, type = 'silver', recordBadge = '', topTag = 'RECORDISTA HISTÓRICO') {
+  if (!player) return '';
+  const fut = player.fut_card || {
+    ovr: player.overall_rating || 75,
+    pos: formatPosition(player.position) || 'ATA',
+    stat1_val: 70, stat1_lbl: 'OFE',
+    stat2_val: 70, stat2_lbl: 'HAB',
+    stat3_val: 70, stat3_lbl: 'MOV',
+    stat4_val: 70, stat4_lbl: 'FOR',
+    stat5_val: 70, stat5_lbl: 'MEN',
+    stat6_val: 50, stat6_lbl: 'DEF'
+  };
+
+  const isGold = type === 'gold';
+  const cardClass = isGold ? 'fut-card-gold' : 'fut-card-silver';
+  const tagIcon = isGold ? '👑' : '⭐';
+
+  return `
+    <div class="fut-card ${cardClass}" onclick="openPlayerModal(${player.player_id})" title="Ver ficha de ${escapeHtml(player.player_name)}">
+      <div class="fut-card-top-tag">
+        <span>${tagIcon}</span> <span>${escapeHtml(topTag)}</span>
+      </div>
+      <div class="fut-card-header">
+        <div class="fut-card-rating">
+          <span class="fut-rating-val">${player.overall_rating || fut.ovr}</span>
+          <span class="fut-pos-val">${escapeHtml(fut.pos || formatPosition(player.position))}</span>
+        </div>
+        <div class="fut-card-face-wrap">
+          <img class="fut-card-face" src="${player.face_url || '/assets/heads/notfound.png'}" onerror="this.src='/assets/heads/notfound.png'" alt="${escapeHtml(player.player_name)}">
+        </div>
+      </div>
+      <div class="fut-card-name">${escapeHtml(player.player_name)}</div>
+      <div class="fut-card-divider"></div>
+      <div class="fut-card-stats-grid">
+        <div class="fut-stat"><span class="fut-stat-val">${fut.stat1_val}</span><span class="fut-stat-lbl">${fut.stat1_lbl}</span></div>
+        <div class="fut-stat"><span class="fut-stat-val">${fut.stat2_val}</span><span class="fut-stat-lbl">${fut.stat2_lbl}</span></div>
+        <div class="fut-stat"><span class="fut-stat-val">${fut.stat3_val}</span><span class="fut-stat-lbl">${fut.stat3_lbl}</span></div>
+        <div class="fut-stat"><span class="fut-stat-val">${fut.stat4_val}</span><span class="fut-stat-lbl">${fut.stat4_lbl}</span></div>
+        <div class="fut-stat"><span class="fut-stat-val">${fut.stat5_val}</span><span class="fut-stat-lbl">${fut.stat5_lbl}</span></div>
+        <div class="fut-stat"><span class="fut-stat-val">${fut.stat6_val}</span><span class="fut-stat-lbl">${fut.stat6_lbl}</span></div>
+      </div>
+      ${recordBadge ? `<div class="fut-card-record-badge">${escapeHtml(recordBadge)}</div>` : ''}
+    </div>
+  `;
+}
+
+// -------------------------------------------------------------
 // 8. CARREGAR HALL DA FAMA ETERNO (APOSENTADOS & PRÊMIOS)
 // -------------------------------------------------------------
 async function loadHallOfFameData() {
@@ -1607,110 +1655,184 @@ async function loadHallOfFameData() {
 
     // 1. Galeria de Prêmios Individuais de Jogadores
     const awardsGrid = document.getElementById("hofPlayerAwardsGrid");
-    if (data.player_awards && data.player_awards.length > 0) {
-      awardsGrid.innerHTML = data.player_awards.map(a => `
-        <div class="award-card" onclick="openPlayerModal(${a.player_id})" style="cursor: pointer;">
-          <img class="award-player-face" src="${a.face_url}" onerror="this.src='/api/avatar/youth/${a.player_id}'" alt="${a.player_name}">
-          <div class="award-details">
-            <span class="award-tag-type">${a.award_type}</span>
-            <span class="award-title-text">${a.award_title}</span>
-            <span class="award-player-name">${a.player_name} • ${a.season_year}</span>
-            ${a.stat_value ? `<span class="award-stat-val">${a.stat_value}</span>` : ''}
-          </div>
-        </div>
-      `).join('');
-    } else {
-      awardsGrid.innerHTML = `<span class="empty-hint">Nenhum prêmio individual registrado ainda</span>`;
-    }
-
-    // 2. Maiores Artilheiros
-    const scorersGrid = document.getElementById("hofTopScorersGrid");
-    if (data.top_scorers && data.top_scorers.length > 0) {
-      scorersGrid.innerHTML = data.top_scorers.slice(0, 6).map((p, idx) => `
-        <div class="podium-card ${idx === 0 ? 'first-place' : ''}" onclick="openPlayerModal(${p.player_id})" style="cursor: pointer;">
-          <div class="pc-rank">${idx + 1}º</div>
-          <img class="pc-face" src="${p.face_url}" onerror="this.src='/assets/heads/notfound.png'" alt="${p.player_name}">
-          <div class="pc-name">${p.player_name}</div>
-          <div class="pc-goals">${p.total_goals} Gols</div>
-          <div class="pc-meta">${p.total_apps} Jogos • Média ${(p.total_goals / (p.total_apps || 1)).toFixed(2)}</div>
-        </div>
-      `).join('');
-    }
-
-    // 3. Mais Jogos
-    const appsList = document.getElementById("hofAppearancesList");
-    if (data.top_appearances && data.top_appearances.length > 0) {
-      appsList.innerHTML = data.top_appearances.slice(0, 8).map((p, idx) => `
-        <div class="rank-item" onclick="openPlayerModal(${p.player_id})" style="cursor: pointer;">
-          <span class="rank-idx">${idx + 1}</span>
-          <img class="rank-face" src="${p.face_url}" onerror="this.src='/assets/heads/notfound.png'" alt="">
-          <div class="rank-info">
-            <span class="rank-name">${p.player_name}</span>
-            <span class="rank-sub">${formatPosition(p.position)} • Nota ${p.career_avg}</span>
-          </div>
-          <span class="rank-val font-bold">${p.total_apps} J</span>
-        </div>
-      `).join('');
-    }
-
-    // 4. Maiores Garçons (Assistências)
-    const assistsList = document.getElementById("hofAssistsList");
-    if (data.top_assists && data.top_assists.length > 0) {
-      assistsList.innerHTML = data.top_assists.slice(0, 8).map((p, idx) => `
-        <div class="rank-item" onclick="openPlayerModal(${p.player_id})" style="cursor: pointer;">
-          <span class="rank-idx">${idx + 1}</span>
-          <img class="rank-face" src="${p.face_url}" onerror="this.src='/assets/heads/notfound.png'" alt="">
-          <div class="rank-info">
-            <span class="rank-name">${p.player_name}</span>
-            <span class="rank-sub">${formatPosition(p.position)} • ${p.total_goals} Gols</span>
-          </div>
-          <span class="rank-val font-bold text-gold">${p.total_assists} A</span>
-        </div>
-      `).join('');
-    }
-
-    // 5. Paredões (Goleiros)
-    const gkList = document.getElementById("hofGoalkeepersList");
-    if (data.top_goalkeepers && data.top_goalkeepers.length > 0) {
-      gkList.innerHTML = data.top_goalkeepers.slice(0, 8).map((p, idx) => `
-        <div class="rank-item" onclick="openPlayerModal(${p.player_id})" style="cursor: pointer;">
-          <span class="rank-idx">${idx + 1}</span>
-          <img class="rank-face" src="${p.face_url}" onerror="this.src='/assets/heads/notfound.png'" alt="">
-          <div class="rank-info">
-            <span class="rank-name">${p.player_name}</span>
-            <span class="rank-sub">${p.total_saves} Defesas (${p.total_apps} J)</span>
-          </div>
-          <span class="rank-val font-bold text-success">${p.total_cleansheets} CS</span>
-        </div>
-      `).join('');
-    }
-
-    // 6. Ídolos Aposentados no Clube
-    const retiredGrid = document.getElementById("hofRetiredLegendsGrid");
-    if (data.retired_legends && data.retired_legends.length > 0) {
-      retiredGrid.innerHTML = data.retired_legends.map(r => `
-        <div class="retired-card" style="position: relative;">
-          <button class="btn-secondary btn-xs text-danger" onclick="deleteRetiredPlayer(${r.player_id}, '${escapeJs(r.player_name)}')" title="Remover do Hall da Fama" style="position: absolute; top: 8px; right: 8px; padding: 3px 6px; z-index: 2; border-radius: 4px;">
-            <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
-          </button>
-          <div class="retired-top">
-            <img class="retired-face" src="${r.face_url}" onerror="this.src='/assets/heads/notfound.png'" alt="${escapeHtml(r.player_name)}">
-            <div class="retired-info">
-              <h4>${escapeHtml(r.player_name)}</h4>
-              <span class="retired-title">${escapeHtml(r.legacy_title)}</span>
+    if (awardsGrid) {
+      if (data.player_awards && data.player_awards.length > 0) {
+        awardsGrid.innerHTML = data.player_awards.map(a => `
+          <div class="award-card" onclick="openPlayerModal(${a.player_id})" style="cursor: pointer;">
+            <img class="award-player-face" src="${a.face_url}" onerror="this.src='/api/avatar/youth/${a.player_id}'" alt="${escapeHtml(a.player_name)}">
+            <div class="award-details">
+              <span class="award-tag-type">${escapeHtml(a.award_type)}</span>
+              <span class="award-title-text">${escapeHtml(a.award_title)}</span>
+              <span class="award-player-name">${escapeHtml(a.player_name)} • ${a.season_year}</span>
+              ${a.stat_value ? `<span class="award-stat-val">${escapeHtml(a.stat_value)}</span>` : ''}
             </div>
           </div>
-          <div class="retired-stats-mini">
-            <span><b>${r.total_apps}</b> Jogos</span>
-            <span><b>${r.total_goals}</b> Gols</span>
-            <span><b>${r.total_trophies}</b> Títulos</span>
-            <span>Aposentou aos <b>${r.final_age} anos</b> (${r.season_year || 'Carreira'})</span>
+        `).join('');
+      } else {
+        awardsGrid.innerHTML = `<span class="empty-hint">Nenhum prêmio individual registrado ainda</span>`;
+      }
+    }
+
+    // Helper para preencher lista de ranking
+    const renderRankList = (containerId, list, valFormatter, subFormatter) => {
+      const el = document.getElementById(containerId);
+      if (!el) return;
+      if (!list || list.length <= 1) {
+        el.innerHTML = `<div class="empty-hint text-center" style="padding: 10px 0;">Sem outros atletas registrados</div>`;
+        return;
+      }
+      el.innerHTML = list.slice(1, 6).map((p, idx) => `
+        <div class="rank-item" onclick="openPlayerModal(${p.player_id})" style="cursor: pointer;">
+          <span class="rank-idx">${idx + 2}º</span>
+          <img class="rank-face" src="${p.face_url}" onerror="this.src='/assets/heads/notfound.png'" alt="">
+          <div class="rank-info">
+            <span class="rank-name">${escapeHtml(p.player_name)}</span>
+            <span class="rank-sub">${subFormatter(p)}</span>
           </div>
-          <p class="retired-notes">"${escapeHtml(r.notes)}"</p>
+          <span class="rank-val font-bold">${valFormatter(p)}</span>
         </div>
       `).join('');
-    } else {
-      retiredGrid.innerHTML = `<span class="empty-hint">Nenhum jogador se aposentou no clube durante a carreira ainda. Clique em "+ Registrar Atleta Aposentado" para imortalizar um ídolo.</span>`;
+    };
+
+    // 2. Maiores Artilheiros
+    const topScorers = data.top_scorers || [];
+    const scorerLeadWrap = document.getElementById("hofScorerCardLead");
+    if (scorerLeadWrap) {
+      if (topScorers.length > 0) {
+        const leader = topScorers[0];
+        scorerLeadWrap.innerHTML = generateFutCardHtml(
+          leader,
+          'silver',
+          `⚽ ${leader.total_goals} GOLS (${leader.total_apps} J)`,
+          'LÍDER EM GOLS'
+        );
+      } else {
+        scorerLeadWrap.innerHTML = `<span class="empty-hint">Sem artilheiros</span>`;
+      }
+    }
+    renderRankList(
+      "hofTopScorersList",
+      topScorers,
+      p => `<span class="text-gold font-bold">${p.total_goals} G</span>`,
+      p => `${formatPosition(p.position)} • ${p.total_apps} J`
+    );
+
+    // 3. Maiores Garçons (Assistências)
+    const topAssists = data.top_assists || [];
+    const assistLeadWrap = document.getElementById("hofAssistCardLead");
+    if (assistLeadWrap) {
+      if (topAssists.length > 0) {
+        const leader = topAssists[0];
+        assistLeadWrap.innerHTML = generateFutCardHtml(
+          leader,
+          'silver',
+          `🎯 ${leader.total_assists} ASSISTÊNCIAS`,
+          'LÍDER EM ASSISTÊNCIAS'
+        );
+      } else {
+        assistLeadWrap.innerHTML = `<span class="empty-hint">Sem assistências</span>`;
+      }
+    }
+    renderRankList(
+      "hofAssistsList",
+      topAssists,
+      p => `<span class="text-gold font-bold">${p.total_assists} A</span>`,
+      p => `${formatPosition(p.position)} • ${p.total_apps} J`
+    );
+
+    // 4. Participações em Gols (G+A)
+    const topContrib = data.top_contributions || [];
+    const contribLeadWrap = document.getElementById("hofContribCardLead");
+    if (contribLeadWrap) {
+      if (topContrib.length > 0) {
+        const leader = topContrib[0];
+        contribLeadWrap.innerHTML = generateFutCardHtml(
+          leader,
+          'silver',
+          `⚡ ${leader.total_contributions} G+A (${leader.total_goals}G + ${leader.total_assists}A)`,
+          'LÍDER EM PARTICIPAÇÕES'
+        );
+      } else {
+        contribLeadWrap.innerHTML = `<span class="empty-hint">Sem participações</span>`;
+      }
+    }
+    renderRankList(
+      "hofContribList",
+      topContrib,
+      p => `<span class="text-green font-bold">${p.total_contributions} G+A</span>`,
+      p => `${p.total_goals}G + ${p.total_assists}A (${p.total_apps} J)`
+    );
+
+    // 5. Mais Jogos na História
+    const topApps = data.top_appearances || [];
+    const appsLeadWrap = document.getElementById("hofAppsCardLead");
+    if (appsLeadWrap) {
+      if (topApps.length > 0) {
+        const leader = topApps[0];
+        appsLeadWrap.innerHTML = generateFutCardHtml(
+          leader,
+          'silver',
+          `🛡️ ${leader.total_apps} PARTIDAS`,
+          'MAIS JOGOS'
+        );
+      } else {
+        appsLeadWrap.innerHTML = `<span class="empty-hint">Sem partidas</span>`;
+      }
+    }
+    renderRankList(
+      "hofAppearancesList",
+      topApps,
+      p => `${p.total_apps} J`,
+      p => `${formatPosition(p.position)} • Nota ${p.career_avg || '-'}`
+    );
+
+    // 6. Paredões (Clean Sheets)
+    const topGk = data.top_goalkeepers || [];
+    const gkLeadWrap = document.getElementById("hofGkCardLead");
+    if (gkLeadWrap) {
+      if (topGk.length > 0) {
+        const leader = topGk[0];
+        gkLeadWrap.innerHTML = generateFutCardHtml(
+          leader,
+          'silver',
+          `🧤 ${leader.total_cleansheets || 0} CLEAN SHEETS`,
+          'PAREDÃO DO CLUBE'
+        );
+      } else {
+        gkLeadWrap.innerHTML = `<span class="empty-hint">Sem goleiros registrados</span>`;
+      }
+    }
+    renderRankList(
+      "hofGoalkeepersList",
+      topGk,
+      p => `<span class="text-success font-bold">${p.total_cleansheets || 0} CS</span>`,
+      p => `${p.total_saves || 0} Defesas • ${p.total_apps} J`
+    );
+
+    // 7. Ídolos Aposentados no Clube (Cartinhas Douradas Oficiais)
+    const retiredGrid = document.getElementById("hofRetiredLegendsGrid");
+    if (retiredGrid) {
+      if (data.retired_legends && data.retired_legends.length > 0) {
+        retiredGrid.innerHTML = data.retired_legends.map(r => `
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <button class="btn-secondary btn-xs text-danger" onclick="deleteRetiredPlayer(${r.player_id}, '${escapeJs(r.player_name)}')" title="Remover do Hall da Fama" style="position: absolute; top: 8px; right: 8px; padding: 4px 6px; z-index: 5; border-radius: 4px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.2);">
+              <i data-lucide="trash-2" style="width: 13px; height: 13px;"></i>
+            </button>
+            ${generateFutCardHtml(
+              r,
+              'gold',
+              `🏆 ${r.total_trophies || 0} TÍTULOS • ${r.total_apps} J • ${r.total_goals} G`,
+              '👑 ÍDOLO ETERNO'
+            )}
+            <div style="text-align: center; margin-top: 6px; max-width: 220px;">
+              <small class="text-muted" style="font-size: 0.72rem; display: block;">Aposentou aos <b>${r.final_age} anos</b> (${r.season_year || 'Carreira'})</small>
+              ${r.notes ? `<p class="retired-notes" style="font-size: 0.75rem; margin-top: 4px; font-style: italic; color: #fbbf24;">"${escapeHtml(r.notes)}"</p>` : ''}
+            </div>
+          </div>
+        `).join('');
+      } else {
+        retiredGrid.innerHTML = `<span class="empty-hint">Nenhum jogador se aposentou no clube durante a carreira ainda. Clique em "+ Registrar Atleta Aposentado" para imortalizar um ídolo com sua Cartinha Dourada.</span>`;
+      }
     }
 
     initLucideIcons();

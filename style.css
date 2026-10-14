@@ -8119,15 +8119,26 @@ body {
 
 .youth-verdict-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .youth-verdict-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .yv-mini-card {
   background: rgba(15, 23, 42, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1rem;
   border-radius: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 .yv-label {
@@ -8135,13 +8146,263 @@ body {
   text-transform: uppercase;
   color: #94a3b8;
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .yv-value {
-  font-size: 0.85rem;
-  font-weight: 700;
+  font-size: 0.82rem;
+  font-weight: 600;
   color: #cbd5e1;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.yv-item-badge {
+  display: block;
+  padding: 3px 0;
+  line-height: 1.4;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.yv-item-badge:not(:last-child) {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  margin-bottom: 4px;
+  padding-bottom: 4px;
+}
+
+/* ==============================================================
+   🌟 CARTINHAS ULTIMATE TEAM (FUT CARDS - SILVER & GOLD)
+   ============================================================== */
+.hof-records-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+  gap: 1.25rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+@media (max-width: 1400px) {
+  .hof-records-grid {
+    grid-template-columns: repeat(3, minmax(220px, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .hof-records-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hof-column-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+}
+
+.hof-card-lead-wrap {
+  padding: 0.75rem 0.5rem 1rem 0.5rem;
+  display: flex;
+  justify-content: center;
+}
+
+.fut-card {
+  position: relative;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
+  border-radius: 16px;
+  padding: 12px 14px;
+  box-sizing: border-box;
+  font-family: 'Outfit', sans-serif;
+  user-select: none;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.fut-card:hover {
+  transform: translateY(-6px) scale(1.03);
+}
+
+/* Cartinha Prateada (Silver Card para os Líderes de Cada Quesito) */
+.fut-card-silver {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 30%, #cbd5e1 60%, #94a3b8 100%);
+  border: 2px solid #e2e8f0;
+  color: #0f172a;
+  box-shadow: 0 10px 25px rgba(100, 116, 139, 0.35), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+}
+
+.fut-card-silver .fut-card-top-tag {
+  color: #334155;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.15);
+}
+
+.fut-card-silver .fut-card-header,
+.fut-card-silver .fut-stat-lbl,
+.fut-card-silver .fut-stat-val,
+.fut-card-silver .fut-card-name,
+.fut-card-silver .fut-card-record-badge {
+  color: #0f172a !important;
+}
+
+.fut-card-silver .fut-card-record-badge {
+  background: rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(15, 23, 42, 0.15);
+}
+
+/* Cartinha Dourada Ícone (Gold Card para Ídolos Aposentados no Clube) */
+.fut-card-gold {
+  background: linear-gradient(135deg, #fef08a 0%, #facc15 25%, #eab308 55%, #ca8a04 85%, #854d0e 100%);
+  border: 2px solid #fef08a;
+  color: #422006;
+  box-shadow: 0 12px 32px rgba(234, 179, 8, 0.45), inset 0 1px 3px rgba(255, 255, 255, 0.9);
+}
+
+.fut-card-gold .fut-card-top-tag {
+  color: #713f12;
+  border-bottom: 1px solid rgba(66, 32, 6, 0.2);
+}
+
+.fut-card-gold .fut-card-header,
+.fut-card-gold .fut-stat-lbl,
+.fut-card-gold .fut-stat-val,
+.fut-card-gold .fut-card-name,
+.fut-card-gold .fut-card-record-badge {
+  color: #422006 !important;
+}
+
+.fut-card-gold .fut-card-record-badge {
+  background: rgba(66, 32, 6, 0.12);
+  border: 1px solid rgba(66, 32, 6, 0.2);
+}
+
+/* Elementos Estruturais da Carta */
+.fut-card-top-tag {
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  text-align: center;
+  padding: 2px 0 4px 0;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.fut-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fut-card-rating {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.fut-rating-val {
+  font-size: 1.85rem;
+  font-weight: 900;
+  letter-spacing: -1px;
+}
+
+.fut-pos-val {
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.fut-card-face-wrap {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.fut-card-face {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fut-card-name {
+  font-size: 0.92rem;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 6px;
+}
+
+.fut-card-divider {
+  height: 1px;
+  background: rgba(0, 0, 0, 0.15);
+  margin-bottom: 6px;
+}
+
+.fut-card-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px 6px;
+  text-align: center;
+}
+
+.fut-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 3px;
+}
+
+.fut-stat-val {
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.fut-stat-lbl {
+  font-size: 0.64rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.fut-card-record-badge {
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* Grid de Ídolos Aposentados */
+.retired-legends-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
 }
 
 

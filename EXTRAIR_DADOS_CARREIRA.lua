@@ -273,7 +273,7 @@ end
 -- ==============================================================================
 -- 🔄 MOTOR ARANAKTU: EXTRAÇÃO DIRETA DE NEGOCIAÇÕES E TRANSFERÊNCIAS DA MEMÓRIA
 -- ==============================================================================
-local function ExtractMemoryTransfers(user_team_id, cur_date)
+local function ExtractMemoryTransfers(user_team_id, cur_date, player_contracts)
     local transfers_list = {}
     local ok, _ = pcall(function()
         local transfer_mgr = GetManagerObjByTypeId(ENUM_FCEGameModesFCECareerModeTransferManager)
@@ -610,10 +610,16 @@ local function ExtractMemoryTransfers(user_team_id, cur_date)
 
                 local d_str = string.format("%02d/%02d/%04d", cur_date.day, cur_date.month, cur_date.year)
                 local t_season = tostring(cur_date.year)
-                if p_nego.date and p_nego.date > 0 then
+                
+                local nego_date = (p_nego.date and p_nego.date > 0) and p_nego.date or nil
+                if (not nego_date or nego_date <= 0) and player_contracts and player_contracts[pid] and player_contracts[pid].join_date and player_contracts[pid].join_date > 0 then
+                    nego_date = player_contracts[pid].join_date
+                end
+
+                if nego_date and nego_date > 0 then
                     pcall(function()
                         local d = DATE:new()
-                        d:FromGregorianDays(p_nego.date)
+                        d:FromGregorianDays(nego_date)
                         if d.year and d.year > 1900 and d.year < 2050 then
                             d_str = string.format("%02d/%02d/%04d", d.day, d.month, d.year)
                             t_season = tostring(d.year)
@@ -777,6 +783,8 @@ function ExtractAndSyncFullCareer(is_silent)
         season_year = tostring(current_year),
         league_name = "Campeonato Principal",
         start_date = string.format("%02d/%02d/%04d", cur_date.day, cur_date.month, cur_date.year),
+        current_date = string.format("%02d/%02d/%04d", cur_date.day, cur_date.month, cur_date.year),
+        game_date = string.format("%02d/%02d/%04d", cur_date.day, cur_date.month, cur_date.year),
         players = {},
         matches = {},
         upcoming_matches = {},
@@ -848,7 +856,7 @@ function ExtractAndSyncFullCareer(is_silent)
     LOGGER:LogInfo(string.format("[Career Vault] 🏆 Clube: %s (ID: %d) | Técnico: %s | Temporada Atual: %s", 
         payload.team_name, payload.team_id, payload.manager_name ~= "" and payload.manager_name or "[Mantido]", payload.season_year))
 
-    -- 2. Salários Reais da Tabela de Contratos (career_playercontract)
+    -- 2. Salários Reais e Datas de Contratos (career_playercontract)
     local player_contracts = {}
     pcall(function()
         local c_tbl = LE.db:GetTable("career_playercontract")
@@ -857,15 +865,20 @@ function ExtractAndSyncFullCareer(is_silent)
             while r > 0 do
                 local pid = c_tbl:GetRecordFieldValue(r, "playerid") or 0
                 local wage = c_tbl:GetRecordFieldValue(r, "wage") or 0
+                local join_date = c_tbl:GetRecordFieldValue(r, "playerjointeamdate") or 0
+                local valid_until = c_tbl:GetRecordFieldValue(r, "contractvaliduntil") or 0
                 if pid > 0 then
                     player_contracts[pid] = {
-                        wage = tonumber(wage) or 0
+                        wage = tonumber(wage) or 0,
+                        join_date = tonumber(join_date) or 0,
+                        valid_until = tonumber(valid_until) or 0
                     }
                 end
                 r = c_tbl:GetNextValidRecord()
             end
         end
     end)
+    payload.player_contracts = player_contracts
 
     -- 3. Identificar Mapeamento de Clubes e Elenco do Usuário (via teamplayerlinks)
     local all_player_team_map = {}
@@ -1332,8 +1345,8 @@ function ExtractAndSyncFullCareer(is_silent)
         table.insert(payload.competitions, c)
     end
 
-    -- 5. Extração de Transferências da Memória (Aranaktu Engine)
-    payload.transfers = ExtractMemoryTransfers(user_team_id, cur_date)
+    -- 5. Extração de Transferências da Memória (Aranaktu Engine com Datas Reais)
+    payload.transfers = ExtractMemoryTransfers(user_team_id, cur_date, player_contracts)
     LOGGER:LogInfo(string.format("[Career Vault] Negociações & Transferências Extraídas: %d", #payload.transfers))
 
     -- 6. Finanças Reais do Clube (Escala USD $)
@@ -1401,6 +1414,8 @@ function ExtractAndSyncFullCareer(is_silent)
             save_id = payload.save_id,
             team_name = payload.team_name,
             extracted_at = os.date("%Y-%m-%d %H:%M:%S"),
+            game_date = payload.game_date,
+            current_date = payload.current_date,
             total_players = #payload.youth_players,
             players = payload.youth_players
         }

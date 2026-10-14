@@ -203,8 +203,11 @@ window.I18N_LOCALES['pt'] = {
     subtitle: 'O panteão dos maiores ídolos, recordistas históricos e esquadrão imortal do clube.',
     allTimeTopScorer: 'Maior Artilheiro da História',
     allTimeTopAssists: 'Líder Histórico em Assistências',
+    allTimeTopContrib: 'Líder em Participação em Gols (G+A)',
     allTimeMostMatches: 'Recordista de Jogos',
-    legendaryXI: 'Esquadrão Imortal (Melhor XI)'
+    allTimeCleanSheets: 'Paredão Histórico (Clean Sheets)',
+    legendaryXI: 'Esquadrão Imortal (Melhor XI)',
+    goldCardsTitle: 'Cartas Douradas Históricas'
   },
 
   h2h: {

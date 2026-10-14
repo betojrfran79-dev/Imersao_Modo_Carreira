@@ -1526,7 +1526,20 @@ def sync_full_career(save_id, full_data, purge_previous=False):
             appearances = excluded.appearances,
             goals = excluded.goals,
             assists = excluded.assists,
-            avg_rating = excluded.avg_rating
+            avg_rating = excluded.avg_rating,
+            motms = excluded.motms,
+            clean_sheets = excluded.clean_sheets,
+            yellow_cards = excluded.yellow_cards,
+            red_cards = excluded.red_cards,
+            goals_conceded = excluded.goals_conceded,
+            saves = excluded.saves,
+            overall_rating = excluded.overall_rating,
+            potential = excluded.potential,
+            weekly_wage = excluded.weekly_wage,
+            market_value = excluded.market_value,
+            player_name = excluded.player_name,
+            team_name = excluded.team_name,
+            position = excluded.position
         """, (
             save_id, season_year, p_id, p_name, team_id, team_name,
             comp, pos, int(p.get("overall_rating", 75)), int(p.get("potential", 80)),
@@ -1535,6 +1548,22 @@ def sync_full_career(save_id, full_data, purge_previous=False):
             float(p.get("avg_rating", 0.0)), int(p.get("motms", 0)), int(p.get("yellow_cards", 0)),
             int(p.get("red_cards", 0)), int(p.get("clean_sheets", 0)), int(p.get("goals_conceded", 0)), int(p.get("saves", 0))
         ))
+
+    # Sincroniza e calibra MOTMs a partir das partidas registradas no save
+    cur.execute("""
+    SELECT motm_player_id, COUNT(*) as match_motms 
+    FROM matches 
+    WHERE save_id = ? AND motm_player_id > 0 
+    GROUP BY motm_player_id
+    """, (save_id,))
+    for row in cur.fetchall():
+        m_pid = row[0]
+        m_count = row[1]
+        cur.execute("""
+        UPDATE player_season_stats 
+        SET motms = MAX(motms, ?)
+        WHERE save_id = ? AND player_id = ?
+        """, (m_count, save_id, m_pid))
 
     # Transferências (Persistência e Deduplicação)
     transfers = full_data.get("transfers", [])
@@ -1551,16 +1580,17 @@ def sync_full_career(save_id, full_data, purge_previous=False):
         t_type = str(t.get("transfer_type", "BUY")).strip().upper()
 
         cur.execute("""
-        SELECT id FROM transfers
+        SELECT id, transfer_date FROM transfers
         WHERE save_id = ? AND player_id = ? AND from_team_id = ? AND to_team_id = ? AND (season_year = ? OR transfer_date = ?)
         """, (save_id, p_id, from_id, to_id, t_season, t_date))
         existing_t = cur.fetchone()
         if existing_t:
+            date_to_keep = existing_t["transfer_date"] if (existing_t["transfer_date"] and not existing_t["transfer_date"].startswith("01/01/")) else t_date
             cur.execute("""
             UPDATE transfers SET
                 player_name = ?, from_team_name = ?, to_team_name = ?, fee = ?, transfer_type = ?, transfer_date = ?, season_year = ?
             WHERE id = ?
-            """, (p_name, from_name, to_name, fee, t_type, t_date, t_season, existing_t["id"]))
+            """, (p_name, from_name, to_name, fee, t_type, date_to_keep, t_season, existing_t["id"]))
         else:
             cur.execute("""
             INSERT INTO transfers (
@@ -2550,6 +2580,56 @@ def get_club_finances(save_id, season_year=None):
         "net_profit": profit
     }
 
+def get_player_fut_card_data(player_id, fallback_ovr=75, pos="ATA"):
+    """
+    Retorna os 6 atributos das categorias resumidas do FCM para desenhar
+    a cartinha estilo Ultimate Team (FUT Card):
+    Ofensivo, Habilidade, Movimentação, Força, Mentalidade, Defesa / Goleiro.
+    """
+    try:
+        import fcm_resolver
+        prof = fcm_resolver.get_full_player_profile(player_id)
+        cats = {c["id"]: c["score"] for c in prof.get("categories", [])}
+        ovr = prof.get("ovr") or prof.get("overall_rating") or fallback_ovr
+        real_pos = prof.get("position_raw") or prof.get("position") or pos
+        is_gk = str(real_pos).upper() in ("GOL", "GK", "GL")
+        
+        if is_gk:
+            return {
+                "is_gk": True,
+                "ovr": int(ovr),
+                "pos": "GOL",
+                "stat1_lbl": "ELA", "stat1_val": int(cats.get("goleiro", ovr)),
+                "stat2_lbl": "MAN", "stat2_val": int(cats.get("habilidade", ovr)),
+                "stat3_lbl": "CHU", "stat3_val": int(cats.get("forca", ovr)),
+                "stat4_lbl": "REF", "stat4_val": int(cats.get("movimentacao", ovr)),
+                "stat5_lbl": "VEL", "stat5_val": int(cats.get("movimentacao", 45)),
+                "stat6_lbl": "POS", "stat6_val": int(cats.get("mentalidade", ovr))
+            }
+        else:
+            return {
+                "is_gk": False,
+                "ovr": int(ovr),
+                "pos": str(real_pos).upper(),
+                "stat1_lbl": "OFE", "stat1_val": int(cats.get("ofensivo", ovr)),
+                "stat2_lbl": "HAB", "stat2_val": int(cats.get("habilidade", ovr)),
+                "stat3_lbl": "MOV", "stat3_val": int(cats.get("movimentacao", ovr)),
+                "stat4_lbl": "FOR", "stat4_val": int(cats.get("forca", ovr)),
+                "stat5_lbl": "MEN", "stat5_val": int(cats.get("mentalidade", ovr)),
+                "stat6_lbl": "DEF", "stat6_val": int(cats.get("defesa", 40))
+            }
+    except Exception as e:
+        print(f"[FUT CARD] Erro ao obter dados da cartinha para {player_id}: {e}")
+        return {
+            "is_gk": False, "ovr": fallback_ovr, "pos": pos,
+            "stat1_lbl": "OFE", "stat1_val": fallback_ovr,
+            "stat2_lbl": "HAB", "stat2_val": fallback_ovr,
+            "stat3_lbl": "MOV", "stat3_val": fallback_ovr,
+            "stat4_lbl": "FOR", "stat4_val": fallback_ovr,
+            "stat5_lbl": "MEN", "stat5_val": fallback_ovr,
+            "stat6_lbl": "DEF", "stat6_val": 40
+        }
+
 def get_hall_of_fame(save_id):
     """
     Retorna artilheiros históricos, mais jogos, garçons, goleiros, aposentados no clube e prêmios individuais.
@@ -2618,23 +2698,70 @@ def get_hall_of_fame(save_id):
     """, (save_id,))
     top_assists = [dict(r) for r in cur.fetchall()]
 
+    # 4. Maiores Participações em Gols (G+A = Gols + Assistências)
     cur.execute("""
     SELECT 
         player_id, 
         player_name, 
         team_name,
+        position,
+        MAX(overall_rating) as overall_rating,
+        MAX(potential) as potential,
+        MAX(market_value) as market_value,
+        SUM(appearances) as total_apps,
+        SUM(goals) as total_goals,
+        SUM(assists) as total_assists,
+        (SUM(goals) + SUM(assists)) as total_contributions,
+        ROUND(AVG(avg_rating), 2) as career_avg,
+        SUM(motms) as total_motms
+    FROM player_season_stats
+    WHERE save_id = ?
+    GROUP BY player_id
+    HAVING (SUM(goals) + SUM(assists)) > 0
+    ORDER BY total_contributions DESC, total_goals DESC, total_apps ASC
+    LIMIT 25
+    """, (save_id,))
+    top_contributions = [dict(r) for r in cur.fetchall()]
+
+    # 5. Paredões / Clean Sheets (Goleiros)
+    cur.execute("""
+    SELECT 
+        player_id, 
+        player_name, 
+        team_name,
+        position,
         MAX(overall_rating) as overall_rating,
         SUM(appearances) as total_apps,
         SUM(clean_sheets) as total_cleansheets,
         SUM(saves) as total_saves,
         SUM(goals_conceded) as total_conceded
     FROM player_season_stats
-    WHERE save_id = ? AND position = 'GOL'
+    WHERE save_id = ? AND position IN ('GOL', 'GK', 'GL')
     GROUP BY player_id
-    ORDER BY total_cleansheets DESC
+    ORDER BY total_cleansheets DESC, total_apps DESC
     LIMIT 15
     """, (save_id,))
     top_goalkeepers = [dict(r) for r in cur.fetchall()]
+
+    # Fallback inteligente: se o banco estiver com clean_sheets zerado nos stats, calcula a partir dos jogos do save
+    cur.execute("""
+    SELECT COUNT(*) FROM matches 
+    WHERE save_id = ? AND (
+        (user_team_id = home_team_id AND away_score = 0) OR
+        (user_team_id = away_team_id AND home_score = 0)
+    )
+    """, (save_id,))
+    match_clean_sheets_row = cur.fetchone()
+    match_clean_sheets = match_clean_sheets_row[0] if match_clean_sheets_row else 0
+
+    if match_clean_sheets > 0 and top_goalkeepers:
+        total_g_cs = sum(g.get("total_cleansheets", 0) for g in top_goalkeepers)
+        if total_g_cs == 0:
+            for gk in top_goalkeepers:
+                apps = gk.get("total_apps", 0)
+                if apps > 0:
+                    gk["total_cleansheets"] = min(match_clean_sheets, apps)
+            top_goalkeepers.sort(key=lambda x: (x.get("total_cleansheets", 0), x.get("total_apps", 0)), reverse=True)
 
     cur.execute("""
     SELECT 
@@ -2663,6 +2790,7 @@ def get_hall_of_fame(save_id):
         "top_scorers": top_scorers,
         "top_appearances": top_appearances,
         "top_assists": top_assists,
+        "top_contributions": top_contributions,
         "top_goalkeepers": top_goalkeepers,
         "player_awards": player_awards,
         "retired_legends": retired_legends

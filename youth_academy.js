@@ -100,8 +100,11 @@ function renderYouthPlayersList(players) {
   if (!listEl) return;
 
   listEl.innerHTML = players.map(p => {
-    const potColor = p.potential >= 80 ? "badge-pot-high" : "badge-pot";
+    const potDisplay = p.potential_display || (p.potential_min && p.potential_max ? `${p.potential_min}-${p.potential_max}` : p.potential);
+    const potCeiling = p.potential_max || p.potential;
+    const potColor = potCeiling >= 85 ? "badge-pot-high text-gold" : (potCeiling >= 80 ? "badge-pot-high" : "badge-pot");
     const posPT = formatYouthPosition(p.position_br || p.position);
+    const speedTag = p.growth_speed?.short_label || "";
     return `
       <div class="youth-player-card" id="yCard_${p.playerid}" onclick="showYouthPlayerProfile(${p.playerid})">
         <div class="ypc-avatar-wrap">
@@ -112,8 +115,8 @@ function renderYouthPlayersList(players) {
           <div class="ypc-name">${escapeHtml(p.name)}</div>
           <div class="ypc-meta">
             <span class="ypc-badge-ovr">GER ${p.overall}</span>
-            <span class="ypc-badge-pot ${potColor}">POT ${p.potential}</span>
-            <span class="ypc-foot">${p.preferred_foot}</span>
+            <span class="ypc-badge-pot ${potColor}">POT ${potDisplay}</span>
+            <span class="ypc-foot">${speedTag || p.preferred_foot}</span>
           </div>
         </div>
         <i data-lucide="chevron-right" class="ypc-arrow"></i>
@@ -156,12 +159,22 @@ window.showYouthPlayerProfile = function(playerId) {
   const footEl = document.getElementById("yProfileFoot");
 
   const posPT = formatYouthPosition(p.position_br || p.position);
+  const potDisplay = p.potential_display || (p.potential_min && p.potential_max ? `${p.potential_min}-${p.potential_max}` : p.potential);
+  const potCeiling = p.potential_max || p.potential;
 
   if (nameEl) nameEl.textContent = p.name;
   if (idEl) idEl.textContent = `ID #${p.playerid}`;
   if (posEl) posEl.textContent = posPT;
   if (ovrEl) ovrEl.textContent = `OVR ${p.overall}`;
-  if (potEl) potEl.textContent = `POT ${p.potential}`;
+  if (potEl) {
+    potEl.textContent = `POT ${potDisplay}`;
+    potEl.title = `Faixa de Potencial da Academia: ${potDisplay} (Teto Máximo: ${potCeiling})`;
+    if (potCeiling >= 85) {
+      potEl.classList.add("text-gold");
+    } else {
+      potEl.classList.remove("text-gold");
+    }
+  }
   if (ageEl) ageEl.textContent = `${p.age || 17} anos`;
   if (footEl) footEl.textContent = p.preferred_foot;
 
@@ -171,12 +184,16 @@ window.showYouthPlayerProfile = function(playerId) {
   const skillsEl = document.getElementById("yProfileSkills");
   const wfEl = document.getElementById("yProfileWeakFoot");
   const monthsEl = document.getElementById("yProfileMonths");
+  const potRangeEl = document.getElementById("yProfilePotRange");
+  const speedEl = document.getElementById("yProfileGrowthSpeed");
 
   if (physEl) physEl.textContent = `${p.height || 175} cm / ${p.weight || 70} kg`;
   if (pernaEl) pernaEl.textContent = `${p.preferred_foot} (Pé Bom)`;
   if (skillsEl) skillsEl.innerHTML = `<b>${'⭐'.repeat(p.skill_moves || 3)}</b> (${p.skill_moves}/5)`;
   if (wfEl) wfEl.innerHTML = `<b>${'⭐'.repeat(p.weak_foot || 3)}</b> (${p.weak_foot}/5)`;
-  if (monthsEl) monthsEl.textContent = `${p.monthsinsquad || 0} meses no clube`;
+  if (monthsEl) monthsEl.textContent = `${p.monthsinsquad || 0} meses no CT`;
+  if (potRangeEl) potRangeEl.textContent = `${potDisplay} (Teto: ${potCeiling})`;
+  if (speedEl) speedEl.textContent = p.growth_speed?.label || "📈 Moderado";
 
   // Renderiza as 7 Categorias Oficiais com TODOS os atributos
   renderYouthCategoryCards(p.categories || []);
@@ -392,15 +409,27 @@ window.runYouthComparison = async function() {
     }
 
     if (advEl) {
-      advEl.textContent = (report.advantages && report.advantages.length > 0)
-        ? report.advantages.join(" • ")
-        : "Nenhum atributo atual compete de imediato.";
+      if (report.advantages && report.advantages.length > 0) {
+        advEl.innerHTML = report.advantages.map(a => `
+          <div class="yv-item-badge text-green">
+            <span style="opacity: 0.85;">✔</span> ${escapeHtml(a)}
+          </div>
+        `).join('');
+      } else {
+        advEl.textContent = "Nenhum atributo atual compete de imediato.";
+      }
     }
 
     if (disadvEl) {
-      disadvEl.textContent = (report.disadvantages && report.disadvantages.length > 0)
-        ? report.disadvantages.join(" • ")
-        : "Perfil equilibrado sem deficiências críticas.";
+      if (report.disadvantages && report.disadvantages.length > 0) {
+        disadvEl.innerHTML = report.disadvantages.map(d => `
+          <div class="yv-item-badge text-gold">
+            <span style="opacity: 0.85;">⚠</span> ${escapeHtml(d)}
+          </div>
+        `).join('');
+      } else {
+        disadvEl.textContent = "Perfil equilibrado sem deficiências críticas.";
+      }
     }
 
     if (ceilingEl) {

@@ -203,8 +203,11 @@ window.I18N_LOCALES['es'] = {
     subtitle: 'El panteón de las máximas leyendas, récords históricos y once ideal eterno del club.',
     allTimeTopScorer: 'Máximo Goleador Histórico',
     allTimeTopAssists: 'Líder Histórico en Asistencias',
+    allTimeTopContrib: 'Líder en Participación de Goles (G+A)',
     allTimeMostMatches: 'Jugador con Más Partidos',
-    legendaryXI: 'Once Ideal Histórico'
+    allTimeCleanSheets: 'Cerrojo Histórico (Clean Sheets)',
+    legendaryXI: 'Once Ideal Histórico',
+    goldCardsTitle: 'Cartas Doradas Históricas'
   },
 
   h2h: {

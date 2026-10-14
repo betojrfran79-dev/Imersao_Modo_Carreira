@@ -213,11 +213,75 @@ def update_via_http_zip(remote_info):
     except Exception as e:
         return False, f"Erro ao extrair arquivos: {e}"
 
+def sync_lua_to_destinations():
+    """
+    Garante que o script EXTRAIR_DADOS_CARREIRA.lua e career_vault_sync.lua sejam propagados
+    para todas as pastas de execução do Live Editor e Desktop do usuário.
+    """
+    lua_src = os.path.join(BASE_DIR, "EXTRAIR_DADOS_CARREIRA.lua")
+    if not os.path.exists(lua_src):
+        return
+
+    user_prof = os.environ.get("USERPROFILE", "")
+    if not user_prof:
+        return
+
+    search_roots = []
+    for d in ["Desktop", os.path.join("OneDrive", "Desktop"), "Documents", os.path.join("OneDrive", "Documents")]:
+        full_d = os.path.join(user_prof, d)
+        if os.path.exists(full_d):
+            search_roots.append(full_d)
+
+    target_folders = [
+        "Imersao_Modo_Carreira",
+        "App_Modo_carreira",
+        "Imersão_Modo_Carreira",
+        "Imersao Modo Carreira",
+        "Live Editor",
+        "FC 24 Live Editor",
+        "FC 25 Live Editor",
+        "FIFA 23 Live Editor"
+    ]
+
+    copied_paths = set()
+
+    for root in search_roots:
+        # 1. Pastas conhecidas de Live Editor e App
+        for f in target_folders:
+            candidate = os.path.join(root, f)
+            if os.path.exists(candidate) and candidate.lower() != BASE_DIR.lower():
+                target_file = os.path.join(candidate, "EXTRAIR_DADOS_CARREIRA.lua")
+                try:
+                    shutil.copy2(lua_src, target_file)
+                    copied_paths.add(target_file)
+                    sub_lua = os.path.join(candidate, "lua")
+                    if os.path.exists(sub_lua):
+                        shutil.copy2(lua_src, os.path.join(sub_lua, "career_vault_sync.lua"))
+                except Exception:
+                    pass
+
+        # 2. Busca scripts EXTRAIR_DADOS_CARREIRA.lua existentes no Desktop para sobrescrever
+        if "desktop" in root.lower():
+            try:
+                for dirpath, _, filenames in os.walk(root):
+                    if "EXTRAIR_DADOS_CARREIRA.lua" in filenames:
+                        target_file = os.path.join(dirpath, "EXTRAIR_DADOS_CARREIRA.lua")
+                        if target_file.lower() != lua_src.lower():
+                            shutil.copy2(lua_src, target_file)
+                            copied_paths.add(target_file)
+            except Exception:
+                pass
+
+    if copied_paths:
+        for p in copied_paths:
+            print(f"[Updater] [LUA] Script EXTRAIR_DADOS_CARREIRA.lua sincronizado em: {p}")
+
 def check_and_apply_update(auto_apply=True):
     """
     Função principal de auto-atualização:
     1. Tenta Git se disponível.
     2. Se não, usa HTTP ZIP inteligente sem afetar saves.
+    3. Propaga o script Lua para o Live Editor / Desktop.
     """
     local_info = get_local_version_info()
     local_commit = local_info.get("commit", "")
@@ -233,6 +297,7 @@ def check_and_apply_update(auto_apply=True):
                 save_local_version_info(out.decode("utf-8").strip())
             except Exception:
                 pass
+            sync_lua_to_destinations()
             return {"success": True, "method": "git", "message": msg}
         else:
             print(f"[Atualizacoes] Aviso Git: {msg}. Verificando canal direto HTTP...")
@@ -241,6 +306,7 @@ def check_and_apply_update(auto_apply=True):
     remote_info = get_remote_latest_commit()
     if not remote_info:
         print("[Atualizacoes] Nao foi possivel conectar ao GitHub no momento. Iniciando com a versao local.")
+        sync_lua_to_destinations()
         return {"success": False, "reason": "offline_or_ratelimit"}
 
     remote_sha = remote_info["sha"]
@@ -249,6 +315,7 @@ def check_and_apply_update(auto_apply=True):
 
     if local_commit and local_commit == remote_sha:
         print(f"[Atualizacoes] [OK] Voce ja esta com a versao mais recente instalada ({short_remote}).")
+        sync_lua_to_destinations()
         return {"success": True, "updated": False, "commit": short_remote}
 
     print(f"==================================================")
@@ -265,6 +332,7 @@ def check_and_apply_update(auto_apply=True):
     if ok:
         print(f"[Atualizacoes] [SUCESSO] {msg}")
         print(f"[Atualizacoes] [PROTEGIDO] Seu save e configuracoes foram 100% mantidos intactos.")
+        sync_lua_to_destinations()
         return {"success": True, "updated": True, "commit": short_remote, "message": msg}
     else:
         print(f"[Atualizacoes] [AVISO] Falha ao aplicar atualizacao: {msg}")

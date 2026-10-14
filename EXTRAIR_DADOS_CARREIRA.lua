@@ -856,29 +856,37 @@ function ExtractAndSyncFullCareer(is_silent)
     LOGGER:LogInfo(string.format("[Career Vault] 🏆 Clube: %s (ID: %d) | Técnico: %s | Temporada Atual: %s", 
         payload.team_name, payload.team_id, payload.manager_name ~= "" and payload.manager_name or "[Mantido]", payload.season_year))
 
-    -- 2. Salários Reais e Datas de Contratos (career_playercontract)
+    -- 2. Salários Reais e Contratos (career_playercontract)
     local player_contracts = {}
+    local player_contracts_export = {}
     pcall(function()
         local c_tbl = LE.db:GetTable("career_playercontract")
         if c_tbl then
             local r = c_tbl:GetFirstRecord()
             while r > 0 do
                 local pid = c_tbl:GetRecordFieldValue(r, "playerid") or 0
-                local wage = c_tbl:GetRecordFieldValue(r, "wage") or 0
-                local join_date = c_tbl:GetRecordFieldValue(r, "playerjointeamdate") or 0
-                local valid_until = c_tbl:GetRecordFieldValue(r, "contractvaliduntil") or 0
                 if pid > 0 then
-                    player_contracts[pid] = {
-                        wage = tonumber(wage) or 0,
-                        join_date = tonumber(join_date) or 0,
-                        valid_until = tonumber(valid_until) or 0
+                    local wage = tonumber(c_tbl:GetRecordFieldValue(r, "wage")) or 0
+                    local c_date = tonumber(c_tbl:GetRecordFieldValue(r, "contract_date")) or 0
+                    local dur_months = tonumber(c_tbl:GetRecordFieldValue(r, "duration_months")) or 0
+                    local c_status = tonumber(c_tbl:GetRecordFieldValue(r, "contract_status")) or 0
+                    local prole = tonumber(c_tbl:GetRecordFieldValue(r, "playerrole")) or 0
+
+                    local c_info = {
+                        wage = wage,
+                        contract_date = c_date,
+                        duration_months = dur_months,
+                        contract_status = c_status,
+                        playerrole = prole
                     }
+                    player_contracts[pid] = c_info
+                    player_contracts_export[tostring(pid)] = c_info
                 end
                 r = c_tbl:GetNextValidRecord()
             end
         end
     end)
-    payload.player_contracts = player_contracts
+    payload.player_contracts = player_contracts_export
 
     -- 3. Identificar Mapeamento de Clubes e Elenco do Usuário (via teamplayerlinks)
     local all_player_team_map = {}

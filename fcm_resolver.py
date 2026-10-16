@@ -17,7 +17,20 @@ LOCAL_REPO_PATHS = [
     BASE_DIR
 ]
 
-LIVE_EDITOR_HEADS_DIR = r"C:\FC 26 Live Editor\mods\legacy\data\ui\imgAssets\heads"
+DEFAULT_LIVE_EDITOR_HEADS_DIR = r"C:\FC 26 Live Editor\mods\legacy\data\ui\imgAssets\heads"
+
+def get_heads_dir():
+    """Retorna o diretório configurado de heads (Live Editor DDS) ou o caminho padrão."""
+    try:
+        import database
+        custom = database.get_app_setting("heads_dir")
+        if custom and str(custom).strip():
+            return str(custom).strip()
+    except Exception:
+        pass
+    return DEFAULT_LIVE_EDITOR_HEADS_DIR
+
+LIVE_EDITOR_HEADS_DIR = get_heads_dir()
 
 def get_repo_dir():
     for p in LOCAL_REPO_PATHS:
@@ -37,18 +50,46 @@ def find_dds_head(player_id):
     if os.path.exists(cache_png):
         return cache_png
 
-    if not os.path.exists(LIVE_EDITOR_HEADS_DIR):
+    active_heads_dir = get_heads_dir()
+    if not os.path.exists(active_heads_dir):
         return None
     candidates = [
-        os.path.join(LIVE_EDITOR_HEADS_DIR, f"p{player_id}.DDS"),
-        os.path.join(LIVE_EDITOR_HEADS_DIR, f"p{player_id}.dds"),
-        os.path.join(LIVE_EDITOR_HEADS_DIR, f"p{player_id}.png"),
-        os.path.join(LIVE_EDITOR_HEADS_DIR, f"p{player_id}.PNG")
+        os.path.join(active_heads_dir, f"p{player_id}.DDS"),
+        os.path.join(active_heads_dir, f"p{player_id}.dds"),
+        os.path.join(active_heads_dir, f"p{player_id}.png"),
+        os.path.join(active_heads_dir, f"p{player_id}.PNG")
     ]
     for c in candidates:
         if os.path.exists(c):
             return c
     return None
+
+def check_player_has_miniface(player_id):
+    """
+    Verifica com precisão se o atleta possui uma miniface real (DDS do jogo ou PNG do FC Mania),
+    ou se está usando a silhueta padrão notfound.png.
+    """
+    try:
+        pid = int(player_id)
+        if pid <= 0:
+            return False
+        # 1. Checa se tem arquivo DDS no Live Editor heads
+        active_heads = get_heads_dir()
+        if os.path.exists(active_heads):
+            for ext in [".dds", ".DDS", ".png", ".PNG"]:
+                if os.path.exists(os.path.join(active_heads, f"p{pid}{ext}")):
+                    return True
+        # 2. Checa se já tem PNG convertido no cache DDS
+        cache_png = os.path.join(BASE_DIR, "uploads", "dds_cache", f"p{pid}.png")
+        if os.path.exists(cache_png):
+            return True
+        # 3. Checa se existe no repositório local do FC Mania ou pasta assets
+        for h_dir in [HEADS_DIR, os.path.join(BASE_DIR, "assets", "heads")]:
+            if os.path.exists(os.path.join(h_dir, f"p{pid}.png")):
+                return True
+        return False
+    except Exception:
+        return False
 
 # Cache em memória
 _PLAYER_CACHE = {}

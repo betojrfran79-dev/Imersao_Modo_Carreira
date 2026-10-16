@@ -42,8 +42,24 @@ window.I18N_LOCALES['pt'] = {
     halloffame: 'Hall da Fama Eterno',
     h2h: 'Raio-X de Duelos (H2H)',
     socialMedia: 'Mídias Sociais',
+    minifaces: 'Estúdio de Minifaces',
     settings: 'Configurações',
     winrateLabel: 'APROVEITAMENTO GERAL'
+  },
+
+  minifaces: {
+    title: 'Estúdio & Gerador de Minifaces',
+    subtitle: 'Identifique atletas sem foto oficial no elenco e na base, gere scripts Lua de captura in-game e injete as faces diretamente no EA FC e no aplicativo.',
+    btnRefresh: 'Sincronizar Minifaces',
+    btnGenerateLua: 'Gerar Script Lua (1-Clique)',
+    folderTitle: 'Diretório Oficial de Heads do Live Editor (.dds)',
+    folderDesc: 'Esta é a pasta onde o EA FC / Live Editor lê as minifaces (heads) no formato .dds. Por padrão, fica na pasta de mods do Live Editor.',
+    btnSaveDir: 'Salvar Pasta',
+    btnResetDir: 'Padrão',
+    metricTotal: 'Total de Atletas Analisados',
+    metricMissing: 'Sem Miniface Oficial',
+    metricWithFace: 'Com Miniface Ativa',
+    metricDds: 'Minifaces DDS na Pasta'
   },
 
   setup: {

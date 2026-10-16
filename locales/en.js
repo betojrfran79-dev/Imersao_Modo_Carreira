@@ -42,8 +42,24 @@ window.I18N_LOCALES['en'] = {
     halloffame: 'Hall of Fame',
     h2h: 'Head-to-Head (H2H)',
     socialMedia: 'Social Media',
+    minifaces: 'Minifaces Studio',
     settings: 'Settings',
     winrateLabel: 'OVERALL WIN RATE'
+  },
+
+  minifaces: {
+    title: 'Minifaces Studio & Generator',
+    subtitle: 'Identify players without official minifaces in squad and youth academy, generate in-game Lua capture scripts, and inject heads into EA FC and the app.',
+    btnRefresh: 'Sync Minifaces',
+    btnGenerateLua: 'Generate Lua Script (1-Click)',
+    folderTitle: 'Live Editor Heads Directory (.dds)',
+    folderDesc: 'This is the folder where EA FC / Live Editor reads minifaces (.dds). By default, it is located in the Live Editor mods folder.',
+    btnSaveDir: 'Save Folder',
+    btnResetDir: 'Default',
+    metricTotal: 'Total Players Analyzed',
+    metricMissing: 'Without Official Miniface',
+    metricWithFace: 'With Active Miniface',
+    metricDds: 'DDS Files in Folder'
   },
 
   setup: {

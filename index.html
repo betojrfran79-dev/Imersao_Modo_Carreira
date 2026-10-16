@@ -169,6 +169,10 @@
           <i data-lucide="share-2"></i>
           <span data-i18n="menu.socialMedia">Mídias Sociais</span>
         </button>
+        <button class="nav-item" data-tab="minifaces">
+          <i data-lucide="camera"></i>
+          <span data-i18n="menu.minifaces">Estúdio de Minifaces</span>
+        </button>
         <button class="nav-item" data-tab="settings">
           <i data-lucide="settings"></i>
           <span data-i18n="menu.settings">Configurações</span>
@@ -2205,6 +2209,127 @@
         </div>
       </section>
 
+      <!-- ======================================================== -->
+      <!-- ABA 10: ESTÚDIO DE MINIFACES (EA FC LIVE EDITOR)         -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-minifaces">
+        <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 1rem; align-items: flex-start; margin-bottom: 1.5rem;">
+          <div>
+            <div class="badge-tag gold" style="display: inline-flex; align-items: center; gap: 6px; margin-bottom: 0.5rem;">
+              <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i> LIVE EDITOR & SIGA LA PELOTA ENGINE
+            </div>
+            <h2 data-i18n="minifaces.title">Estúdio & Gerador de Minifaces</h2>
+            <p data-i18n="minifaces.subtitle" style="color: var(--text-dim); font-size: 0.88rem; max-width: 820px; margin-top: 4px;">
+              Identifique atletas sem foto oficial no elenco e na base, gere scripts Lua de captura in-game e injete as faces diretamente no EA FC e no aplicativo.
+            </p>
+          </div>
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button type="button" class="btn-secondary" id="btnRefreshMinifaces" title="Escanear pasta de heads e atualizar imagens">
+              <i data-lucide="refresh-cw"></i> <span data-i18n="minifaces.btnRefresh">Sincronizar Minifaces</span>
+            </button>
+            <button type="button" class="btn-primary highlight-btn" id="btnGenerateAllLua" title="Gerar script para todos os atletas pendentes">
+              <i data-lucide="zap"></i> <span data-i18n="minifaces.btnGenerateLua">Gerar Script Lua (1-Clique)</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Card de Configuração da Pasta Heads (.dds) -->
+        <div class="glass-card minifaces-config-card" style="margin-bottom: 1.5rem; padding: 1.25rem 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <i data-lucide="folder-cog" style="color: var(--accent-gold); width: 22px; height: 22px;"></i>
+              <strong style="color: #fff; font-size: 0.95rem;" data-i18n="minifaces.folderTitle">Diretório Oficial de Heads do Live Editor (.dds)</strong>
+            </div>
+            <div id="headsDirStatusBadge" class="badge-tag green" style="display: inline-flex; align-items: center; gap: 6px;">
+              <i data-lucide="check-circle" style="width: 13px; height: 13px;"></i> <span id="headsDirStatusText">Detectando pasta...</span>
+            </div>
+          </div>
+
+          <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 0.85rem;" data-i18n="minifaces.folderDesc">
+            Esta é a pasta onde o EA FC / Live Editor lê as minifaces (heads) no formato <code>.dds</code>. Por padrão, fica na pasta de mods do Live Editor. Você pode alterar para qualquer outro local caso use um diretório customizado.
+          </p>
+
+          <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="inputHeadsDirPath" class="vault-input" style="flex: 1; min-width: 280px; font-family: monospace; font-size: 0.85rem;" placeholder="C:\FC 26 Live Editor\mods\legacy\data\ui\imgAssets\heads">
+            <button type="button" class="btn-secondary" id="btnSaveHeadsDir" style="white-space: nowrap;">
+              <i data-lucide="save"></i> <span data-i18n="minifaces.btnSaveDir">Salvar Pasta</span>
+            </button>
+            <button type="button" class="btn-secondary" id="btnResetDefaultHeadsDir" title="Restaurar caminho padrão da EA / Live Editor" style="white-space: nowrap;">
+              <i data-lucide="rotate-ccw"></i> <span data-i18n="minifaces.btnResetDir">Padrão</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid de Métricas do Estúdio -->
+        <div class="metrics-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 1.5rem;">
+          <div class="metric-card">
+            <div class="metric-icon" style="background: rgba(59, 130, 246, 0.15); color: #60a5fa;"><i data-lucide="users"></i></div>
+            <div class="metric-content">
+              <span class="metric-label" data-i18n="minifaces.metricTotal">Total de Atletas Analisados</span>
+              <h3 class="metric-value" id="mfTotalAnalyzed">0</h3>
+              <small style="color: var(--text-dim);" id="mfTotalSub">Elenco & Base</small>
+            </div>
+          </div>
+
+          <div class="metric-card" style="border-color: rgba(239, 68, 68, 0.35);">
+            <div class="metric-icon" style="background: rgba(239, 68, 68, 0.15); color: #f87171;"><i data-lucide="user-x"></i></div>
+            <div class="metric-content">
+              <span class="metric-label" style="color: #f87171;" data-i18n="minifaces.metricMissing">Sem Miniface Oficial</span>
+              <h3 class="metric-value" id="mfTotalMissing" style="color: #ef4444;">0</h3>
+              <small style="color: #f87171;" id="mfMissingSub">Aguardando Captura Lua</small>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon" style="background: rgba(16, 185, 129, 0.15); color: #34d399;"><i data-lucide="check-circle-2"></i></div>
+            <div class="metric-content">
+              <span class="metric-label" data-i18n="minifaces.metricWithFace">Com Miniface Ativa</span>
+              <h3 class="metric-value" id="mfTotalWithFace" style="color: #10b981;">0</h3>
+              <small style="color: #10b981;">Visíveis no Jogo & App</small>
+            </div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;"><i data-lucide="hard-drive"></i></div>
+            <div class="metric-content">
+              <span class="metric-label" data-i18n="minifaces.metricDds">Minifaces DDS na Pasta</span>
+              <h3 class="metric-value" id="mfTotalDdsFiles">0</h3>
+              <small style="color: var(--text-dim);">Arquivos .dds detectados</small>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Filtros e Busca -->
+        <div class="glass-card" style="padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div class="pill-filters-group" id="mfFilterGroup" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="filter-pill active" data-filter="missing">
+              <i data-lucide="alert-circle" style="width: 14px; height: 14px;"></i> Apenas Sem Miniface (<span id="mfCountFilterMissing">0</span>)
+            </button>
+            <button type="button" class="filter-pill" data-filter="all">
+              Todos os Atletas (<span id="mfCountFilterAll">0</span>)
+            </button>
+            <button type="button" class="filter-pill" data-filter="squad">
+              Elenco Principal
+            </button>
+            <button type="button" class="filter-pill" data-filter="youth">
+              Divisões de Base
+            </button>
+          </div>
+
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <div class="search-input-wrap" style="position: relative;">
+              <input type="text" id="mfSearchInput" class="vault-input" placeholder="Buscar por nome ou ID..." style="padding-left: 2.2rem; font-size: 0.85rem; width: 220px;">
+              <i data-lucide="search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 14px; height: 14px; color: var(--text-dim);"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Grid de Cards dos Atletas -->
+        <div class="minifaces-players-grid" id="minifacesCardsContainer">
+          <!-- Renderizado via JS -->
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -3424,6 +3549,55 @@
           </button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: SCRIPT LUA GERADO PARA CAPTURA DE MINIFACES       -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalMinifaceLua">
+    <div class="modal-card wide-modal" style="max-width: 760px; padding: 1.75rem 2rem;">
+      <button class="modal-close-btn" id="modalMinifaceLuaCloseBtn" onclick="closeMinifaceLuaModal()">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;">
+          <i data-lucide="camera"></i>
+        </div>
+        <div>
+          <h2 id="mfModalTitle">Script Lua de Captura de Minifaces</h2>
+          <p id="mfModalSub">Execute este script no console Lua do Live Editor para gerar as cabeças 3D em formato .dds</p>
+        </div>
+      </div>
+
+      <!-- Caixa de Instruções Rápidas -->
+      <div class="sync-tutorial-box" style="margin: 1rem 0; padding: 1rem 1.25rem;">
+        <h4 style="color: #fbbf24; margin-bottom: 6px;"><i data-lucide="play-circle"></i> Como executar no Live Editor:</h4>
+        <ol style="font-size: 0.82rem; color: #cbd5e1; margin-left: 1.25rem; line-height: 1.6;">
+          <li>Com o <b>EA SPORTS FC</b> aberto e o seu save do Modo Carreira carregado, abra o <b>Live Editor</b>.</li>
+          <li>Acesse a aba <b>Lua Scripts</b> ou abra o Console Lua (pressione <b>F9</b> ou clique em Run Script).</li>
+          <li>Cole o código abaixo e execute, ou selecione o arquivo <code>CAPTURAR_MINIFACES.lua</code> salvo automaticamente.</li>
+          <li>O jogo renderizará os rostos e salvará em <code>.dds</code>. O app carregará as fotos instantaneamente!</li>
+        </ol>
+      </div>
+
+      <!-- Editor / Visualizador do Código Lua -->
+      <div style="position: relative; margin-bottom: 1rem;">
+        <textarea id="mfLuaCodeTextarea" readonly class="vault-input" style="width: 100%; height: 260px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.82rem; line-height: 1.5; background: #0f172a; border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; color: #38bdf8; padding: 12px; resize: vertical;"></textarea>
+      </div>
+
+      <div class="form-actions flex-between" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <div id="mfSavedLocationsNotice" style="font-size: 0.78rem; color: #10b981; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> Arquivo salvo em <code>CAPTURAR_MINIFACES.lua</code>
+        </div>
+        <div style="display: flex; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" onclick="downloadMinifaceLuaFile()">
+            <i data-lucide="download"></i> Baixar .lua
+          </button>
+          <button type="button" class="btn-primary" id="btnCopyMinifaceLua" onclick="copyMinifaceLuaCode()">
+            <i data-lucide="copy"></i> Copiar Código Lua
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

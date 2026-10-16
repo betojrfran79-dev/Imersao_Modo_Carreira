@@ -1601,6 +1601,98 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 self.wfile.write(content)
                 return
 
+            # 16.8 Status do Módulo de Minifaces (Live Editor Heads & Atletas sem foto)
+            if path == "/api/minifaces/status":
+                heads_dir = fcm_resolver.get_heads_dir()
+                dir_exists = os.path.exists(heads_dir)
+                total_dds = 0
+                if dir_exists:
+                    try:
+                        total_dds = len(glob.glob(os.path.join(heads_dir, "*.dds")) + glob.glob(os.path.join(heads_dir, "*.DDS")))
+                    except Exception:
+                        total_dds = 0
+
+                players = []
+                seen = set()
+
+                # 1. Elenco Ativo (DADOS_CARREIRA.json ou banco)
+                for jpath in [
+                    os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+                    os.path.join(BASE_DIR, "DADOS_CARREIRA.json")
+                ]:
+                    if os.path.exists(jpath):
+                        try:
+                            with open(jpath, "r", encoding="utf-8", errors="ignore") as f:
+                                dj = json.load(f)
+                                for p in dj.get("players", []):
+                                    pid = int(p.get("player_id") or 0)
+                                    if pid > 0 and pid not in seen:
+                                        seen.add(pid)
+                                        has_face = fcm_resolver.check_player_has_miniface(pid)
+                                        players.append({
+                                            "player_id": pid,
+                                            "name": p.get("player_name") or f"Jogador #{pid}",
+                                            "overall": int(p.get("overall_rating") or 60),
+                                            "position": p.get("position") or "ATA",
+                                            "age": int(p.get("age") or 24),
+                                            "team_id": int(p.get("team_id") or dj.get("team_id") or 0),
+                                            "team_name": p.get("team_name") or dj.get("team_name") or "Meu Clube",
+                                            "source": "Elenco Principal",
+                                            "has_miniface": has_face,
+                                            "face_url": fcm_resolver.get_head_image_path_or_url(pid)
+                                        })
+                        except Exception as e:
+                            print("[MINIFACES] Erro ao ler DADOS_CARREIRA:", e)
+                        break
+
+                # 2. Divisões de Base (BASE_JOVENS_EXTRAIDA.json)
+                for ypath in [
+                    os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "BASE_JOVENS_EXTRAIDA.json"),
+                    os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "Imersao_Modo_Carreira", "BASE_JOVENS_EXTRAIDA.json"),
+                    os.path.join(BASE_DIR, "BASE_JOVENS_EXTRAIDA.json")
+                ]:
+                    if os.path.exists(ypath):
+                        try:
+                            with open(ypath, "r", encoding="utf-8", errors="ignore") as f:
+                                yj = json.load(f)
+                                for p in yj.get("players", []):
+                                    pid = int(p.get("playerid") or p.get("player_id") or 0)
+                                    if pid > 0 and pid not in seen:
+                                        seen.add(pid)
+                                        has_face = fcm_resolver.check_player_has_miniface(pid)
+                                        players.append({
+                                            "player_id": pid,
+                                            "name": p.get("name") or p.get("player_name") or f"Jovem #{pid}",
+                                            "overall": int(p.get("overall") or p.get("overall_rating") or 55),
+                                            "position": p.get("position") or "ATA",
+                                            "age": 17,
+                                            "team_id": int(yj.get("team_id") or 0),
+                                            "team_name": yj.get("team_name") or "Academia de Base",
+                                            "source": "Divisões de Base",
+                                            "has_miniface": has_face,
+                                            "face_url": fcm_resolver.get_head_image_path_or_url(pid)
+                                        })
+                        except Exception as e:
+                            print("[MINIFACES] Erro ao ler BASE_JOVENS_EXTRAIDA:", e)
+                        break
+
+                # Ordenar: primeiro os que NÃO tem miniface, depois por overall decrescente
+                players.sort(key=lambda x: (x["has_miniface"], -x["overall"]))
+
+                missing_players = [p for p in players if not p["has_miniface"]]
+                with_face_players = [p for p in players if p["has_miniface"]]
+
+                return self.send_json({
+                    "heads_dir": heads_dir,
+                    "default_heads_dir": fcm_resolver.DEFAULT_LIVE_EDITOR_HEADS_DIR,
+                    "heads_dir_exists": dir_exists,
+                    "total_dds_in_dir": total_dds,
+                    "total_players": len(players),
+                    "missing_count": len(missing_players),
+                    "with_face_count": len(with_face_players),
+                    "players": players
+                })
+
             # 17. Arquivos Estáticos do Frontend
             return super().do_GET()
         except Exception as e:
@@ -2880,6 +2972,141 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                 except Exception as err:
                     return self.send_json({"status": "error", "message": str(err)}, 500)
 
+            # 16.9 Salvar Pasta Customizada de Heads
+            if path == "/api/minifaces/config":
+                new_dir = str(payload.get("heads_dir", "")).strip()
+                if not new_dir:
+                    new_dir = fcm_resolver.DEFAULT_LIVE_EDITOR_HEADS_DIR
+                database.set_app_setting("heads_dir", new_dir)
+                fcm_resolver.LIVE_EDITOR_HEADS_DIR = new_dir
+                return self.send_json({
+                    "status": "success",
+                    "message": "Diretório de Minifaces atualizado com sucesso!",
+                    "heads_dir": new_dir,
+                    "heads_dir_exists": os.path.exists(new_dir)
+                })
+
+            # 16.10 Gerar Script Lua de Captura (Siga La Pelota Engine)
+            if path == "/api/minifaces/generate_lua":
+                player_ids = payload.get("player_ids", [])
+                heads_dir = fcm_resolver.get_heads_dir().replace("\\", "/")
+                if not heads_dir.endswith("/"):
+                    heads_dir += "/"
+
+                # Se não enviou lista específica, captura todos os que estão sem miniface
+                if not player_ids:
+                    # Varre os arquivos
+                    seen = set()
+                    for jpath in [
+                        os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+                        os.path.join(BASE_DIR, "DADOS_CARREIRA.json")
+                    ]:
+                        if os.path.exists(jpath):
+                            try:
+                                with open(jpath, "r", encoding="utf-8", errors="ignore") as f:
+                                    dj = json.load(f)
+                                    for p in dj.get("players", []):
+                                        pid = int(p.get("player_id") or 0)
+                                        if pid > 0 and pid not in seen:
+                                            seen.add(pid)
+                                            if not fcm_resolver.check_player_has_miniface(pid):
+                                                player_ids.append(pid)
+                            except Exception:
+                                pass
+                            break
+
+                    for ypath in [
+                        os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "BASE_JOVENS_EXTRAIDA.json"),
+                        os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "Imersao_Modo_Carreira", "BASE_JOVENS_EXTRAIDA.json"),
+                        os.path.join(BASE_DIR, "BASE_JOVENS_EXTRAIDA.json")
+                    ]:
+                        if os.path.exists(ypath):
+                            try:
+                                with open(ypath, "r", encoding="utf-8", errors="ignore") as f:
+                                    yj = json.load(f)
+                                    for p in yj.get("players", []):
+                                        pid = int(p.get("playerid") or p.get("player_id") or 0)
+                                        if pid > 0 and pid not in seen:
+                                            seen.add(pid)
+                                            if not fcm_resolver.check_player_has_miniface(pid):
+                                                player_ids.append(pid)
+                            except Exception:
+                                pass
+                            break
+
+                ids_str = ", ".join(str(int(pid)) for pid in player_ids)
+
+                lua_code = f'''-- ==============================================================================
+-- 📸 FC CAREER VAULT & SIGA LA PELOTA - CAPTURA DE MINIFACES (LIVE EDITOR)
+-- Total de Atletas Selecionados: {len(player_ids)}
+-- Destino das Minifaces (.dds): {heads_dir}
+-- ==============================================================================
+
+if not IsInCM() then
+    MessageBox("⚠️ MODO CARREIRA NÃO DETECTADO", "Por favor, carregue o seu Save no Modo Carreira antes de executar a captura de minifaces!")
+    return
+end
+
+local DIR_HEADS = "{heads_dir}"
+
+local player_ids = {{ {ids_str} }}
+local added_count = 0
+
+PlayerCaptureSetOutputDirectory(DIR_HEADS)
+PlayerCaptureSetCamera(1)
+PlayerCaptureSetSize(256, 256)
+PlayerCaptureSetType(1)
+
+for i=1, #player_ids do
+    local pid = player_ids[i]
+    local tid = GetTeamIdFromPlayerId(pid) or 0
+    PlayerCaptureAddPlayer(pid, tid, false)
+    added_count = added_count + 1
+end
+
+if added_count > 0 then
+    PlayerCaptureStart()
+    MessageBox("✅ CAPTURA INICIADA", "Captura de " .. tostring(added_count) .. " minifaces iniciada com sucesso!\\n\\nAs imagens estão sendo salvas em formato .dds na pasta:\\n" .. DIR_HEADS .. "\\n\\nO jogo e o Imersão Modo Carreira exibirão os rostos atualizados!")
+else
+    MessageBox("ℹ️ INFORMAÇÃO", "Nenhum atleta selecionado para captura.")
+end
+'''
+                saved_locations = []
+                # Salvar na pasta do Live Editor se existir
+                le_lua_folder = r"C:\FC 26 Live Editor\lua"
+                if os.path.exists(le_lua_folder):
+                    le_path = os.path.join(le_lua_folder, "capturar_minifaces.lua")
+                    try:
+                        with open(le_path, "w", encoding="utf-8") as f:
+                            f.write(lua_code)
+                        saved_locations.append(le_path)
+                    except Exception:
+                        pass
+
+                # Salvar no workspace
+                ws_path = os.path.join(BASE_DIR, "CAPTURAR_MINIFACES.lua")
+                try:
+                    with open(ws_path, "w", encoding="utf-8") as f:
+                        f.write(lua_code)
+                    saved_locations.append(ws_path)
+                except Exception:
+                    pass
+
+                return self.send_json({
+                    "status": "success",
+                    "lua_code": lua_code,
+                    "player_count": len(player_ids),
+                    "saved_locations": saved_locations
+                })
+
+            # 16.11 Atualizar Cache & Sincronizar Minifaces
+            if path == "/api/minifaces/refresh":
+                preconvert_all_dds_heads()
+                return self.send_json({
+                    "status": "success",
+                    "message": "Minifaces sincronizadas com sucesso!"
+                })
+
             return self.send_json({"error": "Endpoint não encontrado"}, 404)
         except Exception as e:
             traceback.print_exc()
@@ -2888,7 +3115,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
 def preconvert_all_dds_heads():
     try:
         from PIL import Image
-        dds_dir = r"C:\FC 26 Live Editor\mods\legacy\data\ui\imgAssets\heads"
+        dds_dir = fcm_resolver.get_heads_dir()
         cache_dir = os.path.join(UPLOADS_DIR, "dds_cache")
         if not os.path.exists(dds_dir):
             return

@@ -202,6 +202,7 @@ function initTabsNavigation() {
       if (tabTarget === "h2h") loadOpponentsList();
       if (tabTarget === "scout") loadScoutHubData();
       if (tabTarget === "midias-sociais" && window.loadSocialMediaTab) window.loadSocialMediaTab();
+      if (tabTarget === "minifaces") loadMinifacesStudio();
 
       initLucideIcons();
     });
@@ -6795,6 +6796,7 @@ function switchTab(tabTarget) {
   if (tabTarget === "h2h") loadOpponentsList();
   if (tabTarget === "scout") loadScoutHubData();
   if (tabTarget === "dashboard") loadDashboardData();
+  if (tabTarget === "minifaces") loadMinifacesStudio();
 
   initLucideIcons();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -7095,4 +7097,353 @@ window.addEventListener("appLanguageChanged", (e) => {
   else if (activeTab === "scout") loadScoutHubData();
   else if (activeTab === "finances") loadFinancesData();
   else if (activeTab === "setup") loadSetupStatus();
+  else if (activeTab === "minifaces") loadMinifacesStudio();
 });
+
+// ==============================================================================
+// 📸 ESTÚDIO & GERADOR DE MINIFACES (LIVE EDITOR & SIGA LA PELOTA ENGINE)
+// ==============================================================================
+
+let minifacesData = null;
+let currentMinifacesFilter = 'missing';
+let currentMinifacesSearch = '';
+let minifacesListenersInitialized = false;
+
+async function loadMinifacesStudio() {
+  initMinifacesListeners();
+
+  const container = document.getElementById("minifacesCardsContainer");
+  if (container && !minifacesData) {
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 3rem 1rem; color: var(--text-dim);">
+        <i data-lucide="loader-2" class="spin" style="width: 32px; height: 32px; margin-bottom: 0.75rem; color: var(--accent-gold);"></i>
+        <p>Analisando atletas do elenco, divisões de base e pasta de heads do Live Editor...</p>
+      </div>
+    `;
+    initLucideIcons();
+  }
+
+  try {
+    const res = await fetch("/api/minifaces/status");
+    if (!res.ok) throw new Error("Falha ao consultar status de minifaces");
+    minifacesData = await res.json();
+
+    // 1. Atualizar campo e status do diretório
+    const inputDir = document.getElementById("inputHeadsDirPath");
+    if (inputDir) {
+      inputDir.value = minifacesData.heads_dir || "";
+    }
+
+    const badge = document.getElementById("headsDirStatusBadge");
+    const badgeText = document.getElementById("headsDirStatusText");
+    if (badge && badgeText) {
+      if (minifacesData.heads_dir_exists) {
+        badge.className = "badge-tag green";
+        badgeText.innerHTML = `✅ Pasta Localizada (${minifacesData.total_dds_in_dir} arquivos .dds)`;
+      } else {
+        badge.className = "badge-tag red";
+        badgeText.innerHTML = `⚠️ Pasta não encontrada no disco`;
+      }
+    }
+
+    // 2. Atualizar métricas numéricas
+    const totalEl = document.getElementById("mfTotalAnalyzed");
+    if (totalEl) totalEl.textContent = minifacesData.total_players || 0;
+
+    const missingEl = document.getElementById("mfTotalMissing");
+    if (missingEl) missingEl.textContent = minifacesData.missing_count || 0;
+
+    const withFaceEl = document.getElementById("mfTotalWithFace");
+    if (withFaceEl) withFaceEl.textContent = minifacesData.with_face_count || 0;
+
+    const ddsEl = document.getElementById("mfTotalDdsFiles");
+    if (ddsEl) ddsEl.textContent = minifacesData.total_dds_in_dir || 0;
+
+    // 3. Atualizar contadores nos filtros
+    const countFilterMissing = document.getElementById("mfCountFilterMissing");
+    if (countFilterMissing) countFilterMissing.textContent = minifacesData.missing_count || 0;
+
+    const countFilterAll = document.getElementById("mfCountFilterAll");
+    if (countFilterAll) countFilterAll.textContent = minifacesData.total_players || 0;
+
+    // 4. Renderizar lista de atletas
+    renderMinifacesCards();
+  } catch (err) {
+    console.error("[MINIFACES] Erro ao carregar status:", err);
+    if (container) {
+      container.innerHTML = `
+        <div style="grid-column: 1/-1; text-align: center; padding: 2.5rem 1rem; color: #f87171;">
+          <i data-lucide="alert-triangle" style="width: 32px; height: 32px; margin-bottom: 0.5rem;"></i>
+          <p>Erro ao carregar dados de minifaces: ${err.message}</p>
+        </div>
+      `;
+      initLucideIcons();
+    }
+  }
+}
+
+function initMinifacesListeners() {
+  if (minifacesListenersInitialized) return;
+  minifacesListenersInitialized = true;
+
+  // Botão Sincronizar / Refresh
+  const btnRefresh = document.getElementById("btnRefreshMinifaces");
+  if (btnRefresh) {
+    btnRefresh.addEventListener("click", refreshMinifaces);
+  }
+
+  // Botão Gerar Script Lua 1-Clique (para todos os pendentes)
+  const btnGenerateAll = document.getElementById("btnGenerateAllLua");
+  if (btnGenerateAll) {
+    btnGenerateAll.addEventListener("click", () => generateMinifacesLua());
+  }
+
+  // Botão Salvar Pasta
+  const btnSaveDir = document.getElementById("btnSaveHeadsDir");
+  if (btnSaveDir) {
+    btnSaveDir.addEventListener("click", saveHeadsDirConfig);
+  }
+
+  // Botão Restaurar Padrão
+  const btnResetDir = document.getElementById("btnResetDefaultHeadsDir");
+  if (btnResetDir) {
+    btnResetDir.addEventListener("click", resetDefaultHeadsDir);
+  }
+
+  // Filtros em pílula
+  const filterPills = document.querySelectorAll("#mfFilterGroup .filter-pill");
+  filterPills.forEach(pill => {
+    pill.addEventListener("click", () => {
+      filterPills.forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      currentMinifacesFilter = pill.getAttribute("data-filter") || "missing";
+      renderMinifacesCards();
+    });
+  });
+
+  // Busca textual por nome ou ID
+  const searchInput = document.getElementById("mfSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      currentMinifacesSearch = e.target.value.toLowerCase().trim();
+      renderMinifacesCards();
+    });
+  }
+}
+
+function renderMinifacesCards() {
+  const container = document.getElementById("minifacesCardsContainer");
+  if (!container || !minifacesData) return;
+
+  const players = minifacesData.players || [];
+  
+  // Filtragem
+  const filtered = players.filter(p => {
+    // Filtro por categoria
+    if (currentMinifacesFilter === "missing" && p.has_miniface) return false;
+    if (currentMinifacesFilter === "squad" && p.source !== "Elenco Principal") return false;
+    if (currentMinifacesFilter === "youth" && p.source !== "Divisões de Base") return false;
+
+    // Filtro por texto
+    if (currentMinifacesSearch) {
+      const matchName = (p.name || "").toLowerCase().includes(currentMinifacesSearch);
+      const matchId = String(p.player_id || "").includes(currentMinifacesSearch);
+      const matchPos = (p.position || "").toLowerCase().includes(currentMinifacesSearch);
+      if (!matchName && !matchId && !matchPos) return false;
+    }
+
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 3rem 1rem; color: var(--text-dim); background: rgba(0,0,0,0.2); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">
+        <i data-lucide="check-circle-2" style="width: 40px; height: 40px; color: #10b981; margin-bottom: 0.75rem;"></i>
+        <h4 style="color: #fff; margin-bottom: 0.25rem;">Nenhum atleta pendente neste filtro!</h4>
+        <p style="font-size: 0.85rem;">Todos os atletas selecionados já possuem miniface ou nenhum atleta corresponde à busca.</p>
+      </div>
+    `;
+    initLucideIcons();
+    return;
+  }
+
+  let html = "";
+  filtered.forEach(p => {
+    const cardClass = p.has_miniface ? "has-face" : "missing-face";
+    const statusPill = p.has_miniface 
+      ? `<span class="mf-status-pill ready"><i data-lucide="check" style="width:12px;height:12px;"></i> No Jogo & App</span>`
+      : `<span class="mf-status-pill missing"><i data-lucide="alert-circle" style="width:12px;height:12px;"></i> Sem Miniface</span>`;
+
+    const noFaceTag = !p.has_miniface ? `<div class="mf-no-face-tag">SEM FOTO</div>` : "";
+
+    html += `
+      <div class="mf-player-card ${cardClass}">
+        <div class="mf-card-top">
+          <div class="mf-avatar-wrap">
+            <img src="${p.face_url || '/assets/heads/notfound.png'}" class="mf-avatar-img" onerror="this.src='/assets/heads/notfound.png'" alt="${p.name}">
+            ${noFaceTag}
+          </div>
+          <div class="mf-info">
+            <div class="mf-name" title="${p.name}">${p.name}</div>
+            <div class="mf-meta-row">
+              <span class="mf-pos-chip">${formatPosition(p.position)}</span>
+              <span class="mf-ovr-chip">OVR ${p.overall || 60}</span>
+              <span class="mf-source-chip">${p.source}</span>
+            </div>
+            <div class="mf-id-badge">ID: #${p.player_id}</div>
+          </div>
+        </div>
+
+        <div class="mf-card-bottom">
+          ${statusPill}
+          <button type="button" class="btn-mf-capture-single" onclick="generateMinifacesLua([${p.player_id}])" title="Gerar script de captura exclusivo para este atleta">
+            <i data-lucide="camera" style="width: 13px; height: 13px;"></i> Capturar Lua
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = html;
+  initLucideIcons();
+}
+
+async function saveHeadsDirConfig() {
+  const input = document.getElementById("inputHeadsDirPath");
+  if (!input) return;
+  const newPath = input.value.trim();
+
+  try {
+    const res = await fetch("/api/minifaces/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ heads_dir: newPath })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      showToast("Diretório de Heads salvo com sucesso!", "success");
+      loadMinifacesStudio();
+    } else {
+      showToast("Erro ao salvar diretório.", "error");
+    }
+  } catch (err) {
+    showToast("Erro de conexão ao salvar pasta.", "error");
+  }
+}
+
+async function resetDefaultHeadsDir() {
+  if (!minifacesData || !minifacesData.default_heads_dir) return;
+  const input = document.getElementById("inputHeadsDirPath");
+  if (input) {
+    input.value = minifacesData.default_heads_dir;
+    saveHeadsDirConfig();
+  }
+}
+
+async function generateMinifacesLua(playerIds = null) {
+  try {
+    showToast("Gerando script Lua de captura...", "info");
+    const payload = {};
+    if (playerIds && playerIds.length > 0) {
+      payload.player_ids = playerIds;
+    }
+
+    const res = await fetch("/api/minifaces/generate_lua", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (data.status === "success") {
+      const textarea = document.getElementById("mfLuaCodeTextarea");
+      if (textarea) textarea.value = data.lua_code || "";
+
+      const modalTitle = document.getElementById("mfModalTitle");
+      if (modalTitle) {
+        modalTitle.textContent = `Script Lua: Captura de ${data.player_count} Minifaces`;
+      }
+
+      const modal = document.getElementById("modalMinifaceLua");
+      if (modal) {
+        modal.classList.add("active");
+        initLucideIcons();
+      }
+
+      const notice = document.getElementById("mfSavedLocationsNotice");
+      if (notice && data.saved_locations && data.saved_locations.length > 0) {
+        notice.innerHTML = `<i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> Salvo em: <code>${data.saved_locations[0]}</code>`;
+        initLucideIcons();
+      }
+
+      showToast(`Script pronto para ${data.player_count} atletas!`, "success");
+    } else {
+      showToast(data.message || "Erro ao gerar script Lua.", "error");
+    }
+  } catch (err) {
+    console.error("Erro ao gerar Lua:", err);
+    showToast("Falha de conexão ao gerar script.", "error");
+  }
+}
+
+function closeMinifaceLuaModal() {
+  const modal = document.getElementById("modalMinifaceLua");
+  if (modal) modal.classList.remove("active");
+}
+
+function copyMinifaceLuaCode() {
+  const textarea = document.getElementById("mfLuaCodeTextarea");
+  if (!textarea) return;
+
+  textarea.select();
+  textarea.setSelectionRange(0, 99999);
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(textarea.value).then(() => {
+      showToast("Código Lua copiado para a Área de Transferência!", "success");
+      const btn = document.getElementById("btnCopyMinifaceLua");
+      if (btn) {
+        const orig = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="check"></i> Copiado!`;
+        initLucideIcons();
+        setTimeout(() => { btn.innerHTML = orig; initLucideIcons(); }, 2000);
+      }
+    });
+  } else {
+    document.execCommand("copy");
+    showToast("Código copiado!", "success");
+  }
+}
+
+function downloadMinifaceLuaFile() {
+  const textarea = document.getElementById("mfLuaCodeTextarea");
+  if (!textarea || !textarea.value) return;
+
+  const blob = new Blob([textarea.value], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "CAPTURAR_MINIFACES.lua";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast("Download do arquivo CAPTURAR_MINIFACES.lua iniciado!", "success");
+}
+
+async function refreshMinifaces() {
+  const btn = document.getElementById("btnRefreshMinifaces");
+  if (btn) btn.disabled = true;
+
+  showToast("Sincronizando minifaces e convertendo texturas DDS...", "info");
+  try {
+    const res = await fetch("/api/minifaces/refresh", { method: "POST" });
+    const data = await res.json();
+    showToast(data.message || "Minifaces sincronizadas!", "success");
+    await loadMinifacesStudio();
+  } catch (err) {
+    showToast("Erro ao sincronizar minifaces.", "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}

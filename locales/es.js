@@ -42,8 +42,24 @@ window.I18N_LOCALES['es'] = {
     halloffame: 'Salón de la Fama',
     h2h: 'Cara a Cara (H2H)',
     socialMedia: 'Medios Sociales',
+    minifaces: 'Estudio de Minifaces',
     settings: 'Configuración',
     winrateLabel: 'RENDIMIENTO GENERAL'
+  },
+
+  minifaces: {
+    title: 'Estudio y Generador de Minifaces',
+    subtitle: 'Identifica jugadores sin foto oficial en la plantilla y cantera, genera scripts Lua para captura in-game e inyecta las caras en EA FC y en la aplicación.',
+    btnRefresh: 'Sincronizar Minifaces',
+    btnGenerateLua: 'Generar Script Lua (1-Clic)',
+    folderTitle: 'Directorio Oficial de Heads del Live Editor (.dds)',
+    folderDesc: 'Esta es la carpeta donde EA FC / Live Editor lee las minifaces (.dds). Por defecto se encuentra en la carpeta de mods del Live Editor.',
+    btnSaveDir: 'Guardar Carpeta',
+    btnResetDir: 'Por Defecto',
+    metricTotal: 'Total de Jugadores Analizados',
+    metricMissing: 'Sin Miniface Oficial',
+    metricWithFace: 'Con Miniface Activa',
+    metricDds: 'Archivos DDS en Carpeta'
   },
 
   setup: {

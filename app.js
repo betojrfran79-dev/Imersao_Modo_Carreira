@@ -7108,6 +7108,7 @@ let minifacesData = null;
 let currentMinifacesFilter = 'missing';
 let currentMinifacesSearch = '';
 let minifacesListenersInitialized = false;
+let minifaceCacheBuster = '';
 
 async function loadMinifacesStudio() {
   initMinifacesListeners();
@@ -7163,8 +7164,21 @@ async function loadMinifacesStudio() {
     const countFilterMissing = document.getElementById("mfCountFilterMissing");
     if (countFilterMissing) countFilterMissing.textContent = minifacesData.missing_count || 0;
 
+    const countFilterWithFace = document.getElementById("mfCountFilterWithFace");
+    if (countFilterWithFace) countFilterWithFace.textContent = minifacesData.with_face_count || 0;
+
     const countFilterAll = document.getElementById("mfCountFilterAll");
     if (countFilterAll) countFilterAll.textContent = minifacesData.total_players || 0;
+
+    // Se todos os atletas já possuem miniface ativa e o filtro atual é "missing", alterna para "with_face" para exibir os atletas
+    if (minifacesData.missing_count === 0 && currentMinifacesFilter === "missing") {
+      currentMinifacesFilter = "with_face";
+      const filterPills = document.querySelectorAll("#mfFilterGroup .filter-pill");
+      filterPills.forEach(p => {
+        if (p.getAttribute("data-filter") === "with_face") p.classList.add("active");
+        else p.classList.remove("active");
+      });
+    }
 
     // 4. Renderizar lista de atletas
     renderMinifacesCards();
@@ -7241,6 +7255,7 @@ function renderMinifacesCards() {
   const filtered = players.filter(p => {
     // Filtro por categoria
     if (currentMinifacesFilter === "missing" && p.has_miniface) return false;
+    if (currentMinifacesFilter === "with_face" && !p.has_miniface) return false;
     if (currentMinifacesFilter === "squad" && p.source !== "Elenco Principal") return false;
     if (currentMinifacesFilter === "youth" && p.source !== "Divisões de Base") return false;
 
@@ -7275,12 +7290,14 @@ function renderMinifacesCards() {
       : `<span class="mf-status-pill missing"><i data-lucide="alert-circle" style="width:12px;height:12px;"></i> Sem Miniface</span>`;
 
     const noFaceTag = !p.has_miniface ? `<div class="mf-no-face-tag">SEM FOTO</div>` : "";
+    const buster = minifaceCacheBuster ? (p.face_url && p.face_url.includes('?') ? '&' : '?') + 't=' + minifaceCacheBuster : '';
+    const imgUrl = (p.face_url || '/assets/heads/notfound.png') + buster;
 
     html += `
       <div class="mf-player-card ${cardClass}">
         <div class="mf-card-top">
           <div class="mf-avatar-wrap">
-            <img src="${p.face_url || '/assets/heads/notfound.png'}" class="mf-avatar-img" onerror="this.src='/assets/heads/notfound.png'" alt="${p.name}">
+            <img src="${imgUrl}" class="mf-avatar-img" onerror="this.src='/assets/heads/notfound.png'" alt="${p.name}">
             ${noFaceTag}
           </div>
           <div class="mf-info">
@@ -7439,8 +7456,13 @@ async function refreshMinifaces() {
   try {
     const res = await fetch("/api/minifaces/refresh", { method: "POST" });
     const data = await res.json();
+    minifaceCacheBuster = Date.now();
     showToast(data.message || "Minifaces sincronizadas!", "success");
     await loadMinifacesStudio();
+    // Atualiza fotos do elenco também se estiver na memória
+    if (typeof loadSquadData === 'function') {
+      try { loadSquadData(); } catch (e) {}
+    }
   } catch (err) {
     showToast("Erro ao sincronizar minifaces.", "error");
   } finally {

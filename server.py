@@ -493,6 +493,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", "public, max-age=180, stale-while-revalidate=600")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(content)
@@ -720,7 +721,8 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     return self.serve_image(local_asset)
 
                 # D. Se existe DDS gerado no Live Editor mods
-                pid_str = fname.replace("p", "").replace(".png", "").replace(".dds", "").replace(".DDS", "")
+                clean_name = os.path.splitext(fname)[0]
+                pid_str = clean_name[1:] if clean_name.lower().startswith("p") else clean_name
                 if pid_str.isdigit():
                     pid = int(pid_str)
                     dds_file = fcm_resolver.find_dds_head(pid)
@@ -1608,7 +1610,9 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 total_dds = 0
                 if dir_exists:
                     try:
-                        total_dds = len(glob.glob(os.path.join(heads_dir, "*.dds")) + glob.glob(os.path.join(heads_dir, "*.DDS")))
+                        preconvert_all_dds_heads()
+                        raw_dds = glob.glob(os.path.join(heads_dir, "*.dds")) + glob.glob(os.path.join(heads_dir, "*.DDS"))
+                        total_dds = len(set(os.path.normpath(f) for f in raw_dds))
                     except Exception:
                         total_dds = 0
 
@@ -3101,10 +3105,12 @@ end
 
             # 16.11 Atualizar Cache & Sincronizar Minifaces
             if path == "/api/minifaces/refresh":
-                preconvert_all_dds_heads()
+                converted = preconvert_all_dds_heads()
+                msg = f"Sincronização concluída! {converted} novas minifaces convertidas do Live Editor." if converted > 0 else "Todas as minifaces já estão sincronizadas e em cache!"
                 return self.send_json({
                     "status": "success",
-                    "message": "Minifaces sincronizadas com sucesso!"
+                    "converted": converted,
+                    "message": msg
                 })
 
             return self.send_json({"error": "Endpoint não encontrado"}, 404)
@@ -3118,9 +3124,10 @@ def preconvert_all_dds_heads():
         dds_dir = fcm_resolver.get_heads_dir()
         cache_dir = os.path.join(UPLOADS_DIR, "dds_cache")
         if not os.path.exists(dds_dir):
-            return
+            return 0
         os.makedirs(cache_dir, exist_ok=True)
-        files = glob.glob(os.path.join(dds_dir, "*.dds")) + glob.glob(os.path.join(dds_dir, "*.DDS"))
+        raw_files = glob.glob(os.path.join(dds_dir, "*.dds")) + glob.glob(os.path.join(dds_dir, "*.DDS"))
+        files = list({os.path.normpath(f) for f in raw_files})
         converted = 0
         for f in files:
             base = os.path.basename(f)
@@ -3135,8 +3142,10 @@ def preconvert_all_dds_heads():
                     pass
         if converted > 0:
             print(f"[Career Vault] 🖼️ Pré-convertidas {converted} minifaces DDS para PNG em cache.")
+        return converted
     except Exception as e:
         print(f"[Career Vault] Aviso na pré-conversão de DDS: {e}")
+        return 0
 
 class CareerVaultServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True

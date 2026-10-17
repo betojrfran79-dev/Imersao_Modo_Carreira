@@ -470,7 +470,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def serve_image(self, *candidates):
+    def serve_image(self, *candidates, is_fallback=False):
         target = None
         for c in candidates:
             if c and os.path.exists(c):
@@ -487,13 +487,19 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
         if not ctype:
             ctype = "image/png"
 
+        is_nf = os.path.basename(target).lower() in ["notfound.png", "default_crest.png"]
         try:
             with open(target, "rb") as f:
                 content = f.read()
             self.send_response(200)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(content)))
-            self.send_header("Cache-Control", "public, max-age=180, stale-while-revalidate=600")
+            if is_nf or is_fallback:
+                self.send_header("Cache-Control", "no-cache, no-store, must-revalidate, max-age=0")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Expires", "0")
+            else:
+                self.send_header("Cache-Control", "public, max-age=60, stale-while-revalidate=120")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(content)
@@ -706,21 +712,9 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 if fname == "notfound.png":
                     local_nf = os.path.join(BASE_DIR, "assets", "heads", "notfound.png")
                     repo_nf = os.path.join(REPO_HEADS_DIR, "notfound.png")
-                    return self.serve_image(local_nf, repo_nf)
+                    return self.serve_image(local_nf, repo_nf, is_fallback=True)
 
-                # B. Se já existe PNG convertido no cache DDS
-                if os.path.exists(cache_png):
-                    return self.serve_image(cache_png)
-
-                # C. Se existe PNG local direto no repositório FC Mania ou pasta assets
-                fpath = os.path.join(REPO_HEADS_DIR, fname)
-                local_asset = os.path.join(BASE_DIR, "assets", "heads", fname)
-                if os.path.exists(fpath):
-                    return self.serve_image(fpath)
-                if os.path.exists(local_asset):
-                    return self.serve_image(local_asset)
-
-                # D. Se existe DDS gerado no Live Editor mods
+                # B. Se existe DDS gerado no Live Editor mods (ou PNG no heads do Live Editor)
                 clean_name = os.path.splitext(fname)[0]
                 pid_str = clean_name[1:] if clean_name.lower().startswith("p") else clean_name
                 if pid_str.isdigit():
@@ -730,24 +724,32 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         if dds_file.lower().endswith(".png"):
                             return self.serve_image(dds_file)
                         os.makedirs(cache_dir, exist_ok=True)
-                        try:
-                            if not os.path.exists(cache_png) or os.path.getmtime(cache_png) < os.path.getmtime(dds_file):
-                                from PIL import Image
-                                img = Image.open(dds_file)
-                                img.save(cache_png, "PNG")
+                        if not os.path.exists(cache_png) or os.path.getmtime(cache_png) < os.path.getmtime(dds_file) or os.path.getsize(cache_png) == 0:
+                            convert_dds_to_png(dds_file, cache_png)
+                        if os.path.exists(cache_png) and os.path.getsize(cache_png) > 0:
                             return self.serve_image(cache_png)
-                        except Exception as e:
-                            print(f"Erro ao converter DDS {dds_file}: {e}")
+
+                # C. Se já existe PNG válido convertido no cache DDS
+                if os.path.exists(cache_png) and os.path.getsize(cache_png) > 0:
+                    return self.serve_image(cache_png)
+
+                # D. Se existe PNG local direto no repositório FC Mania ou pasta assets
+                fpath = os.path.join(REPO_HEADS_DIR, fname)
+                local_asset = os.path.join(BASE_DIR, "assets", "heads", fname)
+                if os.path.exists(fpath):
+                    return self.serve_image(fpath)
+                if os.path.exists(local_asset):
+                    return self.serve_image(local_asset)
 
                 # E. On-Demand Cloud Fetch (caso o usuário não possua a pasta baixada localmente)
                 online_head = fetch_online_asset("heads", fname)
                 if online_head and os.path.exists(online_head):
                     return self.serve_image(online_head)
 
-                # F. Fallback universal: Silhueta cinza oficial (notfound.png)
+                # F. Fallback universal: Silhueta cinza oficial (notfound.png sem cache no navegador)
                 fallback = os.path.join(BASE_DIR, "assets", "heads", "notfound.png")
                 repo_fallback = os.path.join(REPO_HEADS_DIR, "notfound.png")
-                return self.serve_image(fallback, repo_fallback)
+                return self.serve_image(fallback, repo_fallback, is_fallback=True)
 
             # 2. Escudos do FC Mania
             if path.startswith("/assets/crest/") or path.startswith("/api/crest/") or path in ["/assets/default_crest.png", "/assets/crest/notfound.png"]:
@@ -3118,34 +3120,51 @@ end
             traceback.print_exc()
             return self.send_json({"error": str(e)}, 500)
 
-def preconvert_all_dds_heads():
+def convert_dds_to_png(dds_path, png_path):
+    """Converte textura DDS para PNG com auto-recuperação do Pillow caso falte."""
+    if not dds_path or not os.path.exists(dds_path):
+        return False
     try:
         from PIL import Image
-        dds_dir = fcm_resolver.get_heads_dir()
-        cache_dir = os.path.join(UPLOADS_DIR, "dds_cache")
-        if not os.path.exists(dds_dir):
-            return 0
-        os.makedirs(cache_dir, exist_ok=True)
-        raw_files = glob.glob(os.path.join(dds_dir, "*.dds")) + glob.glob(os.path.join(dds_dir, "*.DDS"))
-        files = list({os.path.normpath(f) for f in raw_files})
-        converted = 0
-        for f in files:
-            base = os.path.basename(f)
-            fname_png = os.path.splitext(base)[0] + ".png"
-            out_path = os.path.join(cache_dir, fname_png)
-            if not os.path.exists(out_path) or os.path.getmtime(out_path) < os.path.getmtime(f):
-                try:
-                    img = Image.open(f)
-                    img.save(out_path, "PNG")
-                    converted += 1
-                except Exception:
-                    pass
-        if converted > 0:
-            print(f"[Career Vault] 🖼️ Pré-convertidas {converted} minifaces DDS para PNG em cache.")
-        return converted
+        img = Image.open(dds_path)
+        os.makedirs(os.path.dirname(png_path), exist_ok=True)
+        img.save(png_path, "PNG")
+        return True
+    except ImportError:
+        try:
+            import subprocess, sys
+            print(f"[Career Vault] 📦 Instalando Pillow para converter textura {os.path.basename(dds_path)}...")
+            subprocess.run([sys.executable, "-m", "pip", "install", "pillow", "--quiet"], check=True)
+            from PIL import Image
+            img = Image.open(dds_path)
+            os.makedirs(os.path.dirname(png_path), exist_ok=True)
+            img.save(png_path, "PNG")
+            return True
+        except Exception as err:
+            print(f"[Career Vault] Aviso ao instalar Pillow: {err}")
     except Exception as e:
-        print(f"[Career Vault] Aviso na pré-conversão de DDS: {e}")
+        print(f"[Career Vault] Erro ao converter DDS {dds_path}: {e}")
+    return False
+
+def preconvert_all_dds_heads():
+    dds_dir = fcm_resolver.get_heads_dir()
+    cache_dir = os.path.join(UPLOADS_DIR, "dds_cache")
+    if not os.path.exists(dds_dir):
         return 0
+    os.makedirs(cache_dir, exist_ok=True)
+    raw_files = glob.glob(os.path.join(dds_dir, "*.dds")) + glob.glob(os.path.join(dds_dir, "*.DDS"))
+    files = list({os.path.normpath(f) for f in raw_files})
+    converted = 0
+    for f in files:
+        base = os.path.basename(f)
+        fname_png = os.path.splitext(base)[0] + ".png"
+        out_path = os.path.join(cache_dir, fname_png)
+        if not os.path.exists(out_path) or os.path.getmtime(out_path) < os.path.getmtime(f):
+            if convert_dds_to_png(f, out_path):
+                converted += 1
+    if converted > 0:
+        print(f"[Career Vault] 🖼️ Pré-convertidas {converted} minifaces DDS para PNG em cache.")
+    return converted
 
 class CareerVaultServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     allow_reuse_address = True

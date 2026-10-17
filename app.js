@@ -1884,7 +1884,9 @@ async function openPlayerModal(playerId) {
     if (fullNameEl) fullNameEl.textContent = data.full_name || data.player_name || "";
     if (idTagEl) idTagEl.textContent = `ID #${data.player_id}`;
     if (faceEl) {
-      faceEl.src = data.face_url || `/api/heads/p${data.player_id}.png`;
+      const baseFace = data.face_url || `/api/heads/p${data.player_id}.png`;
+      const buster = (baseFace.includes('?') ? '&' : '?') + 't=' + (minifaceCacheBuster || Date.now());
+      faceEl.src = baseFace + buster;
       faceEl.onerror = function() { this.src = '/assets/heads/notfound.png'; };
     }
     if (youthBadge) {
@@ -7112,6 +7114,7 @@ let minifaceCacheBuster = '';
 
 async function loadMinifacesStudio() {
   initMinifacesListeners();
+  minifaceCacheBuster = Date.now();
 
   const container = document.getElementById("minifacesCardsContainer");
   if (container && !minifacesData) {

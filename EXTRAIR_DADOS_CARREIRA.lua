@@ -1,5 +1,6 @@
 -- ==============================================================================
--- 🏆 FC CAREER VAULT - SCRIPT MASTER DE EXTRAÇÃO & SINCRONIZAÇÃO (LUA ENGINE v5.0)
+-- 🏆 FC CAREER VAULT - SCRIPT MASTER DE EXTRAÇÃO & SINCRONIZAÇÃO (LUA ENGINE v5.2)
+-- Versão Oficial: v5.2 (Build 17/10/2026)
 -- Compatível com: EA Sports FC 24, FC 25, FC 26 & Patches FC Mania / Live Editor
 -- Integração Completa: Transferências na Memória (Aranaktu Engine), Calendário Real,
 -- ==============================================================================

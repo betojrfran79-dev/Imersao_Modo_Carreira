@@ -108,7 +108,7 @@ function renderYouthPlayersList(players) {
     return `
       <div class="youth-player-card" id="yCard_${p.playerid}" onclick="showYouthPlayerProfile(${p.playerid})">
         <div class="ypc-avatar-wrap">
-          <img src="assets/heads/notfound.png" alt="${escapeHtml(p.name)}" class="ypc-avatar">
+          <img src="${p.face_url || p.head_url || `/assets/heads/p${p.playerid}.png`}" onerror="this.src='/assets/heads/notfound.png'" alt="${escapeHtml(p.name)}" class="ypc-avatar">
           <span class="ypc-pos-tag">${posPT}</span>
         </div>
         <div class="ypc-info">
@@ -150,6 +150,7 @@ window.showYouthPlayerProfile = function(playerId) {
   if (compSection) compSection.style.display = "none";
 
   // Preenche dados do Cabeçalho com posição traduzida em Português
+  const faceEl = document.getElementById("yProfileFace");
   const nameEl = document.getElementById("yProfileName");
   const idEl = document.getElementById("yProfileIdTag");
   const posEl = document.getElementById("yProfilePosition");
@@ -157,6 +158,11 @@ window.showYouthPlayerProfile = function(playerId) {
   const potEl = document.getElementById("yProfilePot");
   const ageEl = document.getElementById("yProfileAge");
   const footEl = document.getElementById("yProfileFoot");
+
+  if (faceEl) {
+    faceEl.src = p.face_url || p.head_url || `/assets/heads/p${p.playerid}.png`;
+    faceEl.onerror = function() { this.src = '/assets/heads/notfound.png'; };
+  }
 
   const posPT = formatYouthPosition(p.position_br || p.position);
   const potDisplay = p.potential_display || (p.potential_min && p.potential_max ? `${p.potential_min}-${p.potential_max}` : p.potential);

@@ -474,8 +474,17 @@ def format_youth_player(raw):
     pot_min, pot_max = calculate_youth_potential_range(pot, pvar, slow, ovr, pid)
     growth_speed = calculate_growth_speed(ovr, pot_max, age)
 
+    face_url = f"/assets/heads/p{pid}.png"
+    try:
+        import fcm_resolver
+        face_url = fcm_resolver.get_head_image_path_or_url(pid)
+    except Exception:
+        pass
+
     return {
         "playerid": pid,
+        "face_url": face_url,
+        "head_url": face_url,
         "name": raw.get("name", "Jovem da Base"),
         "common_name": raw.get("name", "Jovem da Base"),
         "position": pos_pt,

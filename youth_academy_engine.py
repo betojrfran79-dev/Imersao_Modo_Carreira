@@ -8,11 +8,54 @@ from datetime import datetime
 import fcm_resolver
 import database
 
-YOUTH_JSON_PATHS = [
-    r"C:\Users\Roberto\Desktop\BASE_JOVENS_EXTRAIDA.json",
-    r"scratch\BASE_JOVENS_EXTRAIDA.json",
-    r"C:\Users\Roberto\Desktop\Imersao_Modo_Carreira\BASE_JOVENS_EXTRAIDA.json"
-]
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def get_search_roots():
+    uprof = os.environ.get("USERPROFILE") or os.path.expanduser("~")
+    return [
+        os.path.join(uprof, "Desktop"),
+        os.path.join(uprof, "OneDrive", "Desktop"),
+        os.path.join(uprof, "OneDrive", "Área de Trabalho"),
+        os.path.join(uprof, "Área de Trabalho"),
+        uprof,
+        BASE_DIR,
+        os.path.join(BASE_DIR, "uploads"),
+        os.path.join(BASE_DIR, "scratch"),
+    ]
+
+def find_career_files():
+    """Retorna lista de caminhos candidatos para DADOS_CARREIRA.json em ordem de prioridade."""
+    candidates = []
+    folders = ["Imersao_Modo_Carreira", "Imersão_Modo_Carreira", "App_Modo_carreira", "Dados_Carreira_FC", ""]
+    filenames = ["DADOS_CARREIRA.json", "FC_CAREER_VAULT_BACKUP.json", "dados_carreira_sync.json"]
+    for root in get_search_roots():
+        if not os.path.exists(root):
+            continue
+        for f in folders:
+            d = os.path.join(root, f) if f else root
+            if os.path.exists(d):
+                for fn in filenames:
+                    cp = os.path.join(d, fn)
+                    if os.path.exists(cp) and cp not in candidates:
+                        candidates.append(cp)
+    return candidates
+
+def find_youth_json_files():
+    """Retorna lista de caminhos candidatos para BASE_JOVENS_EXTRAIDA.json."""
+    candidates = []
+    folders = ["Imersao_Modo_Carreira", "Imersão_Modo_Carreira", "App_Modo_carreira", "Dados_Carreira_FC", "scratch", ""]
+    filenames = ["BASE_JOVENS_EXTRAIDA.json", "base_jovens_extraida.json", "YOUTH_ACADEMY_PLAYERS.json"]
+    for root in get_search_roots():
+        if not os.path.exists(root):
+            continue
+        for f in folders:
+            d = os.path.join(root, f) if f else root
+            if os.path.exists(d):
+                for fn in filenames:
+                    yp = os.path.join(d, fn)
+                    if os.path.exists(yp) and yp not in candidates:
+                        candidates.append(yp)
+    return candidates
 
 CATEGORIES_CONFIG = [
     ("Ofensivo", "ofensivo", [
@@ -360,42 +403,37 @@ def load_youth_players():
     Prioridade 1: DADOS_CARREIRA.json (que o script mestre atualiza a cada rodada)
     Prioridade 2: BASE_JOVENS_EXTRAIDA.json
     """
-    career_paths = [
-        r"C:\Users\Roberto\Desktop\Imersao_Modo_Carreira\DADOS_CARREIRA.json",
-        r"c:\Users\Roberto\.gemini\antigravity-ide\scratch\Imersão_Modo_Carreira\DADOS_CARREIRA.json",
-        r"C:\Users\Roberto\Desktop\App_Modo_carreira\DADOS_CARREIRA.json"
-    ]
+    career_paths = find_career_files()
     for cp in career_paths:
-        if os.path.exists(cp):
-            try:
-                with open(cp, "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                    yp = cdata.get("youth_players")
-                    if yp and len(yp) > 0:
-                        formatted = []
-                        for pl in yp:
-                            fp = format_youth_player(pl)
-                            save_youth_snapshot(fp, cdata.get("save_id", "carreira_ativa"))
-                            formatted.append(fp)
-                        return formatted
-            except Exception as e:
-                print(f"[YOUTH] Erro ao ler youth_players de {cp}: {e}")
+        try:
+            with open(cp, "r", encoding="utf-8", errors="ignore") as f:
+                cdata = json.load(f)
+                yp = cdata.get("youth_players")
+                if yp and len(yp) > 0:
+                    formatted = []
+                    for pl in yp:
+                        fp = format_youth_player(pl)
+                        save_youth_snapshot(fp, cdata.get("save_id", "carreira_ativa"))
+                        formatted.append(fp)
+                    return formatted
+        except Exception as e:
+            print(f"[YOUTH] Erro ao ler youth_players de {cp}: {e}")
 
-    for p in YOUTH_JSON_PATHS:
-        if os.path.exists(p):
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    players = data.get("players", [])
-                    if players:
-                        formatted = []
-                        for pl in players:
-                            fp = format_youth_player(pl)
-                            save_youth_snapshot(fp)
-                            formatted.append(fp)
-                        return formatted
-            except Exception as e:
-                print(f"[YOUTH] Erro ao ler {p}: {e}")
+    youth_paths = find_youth_json_files()
+    for p in youth_paths:
+        try:
+            with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                data = json.load(f)
+                players = data.get("players", [])
+                if players:
+                    formatted = []
+                    for pl in players:
+                        fp = format_youth_player(pl)
+                        save_youth_snapshot(fp)
+                        formatted.append(fp)
+                    return formatted
+        except Exception as e:
+            print(f"[YOUTH] Erro ao ler {p}: {e}")
     return []
 
 def format_youth_player(raw):
@@ -517,21 +555,16 @@ def format_youth_player(raw):
 
 def get_first_team_squad():
     """Recupera o elenco principal do clube do save ativo."""
-    career_paths = [
-        r"C:\Users\Roberto\Desktop\Imersao_Modo_Carreira\DADOS_CARREIRA.json",
-        r"c:\Users\Roberto\.gemini\antigravity-ide\scratch\Imersão_Modo_Carreira\DADOS_CARREIRA.json",
-        r"C:\Users\Roberto\Desktop\App_Modo_carreira\DADOS_CARREIRA.json"
-    ]
+    career_paths = find_career_files()
     for cp in career_paths:
-        if os.path.exists(cp):
-            try:
-                with open(cp, "r", encoding="utf-8") as f:
-                    cdata = json.load(f)
-                    players = cdata.get("players", [])
-                    if players:
-                        return players
-            except Exception as e:
-                print(f"[YOUTH] Erro ao carregar elenco de {cp}: {e}")
+        try:
+            with open(cp, "r", encoding="utf-8", errors="ignore") as f:
+                cdata = json.load(f)
+                players = cdata.get("players", [])
+                if players:
+                    return players
+        except Exception as e:
+            print(f"[YOUTH] Erro ao carregar elenco de {cp}: {e}")
     return []
 
 def get_position_rivals(pos, first_team_players):

@@ -75,8 +75,33 @@ if %ERRORLEVEL% EQU 0 (
 
 :not_found
 echo.
+echo ========================================================
+echo   [AVISO] Python nao foi localizado no sistema!
+echo ========================================================
+echo.
+winget --version >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    echo   Tentando instalar o Python automaticamente via winget...
+    echo   Por favor, aguarde o download da Microsoft...
+    echo.
+    winget install Python.Python.3.12 -e --accept-source-agreements --accept-package-agreements
+    if %ERRORLEVEL% EQU 0 (
+        echo.
+        echo   [OK] Python instalado com sucesso!
+        set "PATH=%LOCALAPPDATA%\Programs\Python\Python312;%LOCALAPPDATA%\Programs\Python\Python312\Scripts;%PATH%"
+        if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
+            set "PYTHON_EXE=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+            goto :found_python
+        )
+    )
+)
+echo.
 echo [ERRO] Python nao foi localizado no sistema!
-echo Por favor, certifique-se de que o Python esta instalado.
+echo.
+echo Para rodar a aplicacao:
+echo 1. Instale o Python gratis em: https://www.python.org/downloads/
+echo    (IMPORTANTE: Marque a opcao "Add Python to PATH" durante a instalacao)
+echo 2. Ou execute o instalador "INSTALAR_PRIMEIRA_VEZ.bat" nesta pasta.
 echo.
 pause
 exit /b 1

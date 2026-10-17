@@ -77,13 +77,19 @@ window.reloadYouthAcademyData = async function() {
       // Auto-seleciona a primeira joia da base para conveniência
       window.showYouthPlayerProfile(data.players[0].playerid);
     } else {
+      if (countEl) countEl.textContent = "0";
       if (listEl) {
         listEl.innerHTML = `
-          <div style="padding: 1.5rem; text-align: center; color: var(--text-dim); font-size: 0.85rem;">
-            Nenhum atleta extraído da base encontrado.<br>
-            Execute o script <code>EXTRAIR_BASE_ELENCO.lua</code> no Live Editor.
+          <div style="padding: 2rem 1rem; text-align: center; color: var(--text-dim); font-size: 0.85rem; line-height: 1.5;">
+            <i data-lucide="graduation-cap" style="width: 32px; height: 32px; margin: 0 auto 0.75rem auto; opacity: 0.6; display: block; color: var(--accent-gold);"></i>
+            <strong style="color: #fff; font-size: 0.95rem; display: block; margin-bottom: 0.25rem;">Nenhum Atleta da Base Encontrado</strong>
+            <p style="margin-bottom: 0.5rem;">Sua academia no jogo pode estar vazia ou os dados ainda não foram sincronizados.</p>
+            <span style="font-size: 0.78rem; opacity: 0.8; display: block;">
+              Basta carregar seu save no EA FC e executar o script mestre <code>EXTRAIR_DADOS_CARREIRA.lua</code> no Live Editor (F9).
+            </span>
           </div>
         `;
+        if (window.lucide) lucide.createIcons();
       }
     }
   } catch (err) {

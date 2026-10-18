@@ -113,7 +113,7 @@ echo.
 :: 3.1 Garantir suporte a conversao de minifaces DDS (Pillow)
 "%PYTHON_EXE%" -c "import PIL" >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
-    echo [Minifaces] Configurando suporte a texturas graficas DDS/PNG (Pillow)...
+    echo [Minifaces] Configurando suporte a texturas graficas DDS/PNG [Pillow]...
     "%PYTHON_EXE%" -m pip install pillow --quiet >nul 2>&1
 )
 

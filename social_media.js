@@ -1250,6 +1250,10 @@ window.loadSavedSocialPosts = async function() {
       });
     }
 
+    if (posts.length > 0 && !window.SocialStudioState.activeGeneratedPost) {
+      window.viewSavedPostDetail(posts[0].id, true, false);
+    }
+
     if (!grid) return;
 
     if (posts.length === 0) {
@@ -1333,7 +1337,7 @@ window.loadSavedSocialPosts = async function() {
 };
 
 // Visualiza um post salvo de volta no estúdio e nas abas
-window.viewSavedPostDetail = function(postId) {
+window.viewSavedPostDetail = function(postId, isSilent = false, switchTab = true) {
   const post = (window.SocialStudioState.savedPosts || []).find(p => p.id === postId);
   if (!post) return;
 
@@ -1372,9 +1376,10 @@ window.viewSavedPostDetail = function(postId) {
     renderNewspaperCard(post.newspaper_data, activeMediaUrl, post.media_type, post.video_start, post.video_end, clubName, clubCrest);
   }
 
-  // Alterna para o feed
-  window.switchSocialSubTab('feed');
-  if (window.showToast) window.showToast(`Post de ${post.author_name} carregado no visualizador!`, "info");
+  if (switchTab) {
+    window.switchSocialSubTab('feed');
+  }
+  if (!isSilent && window.showToast) window.showToast(`Post de ${post.author_name} carregado no visualizador!`, "info");
 };
 
 // Exclui post salvo do histórico

@@ -4941,18 +4941,122 @@ def save_social_post(post_data):
         ))
         post_id = cursor.lastrowid
         conn.commit()
+        conn.close()
+        # Backup automático imediato na pasta de extração do jogo (Desktop/Imersao_Modo_Carreira)
+        backup_social_posts_to_files()
         return post_id
     except Exception as e:
         print(f"Erro ao salvar post social: {e}")
         return None
-    finally:
+
+def get_backup_export_dirs():
+    dirs = []
+    userprofile = os.environ.get("USERPROFILE") or "C:\\Users\\Roberto"
+    candidates = [
+        os.path.join(userprofile, "Desktop", "Imersao_Modo_Carreira"),
+        os.path.join(userprofile, "OneDrive", "Desktop", "Imersao_Modo_Carreira"),
+        os.path.join(userprofile, "Área de Trabalho", "Imersao_Modo_Carreira"),
+        os.path.join(userprofile, "OneDrive", "Área de Trabalho", "Imersao_Modo_Carreira"),
+        BASE_DIR
+    ]
+    for d in candidates:
+        if os.path.exists(d) and d not in dirs:
+            dirs.append(d)
+    return dirs
+
+def backup_social_posts_to_files():
+    """
+    Exporta todas as publicações e matérias salvas para a pasta de dados do jogo
+    (Desktop/Imersao_Modo_Carreira e OneDrive), garantindo que nunca se percam.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM social_posts ORDER BY id ASC")
+        rows = cursor.fetchall()
+        posts = [dict(r) for r in rows]
         conn.close()
+
+        if not posts:
+            return
+
+        for target_dir in get_backup_export_dirs():
+            try:
+                # 1. Arquivo mestre unificado
+                master_file = os.path.join(target_dir, "MATERIAS_E_POSTS_SALVOS.json")
+                with open(master_file, "w", encoding="utf-8") as f:
+                    json.dump(posts, f, ensure_ascii=False, indent=2)
+
+                # 2. Pasta individual com cada matéria legível
+                articles_dir = os.path.join(target_dir, "Materias_Salvas")
+                os.makedirs(articles_dir, exist_ok=True)
+                for p in posts:
+                    p_id = p.get("id")
+                    safe_headline = "".join(c for c in (p.get("headline") or "materia") if c.isalnum() or c in (' ', '_', '-')).strip()[:40]
+                    art_file = os.path.join(articles_dir, f"post_{p_id}_{safe_headline}.json")
+                    with open(art_file, "w", encoding="utf-8") as af:
+                        json.dump(p, af, ensure_ascii=False, indent=2)
+            except Exception as ex:
+                print(f"[Backup Social] Aviso ao salvar em {target_dir}: {ex}")
+    except Exception as e:
+        print(f"[Backup Social] Erro ao gerar backup das matérias: {e}")
+
+def restore_social_posts_from_backup():
+    """
+    Se o banco SQLite estiver sem posts ou tiver menos posts que o backup externo,
+    restaura automaticamente os posts a partir de MATERIAS_E_POSTS_SALVOS.json.
+    """
+    try:
+        conn = get_db()
+        cnt = conn.execute("SELECT count(*) FROM social_posts").fetchone()[0]
+        conn.close()
+    except Exception:
+        cnt = 0
+
+    for target_dir in get_backup_export_dirs():
+        master_file = os.path.join(target_dir, "MATERIAS_E_POSTS_SALVOS.json")
+        alt_file = os.path.join(target_dir, "social_posts_backup.json")
+        chosen_file = master_file if os.path.exists(master_file) else (alt_file if os.path.exists(alt_file) else None)
+        if chosen_file:
+            try:
+                with open(chosen_file, "r", encoding="utf-8") as f:
+                    posts = json.load(f)
+                if posts and isinstance(posts, list) and len(posts) > cnt:
+                    conn = get_db()
+                    cur = conn.cursor()
+                    for sp in posts:
+                        cur.execute("""
+                        INSERT OR IGNORE INTO social_posts (
+                            id, save_id, season_year, post_type, author_name, author_handle, author_avatar,
+                            author_role, headline, content, media_url, media_type, video_start, video_end,
+                            stats_json, newspaper_data, comments_json, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            sp.get("id"), sp.get("save_id", "carreira_ativa"), sp.get("season_year", "2027"),
+                            sp.get("post_type", "tweet_and_news"), sp.get("author_name", ""),
+                            sp.get("author_handle", ""), sp.get("author_avatar", ""),
+                            sp.get("author_role", ""), sp.get("headline", ""), sp.get("content", ""),
+                            sp.get("media_url", ""), sp.get("media_type", "video"),
+                            float(sp.get("video_start", 0.0) or 0.0), float(sp.get("video_end", 30.0) or 30.0),
+                            sp.get("stats_json", "{}"), sp.get("newspaper_data", "{}"),
+                            sp.get("comments_json", "[]"), sp.get("created_at")
+                        ))
+                    conn.commit()
+                    conn.close()
+                    break
+            except Exception as e:
+                print(f"[Restore Social] Erro ao restaurar de {chosen_file}: {e}")
 
 def get_social_posts(save_id=None, season_year=None, post_type=None, limit=100):
     """
     Retorna os posts sociais e matérias de jornal armazenados em ordem cronológica reversa.
     Cura automaticamente URLs efêmeras blob: para apontar para arquivos de vídeo reais.
     """
+    try:
+        restore_social_posts_from_backup()
+    except Exception:
+        pass
+
     conn = get_db()
     cursor = conn.cursor()
     try:
@@ -5031,12 +5135,17 @@ def delete_social_post(post_id):
     try:
         cursor.execute("DELETE FROM social_posts WHERE id = ?", (post_id,))
         conn.commit()
+        conn.close()
+        backup_social_posts_to_files()
         return True
     except Exception as e:
         print(f"Erro ao excluir post social {post_id}: {e}")
         return False
     finally:
-        conn.close()
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def get_app_setting(key, default=None):
     conn = get_db()

@@ -2007,7 +2007,7 @@
                   <span style="font-size: 0.78rem; color: var(--neon-blue); font-weight: 700;">
                     <i data-lucide="scissors" style="width: 13px; height: 13px;"></i> Trimmer de Vídeo (O clipe cortado roda em loop na matéria / post)
                   </span>
-                  <span id="videoDurationLabel" style="font-size: 0.75rem; color: var(--text-dim);">Corte permitido: 1s a 60s</span>
+                  <span id="videoDurationLabel" style="font-size: 0.75rem; color: var(--text-dim);">Duração livre | Sem limite de tempo</span>
                 </div>
 
                 <div style="position: relative; max-width: 480px; margin: 0 auto; width: 100%; border-radius: 8px; overflow: hidden; background: #000; border: 1px solid rgba(255,255,255,0.1);">
@@ -2021,12 +2021,12 @@
                     <input type="number" id="socialTrimStart" min="0" step="0.1" value="0" class="vault-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;" oninput="validateSocialTrim()">
                   </div>
                   <div>
-                    <label style="font-size: 0.72rem; color: var(--text-dim); display: block; margin-bottom: 2px;">Fim do Corte (s) - máx 60s</label>
-                    <input type="number" id="socialTrimEnd" min="1" step="0.1" value="30" class="vault-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;" oninput="validateSocialTrim()">
+                    <label style="font-size: 0.72rem; color: var(--text-dim); display: block; margin-bottom: 2px;">Fim do Corte (s)</label>
+                    <input type="number" id="socialTrimEnd" min="0.5" step="0.1" value="30" class="vault-input" style="padding: 0.35rem 0.6rem; font-size: 0.85rem;" oninput="validateSocialTrim()">
                   </div>
                 </div>
                 <div id="socialTrimWarning" style="color: var(--neon-red); font-size: 0.72rem; text-align: center; display: none;">
-                  O corte deve ter entre 1 e 60 segundos!
+                  O corte deve ter no mínimo 0.5 segundos!
                 </div>
               </div>
 
@@ -2044,7 +2044,7 @@
               <!-- Opção de Escolher Outro Arquivo Manualmente + Botão de Descartar -->
               <div style="margin-top: 0.85rem; padding-top: 0.75rem; border-top: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                  <label style="font-size: 0.75rem; color: var(--text-dim); font-weight: 600;">Carregar outro print ou vídeo (máx 300 MB):</label>
+                  <label style="font-size: 0.75rem; color: var(--text-dim); font-weight: 600;">Carregar outro print ou vídeo (máx 200 MB):</label>
                   <input type="file" id="socialManualFileInput" accept="image/*,video/*" onchange="handleManualMediaSelect(event)" style="font-size: 0.78rem; color: var(--text-dim);">
                 </div>
                 <button type="button" class="btn-xs btn-secondary" id="btnClearMediaSelection" onclick="clearSelectedMedia()" style="display: none; color: var(--neon-red); border-color: rgba(255,75,75,0.3);">

@@ -224,23 +224,22 @@ window.reloadLatestCaptureFile = async function() {
         videoEl.load();
 
         videoEl.onloadedmetadata = () => {
-          const maxAllowed = 60;
-          const duration = Math.min(maxAllowed, Math.floor(videoEl.duration || maxAllowed));
+          const fullDuration = Math.round(videoEl.duration || 30);
           const trimStartInput = document.getElementById("socialTrimStart");
           const trimEndInput = document.getElementById("socialTrimEnd");
           const durLabel = document.getElementById("videoDurationLabel");
 
           if (durLabel) {
-            durLabel.textContent = `Total: ${Math.round(videoEl.duration || 0)}s | Corte permitido: 1s a 60s`;
+            durLabel.textContent = `Total: ${fullDuration}s | Corte livre (Sem limite de tempo)`;
           }
 
           if (trimStartInput) trimStartInput.value = 0;
           if (trimEndInput) {
-            trimEndInput.value = duration > 0 ? duration : 30;
-            trimEndInput.max = Math.round(videoEl.duration || 300);
+            trimEndInput.value = fullDuration > 0 ? fullDuration : 30;
+            trimEndInput.max = Math.round(videoEl.duration || 7200);
           }
 
-          window.initVideoTrimLoop(videoEl, 0, duration > 0 ? duration : 30);
+          window.initVideoTrimLoop(videoEl, 0, fullDuration > 0 ? fullDuration : 30);
         };
       } else if (media.type === 'image' && imgArea && imgEl) {
         if (trimmerArea) trimmerArea.style.display = "none";
@@ -262,7 +261,7 @@ window.reloadLatestCaptureFile = async function() {
   }
 };
 
-// Validação dos segundos de corte do Trimmer (Início e Fim: 1s a 60s)
+// Validação dos segundos de corte do Trimmer (Início e Fim: sem limite de tempo máximo)
 window.validateSocialTrim = function() {
   const startInput = document.getElementById("socialTrimStart");
   const endInput = document.getElementById("socialTrimEnd");
@@ -275,18 +274,13 @@ window.validateSocialTrim = function() {
   let end = parseFloat(endInput.value) || 30;
 
   if (start < 0) start = 0;
-  if (end <= start) end = start + 1;
+  if (end <= start) end = start + 0.5;
 
   const diff = end - start;
-  if (diff < 1) {
+  if (diff < 0.5) {
     if (warningEl) {
       warningEl.style.display = "block";
-      warningEl.textContent = `O corte deve ter no mínimo 1 segundo!`;
-    }
-  } else if (diff > 60) {
-    if (warningEl) {
-      warningEl.style.display = "block";
-      warningEl.textContent = `O trecho selecionado tem ${diff.toFixed(1)}s. O corte máximo permitido é de 60 segundos!`;
+      warningEl.textContent = `O corte deve ter no mínimo 0.5 segundos!`;
     }
   } else {
     if (warningEl) warningEl.style.display = "none";
@@ -381,16 +375,16 @@ window.handleManualMediaSelect = async function(event) {
   const file = event.target.files && event.target.files[0];
   if (!file) return;
 
-  // Limite máximo permitido: 300 MB
-  const MAX_FILE_SIZE_BYTES = 300 * 1024 * 1024;
+  // Limite máximo permitido: 200 MB
+  const MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024;
   if (file.size > MAX_FILE_SIZE_BYTES) {
     const fileInput = document.getElementById("socialManualFileInput");
     if (fileInput) fileInput.value = "";
     const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
     if (window.showToast) {
-      window.showToast(`⚠️ O arquivo selecionado tem ${sizeMb} MB e excede o limite máximo permitido de 300 MB.`, "warning");
+      window.showToast(`⚠️ O arquivo selecionado tem ${sizeMb} MB e excede o limite máximo permitido de 200 MB.`, "warning");
     } else {
-      alert(`O arquivo selecionado tem ${sizeMb} MB e excede o limite máximo permitido de 300 MB.`);
+      alert(`O arquivo selecionado tem ${sizeMb} MB e excede o limite máximo permitido de 200 MB.`);
     }
     return;
   }
@@ -431,18 +425,17 @@ window.handleManualMediaSelect = async function(event) {
     videoEl.src = localBlobUrl;
     videoEl.load();
     videoEl.onloadedmetadata = () => {
-      const maxAllowed = 60;
-      const duration = Math.min(maxAllowed, Math.floor(videoEl.duration || maxAllowed));
+      const fullDuration = Math.round(videoEl.duration || 30);
       const trimStartInput = document.getElementById("socialTrimStart");
       const trimEndInput = document.getElementById("socialTrimEnd");
       const durLabel = document.getElementById("videoDurationLabel");
-      if (durLabel) durLabel.textContent = `Total: ${Math.round(videoEl.duration || 0)}s | Corte permitido: 1s a 60s`;
+      if (durLabel) durLabel.textContent = `Total: ${fullDuration}s | Corte livre (Sem limite de tempo)`;
       if (trimStartInput) trimStartInput.value = 0;
       if (trimEndInput) {
-        trimEndInput.value = duration > 0 ? duration : 30;
-        trimEndInput.max = Math.round(videoEl.duration || 300);
+        trimEndInput.value = fullDuration > 0 ? fullDuration : 30;
+        trimEndInput.max = Math.round(videoEl.duration || 7200);
       }
-      window.initVideoTrimLoop(videoEl, 0, duration > 0 ? duration : 30);
+      window.initVideoTrimLoop(videoEl, 0, fullDuration > 0 ? fullDuration : 30);
     };
   } else if (!isVideo && imgArea && imgEl) {
     if (trimmerArea) trimmerArea.style.display = "none";

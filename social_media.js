@@ -296,79 +296,138 @@ window.initVideoTrimLoop = function(videoEl, customStart, customEnd) {
   if (!videoEl) return;
 
   const rawStart = typeof customStart !== 'undefined' ? parseFloat(customStart) : (parseFloat(videoEl.dataset.trimStart) || 0);
-  const rawEnd = typeof customEnd !== 'undefined' ? parseFloat(customEnd) : (parseFloat(videoEl.dataset.trimEnd) || 30);
+  const rawEnd = typeof customEnd !== 'undefined' ? parseFloat(customEnd) : (parseFloat(videoEl.dataset.trimEnd) || 0);
   const start = Math.max(0, isNaN(rawStart) ? 0 : rawStart);
-  const end = Math.max(start + 0.2, isNaN(rawEnd) ? 30 : rawEnd);
+  let end = isNaN(rawEnd) || rawEnd <= 0 ? 0 : rawEnd;
 
   videoEl.dataset.trimStart = start;
   videoEl.dataset.trimEnd = end;
   videoEl.muted = true;
+  videoEl.defaultMuted = true;
   videoEl.playsInline = true;
+  videoEl.autoplay = true;
+  videoEl.setAttribute('muted', '');
+  videoEl.setAttribute('playsinline', '');
+  videoEl.setAttribute('autoplay', '');
+  videoEl.setAttribute('preload', 'auto');
+
+  // Limpa listeners anteriores do elemento se existirem
+  if (videoEl.__trimCleanUp) {
+    try { videoEl.__trimCleanUp(); } catch (e) {}
+  }
+
+  let isSeeking = false;
+  let hasSetInitialStart = false;
 
   const getEffectiveEnd = () => {
-    if (videoEl.duration && !isNaN(videoEl.duration) && videoEl.duration > 0) {
-      return Math.min(end, videoEl.duration);
+    const dur = videoEl.duration;
+    if (dur && !isNaN(dur) && dur > 0) {
+      if (end <= start || end > dur) {
+        return dur;
+      }
+      return end;
     }
-    return end;
+    return end > start ? end : 999999;
   };
 
-  const loopBack = () => {
-    if (videoEl.__isLooping) return;
-    videoEl.__isLooping = true;
+  const restartLoop = () => {
+    if (isSeeking) return;
+    isSeeking = true;
     try {
       videoEl.currentTime = start;
     } catch (e) {}
 
     const onSeeked = () => {
       videoEl.removeEventListener('seeked', onSeeked);
-      videoEl.__isLooping = false;
-      videoEl.play().catch(() => {});
+      isSeeking = false;
+      const p = videoEl.play();
+      if (p && typeof p.catch === 'function') p.catch(() => {});
     };
     videoEl.addEventListener('seeked', onSeeked, { once: true });
     setTimeout(() => {
-      videoEl.__isLooping = false;
+      isSeeking = false;
       videoEl.play().catch(() => {});
-    }, 250);
+    }, 350);
   };
 
-  if (videoEl.__trimRaf) {
-    cancelAnimationFrame(videoEl.__trimRaf);
-    videoEl.__trimRaf = null;
-  }
+  const onTimeUpdate = () => {
+    if (isSeeking) return;
+    const effEnd = getEffectiveEnd();
 
-  const checkLoop = () => {
-    if (!videoEl.paused && !videoEl.seeking && !videoEl.__isLooping) {
-      const effEnd = getEffectiveEnd();
-      if (videoEl.currentTime >= effEnd - 0.08 || (start > 0.5 && videoEl.currentTime < start - 0.5)) {
-        loopBack();
-      }
+    // Se atingiu ou ultrapassou o fim do corte, faz o loop para o início do corte
+    if (videoEl.currentTime >= effEnd - 0.08) {
+      restartLoop();
+      return;
     }
-    if (!videoEl.paused) {
-      videoEl.__trimRaf = requestAnimationFrame(checkLoop);
+
+    // Se já inicializou e de repente voltou antes do corte inicial (por mais de 0.5s), recoloca no corte
+    if (hasSetInitialStart && start > 0.3 && videoEl.currentTime < start - 0.5) {
+      restartLoop();
     }
   };
 
-  if (!videoEl.__trimAttached) {
-    videoEl.__trimAttached = true;
-    videoEl.addEventListener('play', () => {
-      if (videoEl.__trimRaf) cancelAnimationFrame(videoEl.__trimRaf);
-      videoEl.__trimRaf = requestAnimationFrame(checkLoop);
-    });
-    videoEl.addEventListener('timeupdate', () => {
-      const effEnd = getEffectiveEnd();
-      if (videoEl.currentTime >= effEnd || (start > 0.5 && videoEl.currentTime < start - 0.5)) {
-        loopBack();
-      }
+  const onEnded = () => {
+    restartLoop();
+  };
+
+  const setupInitialPlayback = () => {
+    if (hasSetInitialStart) return;
+    hasSetInitialStart = true;
+    if (start > 0.05) {
+      try {
+        videoEl.currentTime = start;
+      } catch (e) {}
+    }
+    const p = videoEl.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => {
+        videoEl.muted = true;
+        videoEl.play().catch(() => {});
+      });
+    }
+  };
+
+  videoEl.addEventListener('timeupdate', onTimeUpdate);
+  videoEl.addEventListener('ended', onEnded);
+  videoEl.addEventListener('loadedmetadata', setupInitialPlayback);
+  videoEl.addEventListener('canplay', setupInitialPlayback);
+
+  videoEl.__trimCleanUp = () => {
+    videoEl.removeEventListener('timeupdate', onTimeUpdate);
+    videoEl.removeEventListener('ended', onEnded);
+    videoEl.removeEventListener('loadedmetadata', setupInitialPlayback);
+    videoEl.removeEventListener('canplay', setupInitialPlayback);
+  };
+
+  // Se os metadados já estiverem prontos no elemento
+  if (videoEl.readyState >= 1) {
+    setupInitialPlayback();
+  } else {
+    try {
+      videoEl.load();
+    } catch (e) {}
+  }
+
+  // Tenta dar play
+  const p = videoEl.play();
+  if (p && typeof p.catch === 'function') {
+    p.catch(() => {
+      videoEl.muted = true;
+      videoEl.play().catch(() => {});
     });
   }
 
-  try {
-    if (videoEl.currentTime < start || videoEl.currentTime > end) {
-      videoEl.currentTime = start;
+  // Suporte a pausar/despausar ao clicar no vídeo
+  videoEl.style.cursor = 'pointer';
+  videoEl.onclick = () => {
+    if (videoEl.paused) {
+      videoEl.play().catch(() => {});
+    } else {
+      videoEl.pause();
     }
-    videoEl.play().catch(() => {});
-  } catch (err) {}
+  };
 };
+
 
 // Upload manual de arquivo caso o usuário queira subir outro print/vídeo
 window.handleManualMediaSelect = async function(event) {
@@ -446,34 +505,39 @@ window.handleManualMediaSelect = async function(event) {
   if (hintEl) hintEl.textContent = `Carregando ${file.name}...`;
   if (window.lucide) lucide.createIcons();
 
-  // 2. Upload persistente em base64 para o servidor
-  const reader = new FileReader();
-  reader.onload = async function(e) {
-    try {
-      const base64Data = e.target.result;
-      const res = await fetch("/api/upload-local", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          data: base64Data,
-          fileName: file.name,
-          mimeType: file.type || (isVideo ? "video/mp4" : "image/jpeg")
-        })
-      });
-      const data = await res.json();
-      if (data.status === "success" || data.success) {
-        if (window.SocialStudioState.latestMedia) {
-          window.SocialStudioState.latestMedia.url = data.url;
+  // 2. Upload persistente para o servidor com controle de promessa
+  window.SocialStudioState.uploadPromise = new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        const base64Data = e.target.result;
+        const res = await fetch("/api/upload-local", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            data: base64Data,
+            fileName: file.name,
+            mimeType: file.type || (isVideo ? "video/mp4" : "image/jpeg")
+          })
+        });
+        const data = await res.json();
+        if (data.status === "success" || data.success) {
+          if (window.SocialStudioState.latestMedia) {
+            window.SocialStudioState.latestMedia.url = data.url;
+            window.SocialStudioState.latestMedia.persistent_url = data.url;
+          }
+          if (hintEl) hintEl.textContent = `Arquivo ${file.name} pronto para uso!`;
+          if (window.showToast) window.showToast("Mídia pronta para a publicação!", "success");
         }
-        if (hintEl) hintEl.textContent = `Arquivo ${file.name} pronto para uso!`;
-        if (window.showToast) window.showToast("Mídia pronta para a publicação!", "success");
+        resolve(data);
+      } catch (err) {
+        console.warn("Upload em background finalizado localmente:", err);
+        if (hintEl) hintEl.textContent = `Mídia pronta (${file.name})`;
+        resolve(null);
       }
-    } catch (err) {
-      console.warn("Upload em background finalizado localmente:", err);
-      if (hintEl) hintEl.textContent = `Mídia pronta (${file.name})`;
-    }
-  };
-  reader.readAsDataURL(file);
+    };
+    reader.readAsDataURL(file);
+  });
 };
 
 // Remove qualquer mídia selecionada (permitindo gerar publicação apenas em texto)
@@ -652,6 +716,13 @@ window.handleGenerateMediaContent = async function(event) {
   const personaKey = (authorSelect && authorSelect.value) || "";
   const journalistName = (journalistSelect && journalistSelect.value) || "André Rizek";
 
+  // Aguardar término de upload manual em andamento se houver
+  if (window.SocialStudioState.uploadPromise) {
+    if (hintEl) hintEl.textContent = "Aguardando processamento do vídeo...";
+    try { await window.SocialStudioState.uploadPromise; } catch (e) {}
+    window.SocialStudioState.uploadPromise = null;
+  }
+
   // Obter mídia atual (se houver)
   const media = window.SocialStudioState.latestMedia;
   let mediaUrl = media ? media.url : null;
@@ -786,13 +857,15 @@ async function savePostToCareerVault(postData) {
     const saveId = window.currentSaveId || "carreira_ativa";
     let persistentMediaUrl = postData.media_url || "";
     if (persistentMediaUrl.startsWith("blob:")) {
-      const fileName = postData.filename || window.SocialStudioState?.latestMedia?.filename || "";
-      if (fileName) {
-        persistentMediaUrl = `/api/media/serve-capture?file=${encodeURIComponent(fileName)}`;
-      } else if (window.SocialStudioState?.latestMedia?.persistent_url) {
+      if (window.SocialStudioState?.latestMedia?.url && !window.SocialStudioState.latestMedia.url.startsWith("blob:")) {
+        persistentMediaUrl = window.SocialStudioState.latestMedia.url;
+      } else if (window.SocialStudioState?.latestMedia?.persistent_url && !window.SocialStudioState.latestMedia.persistent_url.startsWith("blob:")) {
         persistentMediaUrl = window.SocialStudioState.latestMedia.persistent_url;
       } else {
-        persistentMediaUrl = "/api/media/serve-capture?file=latest";
+        const fileName = postData.filename || window.SocialStudioState?.latestMedia?.filename || "";
+        if (fileName) {
+          persistentMediaUrl = `/api/media/serve-capture?file=${encodeURIComponent(fileName)}`;
+        }
       }
     }
 
@@ -898,16 +971,18 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
 
   // Mídia anexada (Vídeo em loop ou Imagem)
   let cleanMediaUrl = mediaUrl || '';
-  if (cleanMediaUrl.startsWith('blob:')) {
-    cleanMediaUrl = '/api/media/serve-capture?file=latest';
+  if (!cleanMediaUrl && window.SocialStudioState?.latestMedia?.url) {
+    cleanMediaUrl = window.SocialStudioState.latestMedia.url;
   }
   let mediaHtml = '';
   if (cleanMediaUrl) {
     if (mediaType === 'video') {
       mediaHtml = `
-        <div class="video-container-trimmed" style="margin-top: 12px; border-radius: 14px; overflow: hidden; background: #000; border: 1px solid rgba(255,255,255,0.12); position: relative;">
-          <video id="renderedTweetVideo" src="${cleanMediaUrl}" muted playsinline autoplay style="width: 100%; max-height: 380px; object-fit: contain; display: block;" onerror="if(!this.__retried){this.__retried=true; this.src='/api/media/serve-capture?file=latest'; this.load(); this.play().catch(()=>{});}"></video>
-          <span style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7); font-size: 11px; padding: 2px 6px; border-radius: 4px; color: #fff;">LOOP</span>
+        <div class="video-container-trimmed" style="margin-top: 12px; border-radius: 14px; overflow: hidden; background: #000; border: 1px solid rgba(255,255,255,0.12); position: relative; cursor: pointer;" title="Clique para pausar / reproduzir">
+          <video id="renderedTweetVideo" src="${cleanMediaUrl}" muted playsinline autoplay preload="auto" style="width: 100%; max-height: 380px; object-fit: contain; display: block;"></video>
+          <span style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.75); font-size: 11px; padding: 2px 8px; border-radius: 6px; color: #fff; pointer-events: none; display: flex; align-items: center; gap: 5px;">
+            <span style="width: 6px; height: 6px; background: #00e5ff; border-radius: 50%; display: inline-block;"></span> LOOP
+          </span>
         </div>
       `;
     } else {
@@ -1038,16 +1113,19 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
   const journalist = news.journalist || "Redação Siga La Pelota";
 
   let cleanMediaUrl = mediaUrl || '';
-  if (cleanMediaUrl.startsWith('blob:')) {
-    cleanMediaUrl = '/api/media/serve-capture?file=latest';
+  if (!cleanMediaUrl && window.SocialStudioState?.latestMedia?.url) {
+    cleanMediaUrl = window.SocialStudioState.latestMedia.url;
   }
 
   let mediaColumnHtml = '';
   if (cleanMediaUrl) {
     if (mediaType === 'video') {
       mediaColumnHtml = `
-        <div style="border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 12px;">
-          <video id="renderedNewsVideo" src="${cleanMediaUrl}" muted playsinline autoplay style="width: 100%; max-height: 240px; object-fit: contain; display: block;" onerror="if(!this.__retried){this.__retried=true; this.src='/api/media/serve-capture?file=latest'; this.load(); this.play().catch(()=>{});}"></video>
+        <div style="border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 12px; position: relative; cursor: pointer;" title="Clique para pausar / reproduzir">
+          <video id="renderedNewsVideo" src="${cleanMediaUrl}" muted playsinline autoplay preload="auto" style="width: 100%; max-height: 240px; object-fit: contain; display: block;"></video>
+          <span style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.75); font-size: 11px; padding: 2px 8px; border-radius: 6px; color: #fff; pointer-events: none; display: flex; align-items: center; gap: 5px;">
+            <span style="width: 6px; height: 6px; background: #00e5ff; border-radius: 50%; display: inline-block;"></span> LOOP
+          </span>
         </div>
       `;
     } else {
@@ -1263,15 +1341,13 @@ window.loadSavedSocialPosts = async function() {
     grid.innerHTML = posts.map(post => {
       let previewMedia = '';
       let mUrl = post.media_url || '';
-      if (mUrl.startsWith('blob:')) {
-        mUrl = '/api/media/serve-capture?file=latest';
-      }
+      
       if (mUrl) {
         if (post.media_type === 'video') {
           previewMedia = `
             <div style="width: 100%; height: 140px; background: #000; border-radius: 8px; overflow: hidden; position: relative;">
-              <video src="${mUrl}" muted playsinline style="width: 100%; height: 100%; object-fit: cover;" onerror="if(!this.__retried){this.__retried=true; this.src='/api/media/serve-capture?file=latest';}"></video>
-              <span style="position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.7); font-size: 10px; padding: 2px 5px; border-radius: 4px; color: #fff;">VÍDEO</span>
+              <video src="${mUrl}" muted playsinline autoplay loop preload="metadata" style="width: 100%; height: 100%; object-fit: cover;"></video>
+              <span style="position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.75); font-size: 10px; padding: 2px 6px; border-radius: 4px; color: #fff; pointer-events: none;">VÍDEO</span>
             </div>
           `;
         } else {
@@ -1360,9 +1436,7 @@ window.viewSavedPostDetail = function(postId, isSilent = false, switchTab = true
   const clubCrest = window.cachedDashboardData?.team_crest || null;
 
   let activeMediaUrl = post.media_url || '';
-  if (activeMediaUrl.startsWith('blob:')) {
-    activeMediaUrl = '/api/media/serve-capture?file=latest';
-  }
+  
 
   renderTweetCard(data, activeMediaUrl, post.media_type, post.video_start, post.video_end);
   if (post.newspaper_data) {

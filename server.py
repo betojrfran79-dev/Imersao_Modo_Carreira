@@ -608,11 +608,23 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 if os.path.exists(ico_path):
                     return self.serve_image(ico_path)
 
-            # 0.1 Imagens enviadas pelo usuário (Uploads)
+            # 0.1 Arquivos enviados pelo usuário (Uploads - Vídeos ou Imagens com suporte a Range)
             if path.startswith("/uploads/"):
                 fname = os.path.basename(path.split("?")[0])
                 fpath = os.path.join(UPLOADS_DIR, fname)
-                return self.serve_image(fpath)
+                if not os.path.exists(fpath):
+                    alt_path = os.path.join(BASE_DIR, "assets", "uploads", fname)
+                    if os.path.exists(alt_path):
+                        fpath = alt_path
+                if os.path.isfile(fpath):
+                    is_vid = fpath.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.webm'))
+                    if is_vid:
+                        self.serve_file_with_range(fpath)
+                        return
+                    return self.serve_image(fpath)
+                self.send_response(404)
+                self.end_headers()
+                return
 
             # 0.2 Divisões de Base & Transição (Lucas Valença)
             if path == "/api/youth/players":

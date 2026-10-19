@@ -567,10 +567,128 @@ def get_first_team_squad():
             print(f"[YOUTH] Erro ao carregar elenco de {cp}: {e}")
     return []
 
+def evaluate_position_optimization(card, pos_br):
+    """
+    ETAPA 1 DO MANUAL DO SCOUT:
+    Verifica se atributos-chave rendem OVR funcional superior em outra posição nominal logicamente compatível.
+    """
+    if pos_br == "GOL":
+        return "Confirmada na posição atual (GOL)", "GOL", 0
+
+    pac = card.get("PAC", 50)
+    sho = card.get("SHO", 50)
+    pas = card.get("PAS", 50)
+    dri = card.get("DRI", 50)
+    defn = card.get("DEF", 50)
+    phy = card.get("PHY", 50)
+
+    logical_transitions = {
+        "ATA": ["SA", "PE", "PD"],
+        "SA": ["ATA", "MEI", "PE", "PD"],
+        "PE": ["PD", "ME", "SA", "ATA"],
+        "PD": ["PE", "MD", "SA", "ATA"],
+        "ME": ["PE", "MD", "MEI", "ADE"],
+        "MD": ["PD", "ME", "MEI", "ADD"],
+        "MEI": ["MC", "SA", "PE", "PD"],
+        "MC": ["MEI", "VOL", "ME", "MD"],
+        "VOL": ["MC", "ZAG"],
+        "LE": ["ADE", "ME", "PE", "LD"],
+        "LD": ["ADD", "MD", "PD", "LE"],
+        "ADE": ["LE", "ME", "PE"],
+        "ADD": ["LD", "MD", "PD"],
+        "ZAG": ["VOL", "LE", "LD"]
+    }
+
+    ratings = {
+        "ATA": int(round(0.35 * sho + 0.25 * pac + 0.20 * dri + 0.20 * phy)),
+        "SA": int(round(0.30 * dri + 0.30 * sho + 0.20 * pac + 0.20 * pas)),
+        "PE": int(round(0.35 * pac + 0.35 * dri + 0.15 * pas + 0.15 * sho)),
+        "PD": int(round(0.35 * pac + 0.35 * dri + 0.15 * pas + 0.15 * sho)),
+        "MEI": int(round(0.35 * pas + 0.35 * dri + 0.15 * sho + 0.15 * pac)),
+        "ME": int(round(0.30 * pac + 0.30 * dri + 0.20 * pas + 0.10 * defn + 0.10 * phy)),
+        "MD": int(round(0.30 * pac + 0.30 * dri + 0.20 * pas + 0.10 * defn + 0.10 * phy)),
+        "VOL": int(round(0.35 * defn + 0.25 * phy + 0.25 * pas + 0.15 * pac)),
+        "MC": int(round(0.25 * pas + 0.25 * dri + 0.20 * defn + 0.15 * phy + 0.15 * pac)),
+        "LE": int(round(0.30 * pac + 0.30 * defn + 0.20 * phy + 0.20 * pas)),
+        "LD": int(round(0.30 * pac + 0.30 * defn + 0.20 * phy + 0.20 * pas)),
+        "ADE": int(round(0.35 * pac + 0.25 * dri + 0.20 * pas + 0.20 * defn)),
+        "ADD": int(round(0.35 * pac + 0.25 * dri + 0.20 * pas + 0.20 * defn)),
+        "ZAG": int(round(0.45 * defn + 0.35 * phy + 0.10 * pac + 0.10 * pas))
+    }
+
+    cur_val = ratings.get(pos_br, 50)
+    allowed = logical_transitions.get(pos_br, [])
+    best_pos = pos_br
+    best_val = cur_val
+
+    for p in allowed:
+        v = ratings.get(p, 0)
+        if v > best_val:
+            best_pos = p
+            best_val = v
+
+    diff = best_val - cur_val
+    if diff >= 3:
+        return f"Recomendação de conversão para {best_pos} (+{diff} OVR funcional)", best_pos, diff
+    return f"Confirmada na posição atual ({pos_br})", pos_br, 0
+
+def resolve_league_tier(league_name=None):
+    """
+    Determina o Tier competitivo e as réguas de OVR médio por divisão:
+    Tier 4: 60 | Tier 3: 65 | Tier 2: 70 | Tier 1B: 75 | Tier 1A: 79
+    """
+    if not league_name:
+        candidates = find_career_files()
+        for cp in candidates:
+            try:
+                with open(cp, "r", encoding="utf-8", errors="ignore") as f:
+                    cdata = json.load(f)
+                    league_name = cdata.get("league_name")
+                    if league_name:
+                        break
+            except Exception:
+                pass
+
+    lname = str(league_name or "").lower()
+    # 4ª Divisão (Tier 4)
+    if any(k in lname for k in ["série d", "serie d", "league two", "4ª divisão", "4a divisao"]):
+        return {"tier": "Tier 4 (4ª Divisão)", "name": league_name or "Série D", "avg_ovr": 60, "trigger_ovr": 58}
+    # 3ª Divisão (Tier 3)
+    if any(k in lname for k in ["série c", "serie c", "league one", "3. liga", "3ª divisão", "3a divisao"]):
+        return {"tier": "Tier 3 (3ª Divisão)", "name": league_name or "Brasileirão Série C", "avg_ovr": 65, "trigger_ovr": 63}
+    # 2ª Divisão (Tier 2)
+    if any(k in lname for k in ["série b", "serie b", "championship", "la liga 2", "2. bundesliga", "2ª divisão", "2a divisao"]):
+        return {"tier": "Tier 2 (2ª Divisão)", "name": league_name or "Série B", "avg_ovr": 70, "trigger_ovr": 68}
+    # Top Ligas Europeias (Tier 1A)
+    if any(k in lname for k in ["premier league", "la liga", "laliga", "bundesliga", "ligue 1", "serie a tim"]):
+        return {"tier": "Tier 1A (Top Liga Europeia)", "name": league_name or "Top Liga Europeia", "avg_ovr": 79, "trigger_ovr": 77}
+    # 1ª Divisão Ligas Médias (Tier 1B)
+    if any(k in lname for k in ["série a", "serie a", "brasileirão", "brasileirao", "liga portugal", "eredivisie", "1ª divisão", "1a divisao"]):
+        return {"tier": "Tier 1B (1ª Divisão Ligas Médias)", "name": league_name or "1ª Divisão", "avg_ovr": 75, "trigger_ovr": 73}
+    return {"tier": "Tier 3 (3ª Divisão)", "name": league_name or "Brasileirão Série C", "avg_ovr": 65, "trigger_ovr": 63}
+
+def get_senior_growth_status(p):
+    """
+    Avalia se o jogador profissional atingiu o auge (platô), está em declínio físico ou segue em evolução.
+    Critério técnico: OVR >= Potencial ou margem <= 1 ponto indica platô/auge.
+    """
+    if not p:
+        return "N/A", "none"
+    ovr = int(p.get("ovr") or p.get("overall_rating") or 60)
+    pot = int(p.get("potential") or ovr)
+    age = p.get("age")
+
+    if age and age >= 32:
+        return "Em Declínio Físico", "decline"
+    if ovr >= pot or (pot - ovr <= 1):
+        return "No Auge (Platô / Sem Margem)", "plateau"
+    return f"Em Evolução (+{pot - ovr} pts margem)", "growing"
+
 def get_position_rivals(pos, first_team_players):
     """
     Retorna os jogadores do elenco principal que disputam a mesma posição
-    ou posições diretamente compatíveis, com cargos e siglas 100% em Português.
+    ou posições diretamente compatíveis.
+    REGRA MANDATÓRIA: Limitar estritamente a Titular (T), 1º Reserva (R1) e 2º Reserva (R2).
     """
     pos_upper = pos.upper()
     compat = POSITION_MAP.get(pos_upper, [pos_upper])
@@ -588,6 +706,8 @@ def get_position_rivals(pos, first_team_players):
             prof = fcm_resolver.get_full_player_profile(pid)
             p_name = p.get("player_name") or prof.get("common_name") or f"Atleta #{pid}"
             p_ovr = int(p.get("overall_rating") or prof.get("ovr") or 60)
+            p_pot = int(p.get("potential") or prof.get("pot") or p_ovr)
+            p_age = p.get("age") or prof.get("age")
             p_pos_pt = translate_pos(raw_p_pos)
             
             card = prof.get("card_attributes", {})
@@ -610,32 +730,34 @@ def get_position_rivals(pos, first_team_players):
                     int(card.get("PHY", p_ovr - 2))
                 ]
 
-            rivals.append({
+            r_dict = {
                 "player_id": pid,
                 "name": p_name,
                 "position": p_pos_pt,
                 "position_raw": raw_p_pos,
                 "position_br": p_pos_pt,
                 "ovr": p_ovr,
-                "potential": int(p.get("potential") or prof.get("pot") or p_ovr),
+                "potential": p_pot,
+                "age": p_age,
                 "weekly_wage": p.get("weekly_wage", 0),
                 "market_value": p.get("market_value", 0),
                 "card_attrs": card,
                 "categories": prof.get("categories", []),
                 "radar_values": radar_vals
-            })
+            }
+            status_desc, status_code = get_senior_growth_status(r_dict)
+            r_dict["status_desc"] = status_desc
+            r_dict["status_code"] = status_code
+            rivals.append(r_dict)
 
     rivals.sort(key=lambda x: x["ovr"], reverse=True)
-    return rivals
+    # Limitação estrita: no máximo Titular (T), 1º Reserva (R1) e 2º Reserva (R2)
+    return rivals[:3]
 
 def compare_youth_with_first_team(youth_player_id):
     """
-    Realiza o comparativo completo:
-    1. Dados do jovem da base
-    2. Todos os atletas da mesma posição no time principal (em PT-BR)
-    3. Datasets para o Chart.js (Radar de Atributos Atuais)
-    4. Histórico temporal das 7 categorias (Line Chart)
-    5. Parecer Técnico Realista e Rigoroso de Lucas Valença baseado estritamente nos ATRIBUTOS ATUAIS.
+    Realiza o comparativo completo seguindo o MANUAL DE DIRETRIZES TÉCNICAS DO SCOUT.
+    Limita a concorrência à rotação útil (T, R1, R2).
     """
     youth_list = load_youth_players()
     youth_player = None
@@ -650,7 +772,7 @@ def compare_youth_with_first_team(youth_player_id):
     first_team = get_first_team_squad()
     rivals = get_position_rivals(youth_player["position_raw"], first_team)
 
-    # 1. Preparar Datasets para o Radar Chart dos Atributos Atuais
+    # 1. Datasets para o Radar Chart dos Atributos Atuais (apenas T, R1 e R2)
     radar_labels = youth_player["radar_labels"]
     chart_datasets = []
     
@@ -667,15 +789,14 @@ def compare_youth_with_first_team(youth_player_id):
     RIVAL_COLORS = [
         {"border": "#38bdf8", "bg": "rgba(56, 189, 248, 0.15)"},
         {"border": "#a855f7", "bg": "rgba(168, 85, 247, 0.15)"},
-        {"border": "#ec4899", "bg": "rgba(236, 72, 153, 0.15)"},
-        {"border": "#10b981", "bg": "rgba(16, 185, 129, 0.15)"},
-        {"border": "#f97316", "bg": "rgba(249, 115, 22, 0.15)"}
+        {"border": "#ec4899", "bg": "rgba(236, 72, 153, 0.15)"}
     ]
 
     for idx, r in enumerate(rivals):
         color = RIVAL_COLORS[idx % len(RIVAL_COLORS)]
+        role_label = "Titular" if idx == 0 else f"R{idx}"
         chart_datasets.append({
-            "label": f"{r['name']} ({r['position_br']} • {r['ovr']} OVR)",
+            "label": f"{role_label}: {r['name']} ({r['position_br']} • {r['ovr']} OVR)",
             "data": r["radar_values"],
             "backgroundColor": color["bg"],
             "borderColor": color["border"],
@@ -687,7 +808,7 @@ def compare_youth_with_first_team(youth_player_id):
     # 2. Histórico temporal de evolução das 7 categorias
     evolution_data = get_youth_evolution(youth_player["playerid"])
 
-    # 3. Gerar Parecer Técnico Ultrarrealista de Lucas Valença
+    # 3. Gerar Parecer Oficial de Lucas Valença (Manual de Scout)
     report = generate_lucas_valenca_verdict(youth_player, rivals)
 
     return {
@@ -702,133 +823,226 @@ def compare_youth_with_first_team(youth_player_id):
         "report": report
     }
 
-def generate_lucas_valenca_verdict(youth, rivals):
+def generate_lucas_valenca_verdict(youth, rivals, league_name=None):
     """
-    Parecer Técnico Rigoroso e Realista de Lucas Valença.
-    Regra Tática Profissional:
-    - O ponto de corte para PROMOÇÃO ao time principal é o ÚLTIMO RESERVA da posição (menor OVR).
-    - O comparativo com o TITULAR ABSOLUTO (maior OVR) projeta a titularidade futura.
-    - Incorpora a velocidade de desenvolvimento real e o teto máximo de potencial.
+    PARECER DO SCOUT — LUCAS VALENÇA
+    Implementação 100% fiel ao MANUAL DE DIRETRIZES TÉCNICAS DO SCOUT (EA FC):
+    Etapa 1: Otimização Posicional
+    Etapa 2: Gatilho Global de OVR (OVR >= 69)
+    Etapa 3: Gatilho de Divisão (OVR >= MédiaDiv - 2)
+    Etapa 4: Análise Micro de Elenco (Confronto Direto contra Titular, R1 e R2)
     """
-    y_ovr = youth["overall"]
-    y_pot_max = youth.get("potential_max", youth.get("potential", 75))
-    y_pot_min = youth.get("potential_min", y_ovr)
+    y_ovr = int(youth.get("overall", 50))
+    y_pot_max = int(youth.get("potential_max") or youth.get("potential", 75))
+    y_pot_min = int(youth.get("potential_min") or y_ovr)
     pot_range_str = youth.get("potential_display", f"{y_pot_min}-{y_pot_max}")
-    growth_speed = youth.get("growth_speed", calculate_growth_speed(y_ovr, y_pot_max))
-    y_name = youth["name"]
-    pos_br = youth["position_br"]
+    growth_speed = youth.get("growth_speed") or calculate_growth_speed(y_ovr, y_pot_max)
+    growth_label = growth_speed.get("label", "⚡ Ritmo Acelerado (Alto)")
+    is_fast_growth = any(w in growth_label.lower() for w in ["acelerado", "explosivo"])
+    y_name = youth.get("name", "Jovem da Base")
+    pos_br = youth.get("position_br", "MC")
+    age = youth.get("age", 17)
+    card_attrs = youth.get("card_attrs", {})
 
-    top_rival = rivals[0] if rivals else None         # Titular absoluto da posição (maior OVR)
-    bench_rival = rivals[-1] if rivals else None      # Último reserva da posição (menor OVR)
+    # 1. ETAPA 1: OTIMIZAÇÃO DE POSIÇÃO
+    pos_eval_text, best_pos, pos_diff = evaluate_position_optimization(card_attrs, pos_br)
 
-    highest_rival_ovr = top_rival["ovr"] if top_rival else y_ovr + 6
-    top_rival_name = top_rival["name"] if top_rival else "Titular da Posição"
+    # 2. CONTEXTO COMPETITIVO & DIVISÃO
+    tier_info = resolve_league_tier(league_name)
+    media_div = tier_info["avg_ovr"]
+    gatilho_div = tier_info["trigger_ovr"]
 
-    bench_rival_ovr = bench_rival["ovr"] if bench_rival else y_ovr + 2
-    bench_rival_name = bench_rival["name"] if bench_rival else "Última Opção de Banco"
+    is_global_trigger = (y_ovr >= 69)
+    is_div_trigger = (y_ovr >= gatilho_div)
 
-    gap_to_bench = bench_rival_ovr - y_ovr
-    gap_to_starter = highest_rival_ovr - y_ovr
+    if is_global_trigger:
+        status_regua = f"Atingiu Gatilho Global 69+ ({y_ovr} OVR) — Promoção Mandatória"
+    elif is_div_trigger:
+        status_regua = f"Atingiu Gatilho de Divisão ({y_ovr} ≥ {gatilho_div} OVR) — Nível Técnico Compatível com {tier_info['name']}"
+    else:
+        status_regua = f"Abaixo da Linha de Corte ({y_ovr} < {gatilho_div} OVR — Déficit de {gatilho_div - y_ovr} pts para a Liga)"
 
-    labels = youth["radar_labels"]
-    y_vals = youth["radar_values"]
+    # 3. ROTAÇÃO ÚTIL DO ELENCO (T, R1, R2)
+    t = rivals[0] if len(rivals) > 0 else None
+    r1 = rivals[1] if len(rivals) > 1 else None
+    r2 = rivals[2] if len(rivals) > 2 else None
 
-    # Comparativo de atributos com o último reserva e com o titular
+    t_str = f"{t['name']} (OVR {t['ovr']} | Status: {t['status_desc']}) ➔ Gap: {t['ovr'] - y_ovr:+d} pts" if t else "Sem Titular Definido no Setor"
+    r1_str = f"{r1['name']} (OVR {r1['ovr']} | Status: {r1['status_desc']}) ➔ Gap: {r1['ovr'] - y_ovr:+d} pts" if r1 else "Sem 1º Reserva Cadastrado"
+    r2_str = f"• 2º Reserva (R2): {r2['name']} (OVR {r2['ovr']} | Status: {r2['status_desc']}) ➔ Gap: {r2['ovr'] - y_ovr:+d} pts\n" if r2 else ""
+
+    t_at_peak = t and (t.get("status_code") in ("plateau", "decline"))
+    r1_at_peak = r1 and (r1.get("status_code") in ("plateau", "decline"))
+
+    # Análise de atributos funcionais vs concorrentes
     advantages = []
     severe_deficits = []
+    labels = youth.get("radar_labels", ["Ritmo", "Finalização", "Passe", "Drible", "Defesa", "Físico"])
+    y_vals = youth.get("radar_values", [50, 50, 50, 50, 50, 50])
     
-    comp_ref = bench_rival if bench_rival else top_rival
+    comp_ref = r1 if r1 else t
     if comp_ref:
-        r_vals = comp_ref["radar_values"]
-        for idx, lbl in enumerate(labels):
-            y_v = y_vals[idx]
-            r_v = r_vals[idx]
-            diff = y_v - r_v
-            if diff >= 0:
-                advantages.append(f"{lbl} ({y_v} vs {r_v})")
-            elif diff <= -10:
-                severe_deficits.append(f"{lbl} ({y_v} vs {r_v}, defasagem de {diff} pts)")
-            elif diff <= -5:
-                severe_deficits.append(f"{lbl} ({y_v} vs {r_v}, -{abs(diff)} pts)")
+        r_vals = comp_ref.get("radar_values", [])
+        for idx_l, lbl in enumerate(labels):
+            if idx_l < len(y_vals) and idx_l < len(r_vals):
+                y_v = y_vals[idx_l]
+                r_v = r_vals[idx_l]
+                diff = y_v - r_v
+                if diff >= 0:
+                    advantages.append(f"{lbl} ({y_v} vs {r_v})")
+                elif diff <= -6:
+                    severe_deficits.append(f"{lbl} ({y_v} vs {r_v}, defasagem de {abs(diff)} pts)")
 
-    # Diagnóstico de Promoção com base no ÚLTIMO RESERVA (critério de transição)
-    if gap_to_bench <= 0:
-        status_code = "READY_SENIOR"
-        status_label = "🟢 Pronto para o Time Principal (Supera Último Reserva)"
+    func_comp_text = f"Supera a concorrência em {', '.join(advantages)}." if advantages else "Atributos atuais ainda inferiores à intensidade da rotação profissional."
+    if severe_deficits:
+        func_comp_text += f" Defasagens críticas no setor: {', '.join(severe_deficits)}."
+
+    # 4. ETAPA 4: ANÁLISE MICRO DE ELENCO E VEREDITO FINAL
+    verdict_code = ""
+    verdict_final = ""
+    status_label = ""
+    status_class = ""
+    proj_text = ""
+
+    has_functional_edge = len(advantages) >= 3
+
+    # CASO A: Titular Imediato / Pilar Técnico
+    if t and (y_ovr >= t["ovr"] or (y_ovr >= t["ovr"] - 1 and has_functional_edge)):
+        verdict_code = "READY_STARTER"
+        verdict_final = "PROMOÇÃO: TITULAR IMEDIATO"
+        status_label = "🟢 [PROMOÇÃO: TITULAR IMEDIATO]"
         status_class = "status-ready"
-        tempo_estimado = "Imediato (Janela Atual)"
-        momento = (
-            f"O atleta já atingiu ou superou o nível do último reserva da posição, **{bench_rival_name}** ({bench_rival_ovr} OVR). "
-            f"Considerando seu teto máximo de **{y_pot_max}** e ritmo {growth_speed['short_label']}, recomendo a "
-            f"**promoção imediata para o elenco principal**, assumindo a vaga no banco de reservas dos profissionais."
+        proj_text = (
+            f"O atleta já compete de igual para igual ou supera tecnicamente o titular **{t['name']}** ({t['ovr']} OVR). "
+            f"O rendimento esportivo de campo é soberano: deve assumir a vaga no time titular imediatamente."
         )
-    elif 1 <= gap_to_bench <= 3:
-        status_code = "TRANSITION_IMMINENT"
-        status_label = "🔵 Transição Iminente (Banco em Copas / Rotação)"
+
+    # CASO B: Projeto Futuro Titular / Reserva Imediato (Sucessão Planejada)
+    elif r1 and (
+        y_ovr >= r1["ovr"] or
+        (y_ovr >= r1["ovr"] - 3 and is_fast_growth and y_pot_max >= media_div + 5) or
+        ((t_at_peak or r1_at_peak) and y_ovr >= r1["ovr"] - 5 and is_fast_growth and y_pot_max >= media_div + 5)
+    ):
+        verdict_code = "READY_BENCH_SUCCESSION"
+        verdict_final = "PROMOÇÃO: RESERVA IMEDIATO (SUCESSÃO / FUTURO TITULAR)"
+        status_label = "🔵 [PROMOÇÃO: RESERVA IMEDIATO (SUCESSÃO)]"
         status_class = "status-transition"
-        tempo_estimado = "Imediato a 1 temporada"
-        momento = (
-            f"Diferença curtíssima de apenas **{gap_to_bench} ponto(s)** para superar **{bench_rival_name}** ({bench_rival_ovr} OVR) "
-            f"como opção imediata de banco. O jovem já pode subir para treinar com o grupo principal e ser relacionado "
-            f"em partidas de copas ou rodadas de preservação."
-        )
-    elif 4 <= gap_to_bench <= 7:
-        status_code = "MATURING_ACADEMY"
-        status_label = "🟡 Em Maturação no CT (1 a 2 Temporadas de Trabalho)"
-        status_class = "status-maturing"
-        tempo_estimado = "1 a 2 temporadas completas"
-        momento = (
-            f"Defasagem de {gap_to_bench} pontos para alcançar o banco ocupado por **{bench_rival_name}** ({bench_rival_ovr} OVR). "
-            f"Com seu {growth_speed['label']}, o ideal é cumprir mais 1 a 2 temporadas de formação no CT "
-            f"antes de disputar vaga definitiva nos profissionais."
-        )
-    else: # gap_to_bench >= 8
-        status_code = "LONG_TERM_ACADEMY"
-        status_label = "🔴 Em Formação Básica no CT (Longo Prazo)"
-        status_class = "status-maturing"
-        tempo_estimado = "3 a 4 temporadas de formação"
-        momento = (
-            f"Distância ampla de {gap_to_bench} pontos para a última opção de banco ({bench_rival_name}, {bench_rival_ovr} OVR) "
-            f"e de {gap_to_starter} pontos para o titular absoluto {top_rival_name} ({highest_rival_ovr} OVR). "
-            f"Promovê-lo precocemente agora causaria queima de etapas e queda de rendimento."
+        sucessao_alvo = t['name'] if t_at_peak else r1['name']
+        proj_text = (
+            f"O atleta possui nível para ser o 12º jogador imediato da equipe. Como **{sucessao_alvo}** atingiu o auge e não evoluirá mais seus atributos, "
+            f"a promoção imediata com minutos regulares em copas e finais de partida ativará o **Potencial Dinâmico** do jovem, garantindo a sucessão planejada da posição."
         )
 
-    adv_str = f"Ponto onde já rivaliza: {', '.join(advantages)}." if advantages else "Nenhum atributo atual compete de imediato com os reservas profissionais."
-    def_str = f"Defasagens em relação ao banco: {', '.join(severe_deficits)}." if severe_deficits else "Atributos equilibrados em relação à reserva da posição."
+    # CASO C: Subir e Emprestar (Ganho de Rodagem)
+    elif (y_pot_max >= 80 or y_pot_max >= media_div + 10) and not (is_global_trigger and y_ovr >= (r1['ovr'] if r1 else 60)):
+        verdict_code = "LOAN_DEVELOPMENT"
+        verdict_final = "PROMOÇÃO: EMPRÉSTIMO IMEDIATO (1-2 ANOS)"
+        status_label = "🟣 [PROMOÇÃO: EMPRÉSTIMO IMEDIATO (1-2 ANOS)]"
+        status_class = "status-loan"
+        proj_text = (
+            f"O garoto possui **altíssimo teto de potencial ({y_pot_max} OVR)**, mas perderia espaço para a rotação profissional (R1 e R2). "
+            f"Deixá-lo sem jogar no time de cima destruiria seu Potencial Dinâmico no dia 1º de julho. A diretriz é assinar contrato profissional e "
+            f"colocá-lo imediatamente na lista de empréstimo por 1 a 2 temporadas para ganhar rodagem sem riscos."
+        )
 
+    # CASO D: Subir para Vender e Fazer Caixa
+    elif (is_global_trigger or is_div_trigger) and not is_fast_growth:
+        verdict_code = "SELL_FOR_PROFIT"
+        verdict_final = "PROMOÇÃO: FAZER CAIXA (VITRINE DE VENDA)"
+        status_label = "🟡 [PROMOÇÃO: FAZER CAIXA (VITRINE DE VENDA)]"
+        status_class = "status-sale"
+        proj_text = (
+            f"O jogador atingiu patamar de OVR com valor de mercado ({y_ovr} OVR), porém não tem projeção para ser pilar do clube e perde para a rotação imediata. "
+            f"Recomenda-se promover para a vitrine profissional e aceitar propostas na primeira janela de transferências para monetizar o ativo."
+        )
+
+    # CASO E: Manter no CT (Incubadora Protegida)
+    elif age <= 17 and y_pot_max >= media_div and is_fast_growth:
+        verdict_code = "KEEP_IN_ACADEMY"
+        verdict_final = "INCUBADORA: MANTER NO CT"
+        status_label = "🟠 [INCUBADORA: MANTER NO CT]"
+        status_class = "status-maturing"
+        proj_text = (
+            f"Com {age} anos e ritmo {growth_speed.get('short_label')}, o jovem tem ganho semanal de XP protegido no CT. "
+            f"Promovê-lo agora para a reserva imediata causaria queima precoce de etapas. A orientação é segurá-lo na base mais 1 a 2 temporadas."
+        )
+
+    # CASO F: Dispensa Imediata
+    else:
+        verdict_code = "RELEASE_PLAYER"
+        verdict_final = "DISPENSA DA BASE"
+        status_label = "🔴 [DISPENSA DA BASE]"
+        status_class = "status-danger"
+        proj_text = (
+            f"Atleta com teto de potencial ({y_pot_max} OVR) incompatível com as ambições competitivas do clube e ritmo de evolução insuficiente. "
+            f"A recomendação do scout é a rescisão contratual para abrir vaga no centro de formação para novos talentos."
+        )
+
+    # Checagem de Limite Biológico / Inconformismo contratual (18 anos)
+    if age >= 18 and verdict_code == "KEEP_IN_ACADEMY":
+        if y_pot_max >= media_div + 3:
+            verdict_code = "LOAN_DEVELOPMENT"
+            verdict_final = "PROMOÇÃO: EMPRÉSTIMO IMEDIATO (1-2 ANOS)"
+            status_label = "🟣 [PROMOÇÃO: EMPRÉSTIMO IMEDIATO (1-2 ANOS)]"
+            status_class = "status-loan"
+            proj_text += (
+                f"\n\n⚠️ **ALERTA CONTRATUAL:** O atleta tem {age} anos e não pode mais permanecer no CT sob pena de rescisão contratual do EA FC. "
+                f"Promover obrigatoriamente e listar para empréstimo."
+            )
+        else:
+            verdict_code = "SELL_FOR_PROFIT"
+            verdict_final = "PROMOÇÃO: FAZER CAIXA (VITRINE DE VENDA)"
+            status_label = "🟡 [PROMOÇÃO: FAZER CAIXA (VITRINE DE VENDA)]"
+            status_class = "status-sale"
+            proj_text += (
+                f"\n\n⚠️ **ALERTA CONTRATUAL:** O atleta atingiu {age} anos e exigirá promoção sob pena de perda gratuita. "
+                f"Promover imediatamente para a vitrine de venda."
+            )
+
+    # 5. ESTRUTURAÇÃO DO PARECER OFICIAL DO SCOUT
     parecer_texto = (
-        f"Relatório técnico do olheiro **Lucas Valença** para a comissão técnica:\n\n"
-        f"Avaliando os **atributos atuais** de **{y_name}** ({pos_br}, {y_ovr} OVR), cruzamos seus dados com os concorrentes do setor:\n"
-        f"• **Referência de Promoção (Último Reserva):** {bench_rival_name} ({bench_rival_ovr} OVR) — defasagem de **{gap_to_bench} pts**.\n"
-        f"• **Referência de Titularidade (Titular Absoluto):** {top_rival_name} ({highest_rival_ovr} OVR) — defasagem de **{gap_to_starter} pts**.\n"
-        f"• **Faixa de Potencial:** {pot_range_str} (Teto Máximo: **{y_pot_max}**).\n"
-        f"• **Ritmo de Desenvolvimento:** {growth_speed['label']}.\n\n"
-        f"{adv_str} Por outro lado, {def_str}\n\n"
-        f"**Veredito de Transição:** {momento}"
+        f"**PARECER DO SCOUT — LUCAS VALENÇA**\n\n"
+        f"**IDENTIFICAÇÃO E DIAGNÓSTICO**\n"
+        f"• **Atleta:** {y_name} | {pos_br} | {age} anos\n"
+        f"• **OVR Atual:** {y_ovr} | **Faixa de Potencial:** {pot_range_str} | **Ritmo:** {growth_label}\n"
+        f"• **Avaliação Posicional:** {pos_eval_text}\n\n"
+        f"**CONTEXTO COMPETITIVO & DIVISÃO**\n"
+        f"• **Divisão:** {tier_info['name']} (Média da Liga: {media_div} OVR)\n"
+        f"• **Status da Régua:** {status_regua}\n\n"
+        f"**CONFRONTO DIRETO COM A ROTAÇÃO ÚTIL DO ELENCO**\n"
+        f"• **Titular da Posição (T):** {t_str}\n"
+        f"• **1º Reserva (R1):** {r1_str}\n"
+        f"{r2_str}"
+        f"• **Comparativo Funcional:** {func_comp_text}\n\n"
+        f"**PROJEÇÃO TÉCNICA E TEMPORAL**\n"
+        f"{proj_text}\n\n"
+        f"**VEREDITO FINAL**\n"
+        f"**[{verdict_final}]**"
     )
 
-    teto_desc = f"Faixa de Potencial: {pot_range_str} (Teto de {y_pot_max} OVR). Ritmo: {growth_speed['short_label']}."
+    teto_desc = f"Faixa de Potencial: {pot_range_str} (Teto de {y_pot_max} OVR). Ritmo: {growth_speed.get('short_label', 'Acelerado')}."
 
     return {
         "scout_name": "Lucas Valença",
-        "scout_role": "Especialista em Joias & Alto Potencial (Academia de Base)",
+        "scout_role": "Diretor de Scout & Especialista em Base",
         "scout_avatar": "assets/scouts/scout_lucas.png",
-        "status_code": status_code,
+        "verdict_code": verdict_code,
+        "verdict_final": verdict_final,
+        "status_code": verdict_code,
         "status_label": status_label,
         "status_class": status_class,
-        "overall_gap": gap_to_bench,
-        "starter_gap": gap_to_starter,
-        "highest_rival_ovr": highest_rival_ovr,
-        "top_rival_name": top_rival_name,
-        "bench_rival_name": bench_rival_name,
-        "bench_rival_ovr": bench_rival_ovr,
+        "overall_gap": (r1['ovr'] - y_ovr) if r1 else ((t['ovr'] - y_ovr) if t else 0),
+        "starter_gap": (t['ovr'] - y_ovr) if t else 0,
+        "highest_rival_ovr": t['ovr'] if t else y_ovr,
+        "top_rival_name": t['name'] if t else "Titular da Posição",
+        "bench_rival_name": r1['name'] if r1 else "1º Reserva",
+        "bench_rival_ovr": r1['ovr'] if r1 else y_ovr,
         "potential_range": pot_range_str,
         "potential_max": y_pot_max,
         "growth_speed": growth_speed,
-        "tempo_estimado": tempo_estimado,
+        "pos_evaluation": pos_eval_text,
         "advantages": advantages,
         "disadvantages": severe_deficits,
         "teto_desc": teto_desc,
-        "momento_ideal": momento,
         "parecer_texto": parecer_texto
     }

@@ -1386,10 +1386,9 @@ window.loadSavedSocialPosts = async function() {
     grid.innerHTML = posts.map(post => {
       let previewMedia = '';
       let mUrl = post.media_url || '';
-      if (post.media_type === 'video' && mUrl) {
-        mUrl = window.toSafeStreamUrl(mUrl);
-      }
+      if (mUrl) {
         if (post.media_type === 'video') {
+          mUrl = window.toSafeStreamUrl(mUrl);
           previewMedia = `
             <div style="width: 100%; height: 140px; background: #000; border-radius: 8px; overflow: hidden; position: relative; cursor: pointer;" onclick="viewSavedPostDetail(${post.id})" title="Clique para abrir no visualizador">
               <video src="${mUrl}#t=0.1" muted playsinline preload="metadata" onmouseenter="try{this.play()}catch(e){}" onmouseleave="try{this.pause()}catch(e){}" style="width: 100%; height: 100%; object-fit: cover; display: block;"></video>

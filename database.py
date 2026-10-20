@@ -5106,6 +5106,26 @@ def get_social_posts(save_id=None, season_year=None, post_type=None, limit=100):
                     except Exception:
                         pass
 
+            # Blindagem anti-IDM: Converte URLs de vídeo para rotas de stream sem extensão .mp4
+            if p.get("media_type") == "video" and m_url:
+                import urllib.parse
+                if m_url.startswith("/uploads/"):
+                    fname = m_url.replace("/uploads/", "").split("?")[0]
+                    cname = os.path.splitext(fname)[0]
+                    p["media_url"] = f"/api/video-stream/{urllib.parse.quote(cname)}"
+                elif "/api/media/serve-capture" in m_url:
+                    parsed_u = urllib.parse.urlparse(m_url)
+                    params_u = urllib.parse.parse_qs(parsed_u.query)
+                    f_val = params_u.get("file", [""])[0] or params_u.get("path", [""])[0]
+                    if f_val:
+                        base_val = os.path.basename(f_val)
+                        cname = os.path.splitext(base_val)[0]
+                        p["media_url"] = f"/api/video-stream/{urllib.parse.quote(cname)}"
+                elif m_url.lower().endswith(('.mp4', '.webm', '.mkv', '.mov')):
+                    base_val = os.path.basename(m_url.split("?")[0])
+                    cname = os.path.splitext(base_val)[0]
+                    p["media_url"] = f"/api/video-stream/{urllib.parse.quote(cname)}"
+
             try:
                 p["stats"] = json.loads(p.get("stats_json") or "{}")
             except Exception:

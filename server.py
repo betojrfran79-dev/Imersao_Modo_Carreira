@@ -642,6 +642,60 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 if os.path.exists(ico_path):
                     return self.serve_image(ico_path)
 
+            # 0. Rota Segura de Streaming de Vídeo Anti-Interceptação (IDM/Download Managers)
+            # Serve vídeos sem extensão .mp4 na URL para evitar que o Internet Download Manager (IDM) sequestre a reprodução
+            if path.startswith("/api/video-stream/"):
+                raw_id = path[len("/api/video-stream/"):].split("?")[0]
+                ident = unquote(raw_id).strip()
+                if ident:
+                    capture_folder = database.get_capture_folder() or ""
+                    candidate_dirs = [
+                        UPLOADS_DIR,
+                        os.path.join(BASE_DIR, "assets", "uploads"),
+                        os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "App_Modo_carreira", "uploads"),
+                        os.path.join(r"c:\Users\Roberto\.gemini\antigravity-ide\scratch\Imersão_Modo_Carreira\uploads"),
+                        capture_folder,
+                        os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Videos", "Captures"),
+                        os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Videos")
+                    ]
+                    possible_names = [ident]
+                    if not ident.lower().endswith(('.mp4', '.webm', '.mkv', '.mov', '.avi')):
+                        possible_names.extend([
+                            f"{ident}.mp4",
+                            f"{ident}.webm",
+                            f"{ident}.mkv",
+                            f"{ident}.mov"
+                        ])
+
+                    target_file = None
+                    for cd in candidate_dirs:
+                        if not cd or not os.path.exists(cd):
+                            continue
+                        for pn in possible_names:
+                            cp = os.path.join(cd, pn)
+                            if os.path.isfile(cp):
+                                target_file = cp
+                                break
+                            try:
+                                for fe in os.listdir(cd):
+                                    if fe.lower() == pn.lower():
+                                        target_file = os.path.join(cd, fe)
+                                        break
+                            except Exception:
+                                pass
+                            if target_file and os.path.isfile(target_file):
+                                break
+                        if target_file:
+                            break
+
+                    if target_file and os.path.isfile(target_file):
+                        self.serve_file_with_range(target_file)
+                        return
+
+                self.send_response(404)
+                self.end_headers()
+                return
+
             # 0.1 Arquivos enviados pelo usuário (Uploads - Vídeos ou Imagens com suporte a Range)
             if path.startswith("/uploads/"):
                 fname = os.path.basename(path.split("?")[0])

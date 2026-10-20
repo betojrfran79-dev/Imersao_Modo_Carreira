@@ -81,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadOpponentsList();
   loadScoutHubData();
   loadSetupStatus();
-  if (window.initSocialMediaTab) window.initSocialMediaTab(true);
+  // Mídias Sociais é carregada sob demanda quando o usuário clica na aba (evita requisições pesadas no boot)
 
   // Sincronização automática inicial com dados do Desktop se disponíveis
   checkAndAutoSyncDesktop();

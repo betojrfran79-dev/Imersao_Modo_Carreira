@@ -45,6 +45,45 @@ window.SocialStudioState = {
   selectedFile: null
 };
 
+// Converte qualquer URL de vídeo para a rota interna segura sem extensão .mp4
+// Isso impede 100% que gerenciadores de download externos (como IDM - Internet Download Manager) sequestrem o vídeo
+window.toSafeStreamUrl = function(url) {
+  if (!url) return '';
+  if (typeof url !== 'string') return url;
+  if (url.startsWith('/api/video-stream/')) return url;
+  if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+
+  // Caso 1: /uploads/media_123.mp4 -> /api/video-stream/media_123
+  if (url.startsWith('/uploads/')) {
+    const fname = url.replace('/uploads/', '').split('?')[0];
+    const cleanName = fname.replace(/\.(mp4|webm|mkv|mov|avi)$/i, '');
+    return `/api/video-stream/${encodeURIComponent(cleanName)}`;
+  }
+
+  // Caso 2: /api/media/serve-capture?file=XYZ.mp4 -> /api/video-stream/XYZ
+  if (url.includes('/api/media/serve-capture')) {
+    try {
+      const q = url.split('?')[1] || '';
+      const params = new URLSearchParams(q);
+      const f = params.get('file') || params.get('path') || '';
+      if (f) {
+        const base = f.split('/').pop().split('\\').pop();
+        const cleanName = base.replace(/\.(mp4|webm|mkv|mov|avi)$/i, '');
+        return `/api/video-stream/${encodeURIComponent(cleanName)}`;
+      }
+    } catch (e) {}
+  }
+
+  // Caso 3: Qualquer URL terminando em formato de vídeo
+  const pathOnly = url.split('?')[0];
+  if (/\.(mp4|webm|mkv|mov|avi)$/i.test(pathOnly)) {
+    const base = pathOnly.split('/').pop().replace(/\.(mp4|webm|mkv|mov|avi)$/i, '');
+    return `/api/video-stream/${encodeURIComponent(base)}`;
+  }
+
+  return url;
+};
+
 // Resolve e valida metadados reais do Clube e Treinador no Banco / Dashboard
 window.resolveCurrentCareerMeta = async function() {
   let clubName = window.cachedDashboardData?.save?.current_team_name;
@@ -205,7 +244,7 @@ window.reloadLatestCaptureFile = async function() {
       const isVideo = data.is_video !== false;
       const media = {
         type: isVideo ? 'video' : 'image',
-        url: data.file_url,
+        url: isVideo ? window.toSafeStreamUrl(data.file_url) : data.file_url,
         filename: data.filename,
         size_mb: data.size_bytes ? (data.size_bytes / (1024 * 1024)).toFixed(1) : "0",
         created_at: data.mtime ? new Date(data.mtime * 1000).toLocaleTimeString('pt-BR') : new Date().toLocaleTimeString('pt-BR')
@@ -974,6 +1013,9 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
   if (!cleanMediaUrl && window.SocialStudioState?.latestMedia?.url) {
     cleanMediaUrl = window.SocialStudioState.latestMedia.url;
   }
+  if (mediaType === 'video' && cleanMediaUrl) {
+    cleanMediaUrl = window.toSafeStreamUrl(cleanMediaUrl);
+  }
   let mediaHtml = '';
   if (cleanMediaUrl) {
     if (mediaType === 'video') {
@@ -1115,6 +1157,9 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
   let cleanMediaUrl = mediaUrl || '';
   if (!cleanMediaUrl && window.SocialStudioState?.latestMedia?.url) {
     cleanMediaUrl = window.SocialStudioState.latestMedia.url;
+  }
+  if (mediaType === 'video' && cleanMediaUrl) {
+    cleanMediaUrl = window.toSafeStreamUrl(cleanMediaUrl);
   }
 
   let mediaColumnHtml = '';
@@ -1341,8 +1386,9 @@ window.loadSavedSocialPosts = async function() {
     grid.innerHTML = posts.map(post => {
       let previewMedia = '';
       let mUrl = post.media_url || '';
-      
-      if (mUrl) {
+      if (post.media_type === 'video' && mUrl) {
+        mUrl = window.toSafeStreamUrl(mUrl);
+      }
         if (post.media_type === 'video') {
           previewMedia = `
             <div style="width: 100%; height: 140px; background: #000; border-radius: 8px; overflow: hidden; position: relative; cursor: pointer;" onclick="viewSavedPostDetail(${post.id})" title="Clique para abrir no visualizador">
@@ -1438,7 +1484,9 @@ window.viewSavedPostDetail = function(postId, isSilent = false, switchTab = true
   const clubCrest = window.cachedDashboardData?.team_crest || null;
 
   let activeMediaUrl = post.media_url || '';
-  
+  if (post.media_type === 'video' && activeMediaUrl) {
+    activeMediaUrl = window.toSafeStreamUrl(activeMediaUrl);
+  }
 
   renderTweetCard(data, activeMediaUrl, post.media_type, post.video_start, post.video_end);
   if (post.newspaper_data) {

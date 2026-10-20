@@ -881,6 +881,7 @@ def generate_lucas_valenca_verdict(youth, rivals, league_name=None):
     y_vals = youth.get("radar_values", [50, 50, 50, 50, 50, 50])
     
     comp_ref = r1 if r1 else t
+    ref_label = f"o 1º Reserva ({comp_ref['name']})" if comp_ref == r1 else (f"o Titular ({comp_ref['name']})" if comp_ref else "a concorrência")
     if comp_ref:
         r_vals = comp_ref.get("radar_values", [])
         for idx_l, lbl in enumerate(labels):
@@ -893,7 +894,7 @@ def generate_lucas_valenca_verdict(youth, rivals, league_name=None):
                 elif diff <= -6:
                     severe_deficits.append(f"{lbl} ({y_v} vs {r_v}, defasagem de {abs(diff)} pts)")
 
-    func_comp_text = f"Supera a concorrência em {', '.join(advantages)}." if advantages else "Atributos atuais ainda inferiores à intensidade da rotação profissional."
+    func_comp_text = f"Nos 6 macro-atributos da carta (gráfico radar), supera {ref_label} em {', '.join(advantages)}." if advantages else f"Nos 6 macro-atributos da carta, está abaixo de {ref_label}."
     if severe_deficits:
         func_comp_text += f" Defasagens críticas no setor: {', '.join(severe_deficits)}."
 
@@ -1013,7 +1014,7 @@ def generate_lucas_valenca_verdict(youth, rivals, league_name=None):
         f"• **Titular da Posição (T):** {t_str}\n"
         f"• **1º Reserva (R1):** {r1_str}\n"
         f"{r2_str}"
-        f"• **Comparativo Funcional:** {func_comp_text}\n\n"
+        f"• **Comparativo da Carta (Radar vs Reserva Imediato):** {func_comp_text}\n\n"
         f"**PROJEÇÃO TÉCNICA E TEMPORAL**\n"
         f"{proj_text}\n\n"
         f"**VEREDITO FINAL**\n"

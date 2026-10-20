@@ -1345,15 +1345,17 @@ window.loadSavedSocialPosts = async function() {
       if (mUrl) {
         if (post.media_type === 'video') {
           previewMedia = `
-            <div style="width: 100%; height: 140px; background: #000; border-radius: 8px; overflow: hidden; position: relative;">
-              <video src="${mUrl}" muted playsinline autoplay loop preload="metadata" style="width: 100%; height: 100%; object-fit: cover;"></video>
-              <span style="position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.75); font-size: 10px; padding: 2px 6px; border-radius: 4px; color: #fff; pointer-events: none;">VÍDEO</span>
+            <div style="width: 100%; height: 140px; background: #000; border-radius: 8px; overflow: hidden; position: relative; cursor: pointer;" onclick="viewSavedPostDetail(${post.id})" title="Clique para abrir no visualizador">
+              <video src="${mUrl}#t=0.1" muted playsinline preload="metadata" onmouseenter="try{this.play()}catch(e){}" onmouseleave="try{this.pause()}catch(e){}" style="width: 100%; height: 100%; object-fit: cover; display: block;"></video>
+              <span style="position: absolute; bottom: 6px; right: 6px; background: rgba(0,0,0,0.75); font-size: 10px; padding: 2px 6px; border-radius: 4px; color: #fff; pointer-events: none; display: flex; align-items: center; gap: 4px;">
+                <i data-lucide="play" style="width: 10px; height: 10px;"></i> VÍDEO
+              </span>
             </div>
           `;
         } else {
           previewMedia = `
-            <div style="width: 100%; height: 140px; border-radius: 8px; overflow: hidden;">
-              <img src="${mUrl}" style="width: 100%; height: 100%; object-fit: cover;" />
+            <div style="width: 100%; height: 140px; border-radius: 8px; overflow: hidden; cursor: pointer;" onclick="viewSavedPostDetail(${post.id})" title="Clique para abrir no visualizador">
+              <img src="${mUrl}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'" />
             </div>
           `;
         }

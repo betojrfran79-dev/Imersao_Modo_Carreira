@@ -516,9 +516,31 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 return
 
             file_size = os.path.getsize(filepath)
-            ctype, _ = mimetypes.guess_type(filepath)
-            if not ctype:
-                ctype = 'application/octet-stream'
+            fname = os.path.basename(filepath)
+            
+            # Mapeamento estrito e confiável de MIME types para mídia
+            lower_path = filepath.lower()
+            if lower_path.endswith('.mp4'):
+                ctype = 'video/mp4'
+            elif lower_path.endswith('.webm'):
+                ctype = 'video/webm'
+            elif lower_path.endswith('.mkv'):
+                ctype = 'video/x-matroska'
+            elif lower_path.endswith('.mov'):
+                ctype = 'video/quicktime'
+            elif lower_path.endswith('.avi'):
+                ctype = 'video/x-msvideo'
+            elif lower_path.endswith('.png'):
+                ctype = 'image/png'
+            elif lower_path.endswith(('.jpg', '.jpeg')):
+                ctype = 'image/jpeg'
+            elif lower_path.endswith('.webp'):
+                ctype = 'image/webp'
+            else:
+                ctype, _ = mimetypes.guess_type(filepath)
+                if not ctype:
+                    ctype = 'application/octet-stream'
+
             range_header = self.headers.get('Range')
 
             if range_header and range_header.startswith('bytes='):
@@ -547,10 +569,13 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 content_length = end - start + 1
                 self.send_response(206, "Partial Content")
                 self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", f'inline; filename="{fname}"')
+                self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Content-Range", f"bytes {start}-{end}/{file_size}")
                 self.send_header("Content-Length", str(content_length))
                 self.send_header("Accept-Ranges", "bytes")
                 self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "public, max-age=86400")
                 self.end_headers()
 
                 with open(filepath, 'rb') as f:
@@ -561,15 +586,21 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         chunk = f.read(min(chunk_size, remaining))
                         if not chunk:
                             break
-                        self.wfile.write(chunk)
+                        try:
+                            self.wfile.write(chunk)
+                        except (ConnectionResetError, BrokenPipeError):
+                            return
                         remaining -= len(chunk)
                 return
             else:
                 self.send_response(200)
                 self.send_header("Content-Type", ctype)
+                self.send_header("Content-Disposition", f'inline; filename="{fname}"')
+                self.send_header("X-Content-Type-Options", "nosniff")
                 self.send_header("Content-Length", str(file_size))
                 self.send_header("Accept-Ranges", "bytes")
                 self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "public, max-age=86400")
                 self.end_headers()
 
                 with open(filepath, 'rb') as f:
@@ -578,7 +609,10 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         chunk = f.read(chunk_size)
                         if not chunk:
                             break
-                        self.wfile.write(chunk)
+                        try:
+                            self.wfile.write(chunk)
+                        except (ConnectionResetError, BrokenPipeError):
+                            return
                 return
         except (ConnectionResetError, BrokenPipeError):
             pass
@@ -611,12 +645,22 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             # 0.1 Arquivos enviados pelo usuário (Uploads - Vídeos ou Imagens com suporte a Range)
             if path.startswith("/uploads/"):
                 fname = os.path.basename(path.split("?")[0])
-                fpath = os.path.join(UPLOADS_DIR, fname)
-                if not os.path.exists(fpath):
-                    alt_path = os.path.join(BASE_DIR, "assets", "uploads", fname)
-                    if os.path.exists(alt_path):
-                        fpath = alt_path
-                if os.path.isfile(fpath):
+                capture_folder = database.get_capture_folder() or ""
+                candidates = [
+                    os.path.join(UPLOADS_DIR, fname),
+                    os.path.join(BASE_DIR, "assets", "uploads", fname),
+                    os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "App_Modo_carreira", "uploads", fname),
+                    os.path.join(r"c:\Users\Roberto\.gemini\antigravity-ide\scratch\Imersão_Modo_Carreira\uploads", fname),
+                    os.path.join(capture_folder, fname) if capture_folder else None,
+                    os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Videos", "Captures", fname)
+                ]
+                fpath = None
+                for c in candidates:
+                    if c and os.path.isfile(c):
+                        fpath = c
+                        break
+
+                if fpath and os.path.isfile(fpath):
                     is_vid = fpath.lower().endswith(('.mp4', '.mkv', '.avi', '.mov', '.webm'))
                     if is_vid:
                         self.serve_file_with_range(fpath)
@@ -707,10 +751,21 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
 
             if path.startswith("/assets/uploads/"):
                 fname = os.path.basename(path.split("?")[0])
-                fpath = os.path.join(BASE_DIR, "assets", "uploads", fname)
-                if not os.path.exists(fpath):
-                    fpath = os.path.join(UPLOADS_DIR, fname)
-                if os.path.isfile(fpath):
+                capture_folder = database.get_capture_folder() or ""
+                candidates = [
+                    os.path.join(BASE_DIR, "assets", "uploads", fname),
+                    os.path.join(UPLOADS_DIR, fname),
+                    os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "App_Modo_carreira", "uploads", fname),
+                    os.path.join(r"c:\Users\Roberto\.gemini\antigravity-ide\scratch\Imersão_Modo_Carreira\uploads", fname),
+                    os.path.join(capture_folder, fname) if capture_folder else None,
+                    os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Videos", "Captures", fname)
+                ]
+                fpath = None
+                for c in candidates:
+                    if c and os.path.isfile(c):
+                        fpath = c
+                        break
+                if fpath and os.path.isfile(fpath):
                     self.serve_file_with_range(fpath)
                     return
 

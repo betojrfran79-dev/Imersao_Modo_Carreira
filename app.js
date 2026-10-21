@@ -57,6 +57,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initEditTrophyModal();
   initEditCompetitionModal();
   initRetirePlayerModal();
+  initSeasonHighlightModal();
+  initPlayerAwardModal();
   initFilters();
   initStandingsAiAndEditor();
   initStageManagementModal();
@@ -1646,33 +1648,55 @@ function generateFutCardHtml(player, type = 'silver', recordBadge = '', topTag =
 }
 
 // -------------------------------------------------------------
-// 8. CARREGAR HALL DA FAMA ETERNO (APOSENTADOS & PRÊMIOS)
+// 8. CARREGAR HALL DA FAMA ETERNO (DESTAQUES, PRÊMIOS & MOTM)
 // -------------------------------------------------------------
+let cachedSeasonHighlights = [];
+
 async function loadHallOfFameData() {
   try {
     const res = await fetch(`${API_BASE}/hall-of-fame?save_id=${currentSaveId}`);
     if (!res.ok) return;
     const data = await res.json();
 
-    // 1. Galeria de Prêmios Individuais de Jogadores
+    // 1. Galeria de Prêmios Individuais de Jogadores (Bola de Ouro, Chuteira de Ouro, etc.)
     const awardsGrid = document.getElementById("hofPlayerAwardsGrid");
     if (awardsGrid) {
       if (data.player_awards && data.player_awards.length > 0) {
-        awardsGrid.innerHTML = data.player_awards.map(a => `
-          <div class="award-card" onclick="openPlayerModal(${a.player_id})" style="cursor: pointer;">
-            <img class="award-player-face" src="${a.face_url}" onerror="this.src='/api/avatar/youth/${a.player_id}'" alt="${escapeHtml(a.player_name)}">
-            <div class="award-details">
-              <span class="award-tag-type">${escapeHtml(a.award_type)}</span>
-              <span class="award-title-text">${escapeHtml(a.award_title)}</span>
-              <span class="award-player-name">${escapeHtml(a.player_name)} • ${a.season_year}</span>
-              ${a.stat_value ? `<span class="award-stat-val">${escapeHtml(a.stat_value)}</span>` : ''}
+        awardsGrid.innerHTML = data.player_awards.map(a => {
+          let icon = 'sparkles';
+          const type = (a.award_type || '').toUpperCase();
+          if (type.includes('BOLA') || type.includes('CRAQUE')) icon = 'trophy';
+          else if (type.includes('CHUTEIRA') || type.includes('GOL')) icon = 'flame';
+          else if (type.includes('GARÇOM') || type.includes('ASSIST')) icon = 'sparkles';
+          else if (type.includes('MOTM') || type.includes('JOGO')) icon = 'star';
+          else if (type.includes('LUVA') || type.includes('GK')) icon = 'shield';
+
+          return `
+            <div class="award-card" style="position: relative; cursor: pointer;" onclick="openPlayerModal(${a.player_id})">
+              ${a.id ? `
+                <button class="btn-xs text-danger" onclick="event.stopPropagation(); deletePlayerAward(${a.id}, '${escapeJs(a.award_title)}')" title="Excluir Prêmio" style="position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 2px 5px; cursor: pointer; color: #ef4444; z-index: 3;">
+                  <i data-lucide="trash-2" style="width: 11px; height: 11px;"></i>
+                </button>
+              ` : ''}
+              <img class="award-player-face" src="${a.face_url}" onerror="this.src='/api/avatar/youth/${a.player_id}'" alt="${escapeHtml(a.player_name)}">
+              <div class="award-details">
+                <span class="award-tag-type"><i data-lucide="${icon}" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${escapeHtml(a.award_type)}</span>
+                <span class="award-title-text font-bold" style="color: #fff;">${escapeHtml(a.award_title)}</span>
+                <span class="award-player-name">${escapeHtml(a.player_name)} • ${a.season_year}</span>
+                ${a.stat_value ? `<span class="award-stat-val" style="color: var(--accent-gold); font-size: 0.72rem;">${escapeHtml(a.stat_value)}</span>` : ''}
+              </div>
             </div>
-          </div>
-        `).join('');
+          `;
+        }).join('');
       } else {
-        awardsGrid.innerHTML = `<span class="empty-hint">Nenhum prêmio individual registrado ainda</span>`;
+        awardsGrid.innerHTML = `<span class="empty-hint">Nenhum prêmio individual registrado ainda. Prêmios automáticos são sincronizados ao final de cada temporada e você também pode registrar prêmios no botão acima.</span>`;
       }
     }
+
+    // 2. Galeria de Destaques das Temporadas (Critérios do Treinador)
+    cachedSeasonHighlights = data.season_highlights || [];
+    populateHighlightSeasonFilter(cachedSeasonHighlights);
+    renderSeasonHighlights(cachedSeasonHighlights);
 
     // Helper para preencher lista de ranking
     const renderRankList = (containerId, list, valFormatter, subFormatter) => {
@@ -1695,7 +1719,7 @@ async function loadHallOfFameData() {
       `).join('');
     };
 
-    // 2. Maiores Artilheiros
+    // 3. Maiores Artilheiros
     const topScorers = data.top_scorers || [];
     const scorerLeadWrap = document.getElementById("hofScorerCardLead");
     if (scorerLeadWrap) {
@@ -1718,7 +1742,7 @@ async function loadHallOfFameData() {
       p => `${formatPosition(p.position)} • ${p.total_apps} J`
     );
 
-    // 3. Maiores Garçons (Assistências)
+    // 4. Maiores Garçons (Assistências)
     const topAssists = data.top_assists || [];
     const assistLeadWrap = document.getElementById("hofAssistCardLead");
     if (assistLeadWrap) {
@@ -1741,7 +1765,7 @@ async function loadHallOfFameData() {
       p => `${formatPosition(p.position)} • ${p.total_apps} J`
     );
 
-    // 4. Participações em Gols (G+A)
+    // 5. Participações em Gols (G+A)
     const topContrib = data.top_contributions || [];
     const contribLeadWrap = document.getElementById("hofContribCardLead");
     if (contribLeadWrap) {
@@ -1764,7 +1788,7 @@ async function loadHallOfFameData() {
       p => `${p.total_goals}G + ${p.total_assists}A (${p.total_apps} J)`
     );
 
-    // 5. Mais Jogos na História
+    // 6. Mais Jogos na História
     const topApps = data.top_appearances || [];
     const appsLeadWrap = document.getElementById("hofAppsCardLead");
     if (appsLeadWrap) {
@@ -1787,7 +1811,7 @@ async function loadHallOfFameData() {
       p => `${formatPosition(p.position)} • Nota ${p.career_avg || '-'}`
     );
 
-    // 6. Paredões (Clean Sheets)
+    // 7. Paredões (Clean Sheets)
     const topGk = data.top_goalkeepers || [];
     const gkLeadWrap = document.getElementById("hofGkCardLead");
     if (gkLeadWrap) {
@@ -1810,7 +1834,30 @@ async function loadHallOfFameData() {
       p => `${p.total_saves || 0} Defesas • ${p.total_apps} J`
     );
 
-    // 7. Ídolos Aposentados no Clube (Cartinhas Douradas Oficiais)
+    // 8. Reis do Jogo (Mais vezes Man of the Match / Homem da Partida)
+    const topMotms = data.top_motms || [];
+    const motmLeadWrap = document.getElementById("hofMotmCardLead");
+    if (motmLeadWrap) {
+      if (topMotms.length > 0) {
+        const leader = topMotms[0];
+        motmLeadWrap.innerHTML = generateFutCardHtml(
+          leader,
+          'silver',
+          `⭐ ${leader.total_motms || 0}x HOMEM DO JOGO`,
+          'REI DA PARTIDA (MOTM)'
+        );
+      } else {
+        motmLeadWrap.innerHTML = `<span class="empty-hint">Sem dados de Homem do Jogo</span>`;
+      }
+    }
+    renderRankList(
+      "hofMotmList",
+      topMotms,
+      p => `<span class="text-gold font-bold">${p.total_motms || 0}x</span>`,
+      p => `${formatPosition(p.position)} • ${p.total_apps} J`
+    );
+
+    // 9. Ídolos Aposentados no Clube (Cartinhas Douradas Oficiais)
     const retiredGrid = document.getElementById("hofRetiredLegendsGrid");
     if (retiredGrid) {
       if (data.retired_legends && data.retired_legends.length > 0) {
@@ -5065,6 +5112,343 @@ async function deleteRetiredPlayer(playerId, playerName) {
     }
   } catch (err) {
     showToast("Erro de conexão ao remover registro", "error");
+  }
+}
+
+// ==============================================================================
+// 21.1 DESTAQUES DAS TEMPORADAS & PRÊMIOS INDIVIDUAIS (HALL DA FAMA)
+// ==============================================================================
+function populateHighlightSeasonFilter(highlightsList) {
+  const filterSelect = document.getElementById("hofHighlightSeasonFilter");
+  if (!filterSelect) return;
+  const currentVal = filterSelect.value || "GERAL";
+  const seasons = [...new Set((highlightsList || []).map(h => String(h.season_year)).filter(Boolean))].sort().reverse();
+  
+  let html = '<option value="GERAL">Todas as Temporadas</option>';
+  seasons.forEach(s => {
+    html += `<option value="${s}" ${s === currentVal ? 'selected' : ''}>Temporada ${s}</option>`;
+  });
+  filterSelect.innerHTML = html;
+}
+
+function renderSeasonHighlights(highlightsList) {
+  const grid = document.getElementById("hofSeasonHighlightsGrid");
+  if (!grid) return;
+  if (!highlightsList || highlightsList.length === 0) {
+    grid.innerHTML = `
+      <div class="empty-hint" style="grid-column: 1 / -1; padding: 2rem 1rem; text-align: center;">
+        <i data-lucide="star" style="width: 36px; height: 36px; opacity: 0.35; margin-bottom: 0.5rem; display: inline-block;"></i>
+        <p>Nenhum destaque registrado para esta seleção ainda.</p>
+        <p style="font-size: 0.78rem; color: var(--text-dim); margin-top: 4px;">Clique em <b>"+ Registrar Destaque da Temporada"</b> acima para imortalizar jogadores sob seus próprios critérios de treinador (peça chave, revelação, artilheiro decisivo).</p>
+      </div>
+    `;
+    initLucideIcons();
+    return;
+  }
+
+  grid.innerHTML = highlightsList.map(h => `
+    <div class="season-highlight-card">
+      <button class="shc-delete-btn" onclick="deleteSeasonHighlight(${h.id}, '${escapeJs(h.player_name)}')" title="Excluir Destaque">
+        <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+      </button>
+      <div class="shc-header" onclick="openPlayerModal(${h.player_id})" style="cursor: pointer;">
+        <div class="shc-avatar-wrap">
+          <img src="${h.face_url || '/assets/heads/notfound.png'}" onerror="this.src='/assets/heads/notfound.png'" alt="${escapeHtml(h.player_name)}" class="shc-avatar-img">
+        </div>
+        <div class="shc-player-info">
+          <div class="shc-player-name">${escapeHtml(h.player_name)}</div>
+          <div class="shc-meta">
+            <span class="shc-season-pill">📅 ${h.season_year}</span>
+            <span class="shc-pos-pill">${formatPosition(h.position)}</span>
+            ${h.motms_count > 0 ? `<span class="shc-season-pill" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.1);">⭐ ${h.motms_count}x MOTM</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="shc-title-badge">
+        <i data-lucide="award" style="width: 14px; height: 14px;"></i>
+        <span>${escapeHtml(h.highlight_title)}</span>
+      </div>
+      ${h.notes ? `<div class="shc-quote">"${escapeHtml(h.notes)}"</div>` : ''}
+      ${h.stats_summary ? `<div class="shc-stats"><i data-lucide="bar-chart-2" style="width: 13px; height: 13px; color: var(--accent-gold);"></i> <span>${escapeHtml(h.stats_summary)}</span></div>` : ''}
+    </div>
+  `).join('');
+  initLucideIcons();
+}
+
+function filterSeasonHighlights() {
+  const filterSelect = document.getElementById("hofHighlightSeasonFilter");
+  const selectedSeason = filterSelect ? filterSelect.value : "GERAL";
+  if (!selectedSeason || selectedSeason === "GERAL") {
+    renderSeasonHighlights(cachedSeasonHighlights);
+  } else {
+    const filtered = (cachedSeasonHighlights || []).filter(h => String(h.season_year) === String(selectedSeason));
+    renderSeasonHighlights(filtered);
+  }
+}
+
+function initSeasonHighlightModal() {
+  const modal = document.getElementById("modalAddSeasonHighlight");
+  const openBtn = document.getElementById("btnOpenHighlightModal");
+  const closeBtn = document.getElementById("modalAddSeasonHighlightCloseBtn");
+  const cancelBtn = document.getElementById("btnCancelAddSeasonHighlight");
+  const form = document.getElementById("formAddSeasonHighlight");
+  const playerSelect = document.getElementById("hlSelectPlayer");
+
+  if (!modal) return;
+
+  const closeModal = () => {
+    modal.style.display = "none";
+    modal.classList.remove("active");
+  };
+
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  if (openBtn) {
+    openBtn.addEventListener("click", () => {
+      // Preencher select com elenco atual
+      if (playerSelect) {
+        const currentPlayers = cachedSquadData || [];
+        playerSelect.innerHTML = '<option value="">-- Escolha um atleta ou digite abaixo --</option>' +
+          currentPlayers.map(p => `<option value="${p.player_id}" data-name="${escapeHtml(p.player_name)}" data-pos="${p.position}" data-ovr="${p.overall_rating || 75}" data-apps="${p.appearances || 0}" data-goals="${p.goals || 0}" data-assists="${p.assists || 0}" data-motms="${p.motms || 0}">${p.player_name} (${formatPosition(p.position)} - OVR ${p.overall_rating || 75})</option>`).join('');
+      }
+      const seasonYear = cachedDashboardData?.active_season || cachedDashboardData?.save?.season_year || "2027";
+      const seasonInput = document.getElementById("hlInputSeason");
+      if (seasonInput) seasonInput.value = seasonYear;
+
+      modal.style.display = "flex";
+      modal.classList.add("active");
+      initLucideIcons();
+    });
+  }
+
+  if (playerSelect) {
+    playerSelect.addEventListener("change", () => {
+      const opt = playerSelect.selectedOptions[0];
+      if (opt && opt.value) {
+        const nameInput = document.getElementById("hlInputName");
+        if (nameInput) nameInput.value = opt.getAttribute("data-name") || "";
+        
+        const pos = opt.getAttribute("data-pos") || "ATA";
+        const posSelect = document.getElementById("hlInputPosition");
+        if (posSelect) posSelect.value = formatPosition(pos);
+
+        const motms = opt.getAttribute("data-motms") || 0;
+        const motmsInput = document.getElementById("hlInputMotms");
+        if (motmsInput) motmsInput.value = motms;
+
+        const apps = opt.getAttribute("data-apps") || 0;
+        const goals = opt.getAttribute("data-goals") || 0;
+        const assists = opt.getAttribute("data-assists") || 0;
+        const statsInput = document.getElementById("hlInputStatsSummary");
+        if (statsInput && !statsInput.value) {
+          statsInput.value = `${apps} jogos, ${goals} gols, ${assists} assistências`;
+        }
+      }
+    });
+  }
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pId = parseInt(playerSelect?.value || "0") || Math.floor(Date.now() % 1000000);
+      const name = document.getElementById("hlInputName").value.trim();
+      const seasonYear = document.getElementById("hlInputSeason").value.trim() || "2027";
+      const position = document.getElementById("hlInputPosition").value;
+      const motms = parseInt(document.getElementById("hlInputMotms").value) || 0;
+      const title = document.getElementById("hlInputTitle").value.trim() || "Destaque da Temporada";
+      const statsSummary = document.getElementById("hlInputStatsSummary").value.trim();
+      const notes = document.getElementById("hlInputNotes").value.trim();
+
+      if (!name) {
+        showToast("Preencha o nome do atleta", "error");
+        return;
+      }
+      if (!notes) {
+        showToast("Preencha a justificativa do treinador", "error");
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/hall-of-fame/add_highlight`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            save_id: currentSaveId,
+            player_id: pId,
+            player_name: name,
+            position: position,
+            season_year: seasonYear,
+            highlight_title: title,
+            notes: notes,
+            stats_summary: statsSummary,
+            motms_count: motms
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === "success") {
+          showToast("⭐ Destaque da temporada registrado com sucesso!", "success");
+          form.reset();
+          closeModal();
+          await loadHallOfFameData();
+        } else {
+          showToast(`Erro ao registrar destaque: ${data.message || "Erro desconhecido"}`, "error");
+        }
+      } catch (err) {
+        console.error("Erro ao registrar destaque:", err);
+        showToast("Erro de rede ao registrar destaque", "error");
+      }
+    });
+  }
+}
+
+async function deleteSeasonHighlight(highlightId, playerName) {
+  if (!confirm(`Deseja realmente remover "${playerName}" dos Destaques da Temporada?`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/hall-of-fame/delete_highlight`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        save_id: currentSaveId,
+        highlight_id: highlightId
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      showToast("Destaque removido com sucesso!", "success");
+      await loadHallOfFameData();
+    } else {
+      showToast(`Erro ao remover: ${data.message || "Erro desconhecido"}`, "error");
+    }
+  } catch (err) {
+    showToast("Erro de conexão ao remover destaque", "error");
+  }
+}
+
+function initPlayerAwardModal() {
+  const modal = document.getElementById("modalAddPlayerAward");
+  const openBtn = document.getElementById("btnOpenAwardModal");
+  const closeBtn = document.getElementById("modalAddPlayerAwardCloseBtn");
+  const cancelBtn = document.getElementById("btnCancelAddPlayerAward");
+  const form = document.getElementById("formAddPlayerAward");
+  const playerSelect = document.getElementById("awardSelectPlayer");
+
+  if (!modal) return;
+
+  const closeModal = () => {
+    modal.style.display = "none";
+    modal.classList.remove("active");
+  };
+
+  if (closeBtn) closeBtn.addEventListener("click", closeModal);
+  if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  if (openBtn) {
+    openBtn.addEventListener("click", () => {
+      // Preencher select com elenco atual
+      if (playerSelect) {
+        const currentPlayers = cachedSquadData || [];
+        playerSelect.innerHTML = '<option value="">-- Escolha um atleta ou digite abaixo --</option>' +
+          currentPlayers.map(p => `<option value="${p.player_id}" data-name="${escapeHtml(p.player_name)}" data-pos="${p.position}">${p.player_name} (${formatPosition(p.position)} - OVR ${p.overall_rating || 75})</option>`).join('');
+      }
+      const seasonYear = cachedDashboardData?.active_season || cachedDashboardData?.save?.season_year || "2027";
+      const seasonInput = document.getElementById("awardInputSeason");
+      if (seasonInput) seasonInput.value = seasonYear;
+
+      modal.style.display = "flex";
+      modal.classList.add("active");
+      initLucideIcons();
+    });
+  }
+
+  if (playerSelect) {
+    playerSelect.addEventListener("change", () => {
+      const opt = playerSelect.selectedOptions[0];
+      if (opt && opt.value) {
+        const nameInput = document.getElementById("awardInputName");
+        if (nameInput) nameInput.value = opt.getAttribute("data-name") || "";
+      }
+    });
+  }
+
+  if (form) {
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const pId = parseInt(playerSelect?.value || "0") || Math.floor(Date.now() % 1000000);
+      const name = document.getElementById("awardInputName").value.trim();
+      const seasonYear = document.getElementById("awardInputSeason").value.trim() || "2027";
+      const category = document.getElementById("awardInputCategory").value;
+      const title = document.getElementById("awardInputTitle").value.trim() || "Craque da Temporada";
+      const competition = document.getElementById("awardInputCompetition").value.trim();
+      const notes = document.getElementById("awardInputNotes").value.trim();
+
+      if (!name) {
+        showToast("Preencha o nome do atleta", "error");
+        return;
+      }
+      if (!title) {
+        showToast("Preencha o nome do prêmio", "error");
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/hall-of-fame/add_award`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            save_id: currentSaveId,
+            player_id: pId,
+            player_name: name,
+            season_year: seasonYear,
+            award_type: category,
+            award_title: title,
+            competition_name: competition,
+            stat_value: notes
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.status === "success") {
+          showToast("🏆 Prêmio individual registrado com sucesso!", "success");
+          form.reset();
+          closeModal();
+          await loadHallOfFameData();
+        } else {
+          showToast(`Erro ao salvar prêmio: ${data.message || "Erro desconhecido"}`, "error");
+        }
+      } catch (err) {
+        console.error("Erro ao registrar prêmio:", err);
+        showToast("Erro de rede ao registrar prêmio", "error");
+      }
+    });
+  }
+}
+
+async function deletePlayerAward(awardId, awardTitle) {
+  if (!confirm(`Deseja realmente remover o prêmio "${awardTitle}"?`)) return;
+  try {
+    const res = await fetch(`${API_BASE}/hall-of-fame/delete_award`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        save_id: currentSaveId,
+        award_id: awardId
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      showToast("Prêmio individual removido com sucesso!", "success");
+      await loadHallOfFameData();
+    } else {
+      showToast(`Erro ao remover: ${data.message || "Erro desconhecido"}`, "error");
+    }
+  } catch (err) {
+    showToast("Erro de conexão ao remover prêmio", "error");
   }
 }
 

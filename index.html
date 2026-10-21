@@ -1307,22 +1307,48 @@
         <div class="pane-header flex-between" style="flex-wrap: wrap; gap: 0.75rem;">
           <div>
             <h2>Hall da Fama Eterno</h2>
-            <p>Maiores recordistas da história do save, ídolos aposentados no clube e galeria de prêmios individuais.</p>
+            <p>Maiores recordistas do save, destaques das temporadas, prêmios individuais e ídolos eternos.</p>
           </div>
-          <button class="btn-secondary" id="btnOpenRetireModal" title="Registrar Jogador Aposentado com Honras" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #fbbf24;">
-            <i data-lucide="heart-handshake"></i> + Registrar Atleta Aposentado
-          </button>
+          <div style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center;">
+            <button class="btn-primary" id="btnOpenHighlightModal" title="Registrar Destaque de Temporada por Escolha do Treinador" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; font-weight: 700; border: none; box-shadow: 0 4px 15px rgba(245, 158, 11, 0.35);">
+              <i data-lucide="star"></i> + Registrar Destaque da Temporada
+            </button>
+            <button class="btn-secondary" id="btnOpenAwardModal" title="Registrar Conquista ou Prêmio Individual Oficial" style="background: rgba(0, 210, 255, 0.12); border-color: rgba(0, 210, 255, 0.35); color: var(--neon-blue);">
+              <i data-lucide="sparkles"></i> + Prêmio Individual
+            </button>
+            <button class="btn-secondary" id="btnOpenRetireModal" title="Registrar Jogador Aposentado com Honras" style="background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.15); color: #fff;">
+              <i data-lucide="heart-handshake"></i> + Atleta Aposentado
+            </button>
+          </div>
         </div>
 
-        <!-- Galeria de Prêmios Individuais de Jogadores -->
+        <!-- 1. Galeria de Prêmios Individuais de Jogadores -->
         <div class="hof-category-section" style="margin-bottom: 2rem;">
-          <div class="hof-cat-title"><i data-lucide="sparkles"></i> Galeria de Prêmios Individuais de Jogadores</div>
+          <div class="card-header flex-between" style="flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+            <div class="hof-cat-title"><i data-lucide="sparkles" style="color: var(--neon-blue);"></i> Galeria de Prêmios Individuais de Jogadores</div>
+            <span class="badge-tag" style="background: rgba(0, 210, 255, 0.12); color: var(--neon-blue); font-size: 0.72rem;">CONQUISTAS & PRÊMIOS OFICIAIS</span>
+          </div>
           <div class="player-awards-grid" id="hofPlayerAwardsGrid">
             <!-- Cards de Prêmios (Bola de Ouro, Chuteira de Ouro, POTM, Luva de Ouro) -->
           </div>
         </div>
 
-        <!-- Grid das 5 Categorias Históricas com Cartinhas Prateadas FUT -->
+        <!-- 2. Galeria de Destaques das Temporadas (Escolhas do Treinador) -->
+        <div class="hof-category-section" style="margin-bottom: 2rem;">
+          <div class="card-header flex-between" style="flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+            <div class="ch-title"><i data-lucide="award" style="color: #fbbf24;"></i> Destaques das Temporadas (Critérios do Treinador)</div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <select id="hofHighlightSeasonFilter" class="vault-select" onchange="filterSeasonHighlights()" style="font-size: 0.8rem; padding: 0.3rem 0.6rem;">
+                <option value="GERAL">Todas as Temporadas</option>
+              </select>
+            </div>
+          </div>
+          <div class="season-highlights-grid" id="hofSeasonHighlightsGrid">
+            <!-- Cards dos Destaques registrados pelo treinador -->
+          </div>
+        </div>
+
+        <!-- 3. Grid das 6 Categorias Históricas com Cartinhas Prateadas FUT -->
         <div class="hof-records-grid" style="margin-top: 1.5rem;">
           <!-- 1. Artilheiros -->
           <div class="glass-card hof-column-card">
@@ -1368,9 +1394,18 @@
             <div class="hof-card-lead-wrap" id="hofGkCardLead"></div>
             <div class="rank-list" id="hofGoalkeepersList"></div>
           </div>
+
+          <!-- 6. Reis do Jogo (Mais vezes Man of the Match / Homem do Jogo) -->
+          <div class="glass-card hof-column-card">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="star"></i> Reis do Jogo (MOTM)</div>
+            </div>
+            <div class="hof-card-lead-wrap" id="hofMotmCardLead"></div>
+            <div class="rank-list" id="hofMotmList"></div>
+          </div>
         </div>
 
-        <!-- Seção: Ídolos Eternos Aposentados no Clube (Cartas Douradas FUT) -->
+        <!-- 4. Seção: Ídolos Eternos Aposentados no Clube (Cartas Douradas FUT) -->
         <div class="glass-card" style="margin-top: 2rem;">
           <div class="card-header flex-between" style="flex-wrap: wrap; gap: 0.5rem;">
             <div class="ch-title"><i data-lucide="crown"></i> Galeria dos Ídolos Eternos (Aposentados no Clube)</div>
@@ -3336,6 +3371,159 @@
           <button type="button" class="btn-secondary" id="btnCancelRetirePlayer">Cancelar</button>
           <button type="submit" class="btn-primary" id="btnSaveRetirePlayerSubmit">
             <i data-lucide="check"></i> Imortalizar no Hall da Fama
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: REGISTRAR DESTAQUE DA TEMPORADA (ESCOLHA TREINADOR) -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalAddSeasonHighlight" style="display: none;">
+    <div class="modal-card" style="max-width: 620px;">
+      <button class="modal-close-btn" id="modalAddSeasonHighlightCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;"><i data-lucide="star"></i></div>
+        <div>
+          <h2>Registrar Destaque da Temporada</h2>
+          <p>Consagre um jogador pelos seus próprios critérios de treinador (peça chave, revelação, artilheiro decisivo).</p>
+        </div>
+      </div>
+
+      <form id="formAddSeasonHighlight" class="vault-form" style="margin-top: 1rem;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="hlSelectPlayer">Selecionar Atleta do Elenco</label>
+            <select id="hlSelectPlayer" class="vault-select">
+              <option value="">-- Escolha um atleta ou digite abaixo --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="hlInputName">Nome do Atleta *</label>
+            <input type="text" id="hlInputName" class="vault-input" placeholder="Ex: Lucas Paquetá" required>
+          </div>
+        </div>
+
+        <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+          <div class="form-group">
+            <label for="hlInputSeason">Temporada *</label>
+            <input type="text" id="hlInputSeason" class="vault-input" placeholder="Ex: 2027" value="2027" required>
+          </div>
+          <div class="form-group">
+            <label for="hlInputPosition">Posição</label>
+            <select id="hlInputPosition" class="vault-select">
+              <option value="GOL">GOL - Goleiro</option>
+              <option value="ZAG">ZAG - Zagueiro</option>
+              <option value="LE">LE - Lateral Esquerdo</option>
+              <option value="LD">LD - Lateral Direito</option>
+              <option value="VOL">VOL - Volante</option>
+              <option value="MC">MC - Meia Central</option>
+              <option value="MEI">MEI - Meia Atacante</option>
+              <option value="PE">PE - Ponta Esquerda</option>
+              <option value="PD">PD - Ponta Direita</option>
+              <option value="ATA" selected>ATA - Atacante</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="hlInputMotms">MOTMs (Homem do Jogo)</label>
+            <input type="number" id="hlInputMotms" class="vault-input" placeholder="0" value="0" min="0">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="hlInputTitle">Título do Destaque / Conquista *</label>
+          <input type="text" id="hlInputTitle" class="vault-input" placeholder="Ex: Craque do Acesso, Peça Fundamental, Artilheiro Imparável" value="Destaque da Temporada" required>
+        </div>
+
+        <div class="form-group">
+          <label for="hlInputStatsSummary">Resumo Estatístico da Temporada</label>
+          <input type="text" id="hlInputStatsSummary" class="vault-input" placeholder="Ex: 34 jogos, 19 gols, 8 assistências, nota média 7.4">
+        </div>
+
+        <div class="form-group">
+          <label for="hlInputNotes">Justificativa do Treinador (Seus Critérios) *</label>
+          <textarea id="hlInputNotes" class="vault-input" rows="3" placeholder="Ex: Jogador foi o pulmão do meio-campo e decidiu os dois clássicos mais difíceis do ano, liderando a equipe rumo ao título." required></textarea>
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelAddSeasonHighlight">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSaveSeasonHighlightSubmit" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; font-weight: 700; border: none;">
+            <i data-lucide="star"></i> Salvar Destaque da Temporada
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: REGISTRAR PRÊMIO INDIVIDUAL OFICIAL (BOLA DE OURO, ETC) -->
+  <!-- ======================================================== -->
+  <div class="modal-overlay" id="modalAddPlayerAward" style="display: none;">
+    <div class="modal-card" style="max-width: 600px;">
+      <button class="modal-close-btn" id="modalAddPlayerAwardCloseBtn">&times;</button>
+      
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(0, 210, 255, 0.15); color: var(--neon-blue);"><i data-lucide="sparkles"></i></div>
+        <div>
+          <h2>Registrar Prêmio Individual</h2>
+          <p>Adicione um prêmio oficial ganho por um atleta (Bola de Ouro, Chuteira de Ouro, Melhor da Temporada, etc.).</p>
+        </div>
+      </div>
+
+      <form id="formAddPlayerAward" class="vault-form" style="margin-top: 1rem;">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="awardSelectPlayer">Selecionar Atleta do Elenco</label>
+            <select id="awardSelectPlayer" class="vault-select">
+              <option value="">-- Escolha um atleta ou digite abaixo --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="awardInputName">Nome do Atleta *</label>
+            <input type="text" id="awardInputName" class="vault-input" placeholder="Ex: Cristiano" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="awardInputSeason">Temporada *</label>
+            <input type="text" id="awardInputSeason" class="vault-input" placeholder="Ex: 2027" value="2027" required>
+          </div>
+          <div class="form-group">
+            <label for="awardInputCategory">Categoria do Prêmio</label>
+            <select id="awardInputCategory" class="vault-select">
+              <option value="BOLA_OURO" selected>🏆 Bola de Ouro / Craque da Temporada</option>
+              <option value="CHUTEIRA_OURO">👟 Chuteira de Ouro / Artilheiro</option>
+              <option value="ASSISTS">🪄 Garçom do Ano / Líder em Assistências</option>
+              <option value="MOTM">⭐ Rei do Jogo / Homem da Partida</option>
+              <option value="GK">🧤 Luva de Ouro / Melhor Goleiro</option>
+              <option value="OUTRO">🎖️ Outro Prêmio Individual</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="awardInputTitle">Nome Oficial do Prêmio *</label>
+            <input type="text" id="awardInputTitle" class="vault-input" placeholder="Ex: Bola de Ouro da Série B" value="Craque da Temporada" required>
+          </div>
+          <div class="form-group">
+            <label for="awardInputCompetition">Competição / Torneio</label>
+            <input type="text" id="awardInputCompetition" class="vault-input" placeholder="Ex: Série B, Brasileirão, Estadual">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="awardInputNotes">Estatísticas / Observação</label>
+          <input type="text" id="awardInputNotes" class="vault-input" placeholder="Ex: 22 gols marcados e eleito craque do campeonato">
+        </div>
+
+        <div class="form-actions" style="margin-top: 1.5rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" id="btnCancelAddPlayerAward">Cancelar</button>
+          <button type="submit" class="btn-primary" id="btnSavePlayerAwardSubmit">
+            <i data-lucide="check"></i> Salvar Prêmio Individual
           </button>
         </div>
       </form>

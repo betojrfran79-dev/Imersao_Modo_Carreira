@@ -1077,7 +1077,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             # 10. API Hall of Fame (com Aposentados, Prêmios e Cartinhas FUT Silver & Gold)
             if path == "/api/hall-of-fame":
                 hof = database.get_hall_of_fame(save_id)
-                for cat in ["top_scorers", "top_appearances", "top_assists", "top_contributions", "top_goalkeepers"]:
+                for cat in ["top_scorers", "top_appearances", "top_assists", "top_contributions", "top_goalkeepers", "top_motms"]:
                     for idx, p in enumerate(hof.get(cat, [])):
                         p["face_url"] = fcm_resolver.get_head_image_path_or_url(p["player_id"])
                         if idx == 0:
@@ -1085,6 +1085,10 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 
                 for a in hof.get("player_awards", []):
                     a["face_url"] = fcm_resolver.get_head_image_path_or_url(a["player_id"])
+
+                for sh in hof.get("season_highlights", []):
+                    sh["face_url"] = fcm_resolver.get_head_image_path_or_url(sh["player_id"])
+                    sh["fut_card"] = database.get_player_fut_card_data(sh["player_id"], sh.get("overall_rating", 75), sh.get("position", "ATA"))
 
                 for r in hof.get("retired_legends", []):
                     r["face_url"] = fcm_resolver.get_head_image_path_or_url(r["player_id"])
@@ -2775,6 +2779,56 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                 except Exception as e:
                     traceback.print_exc()
                     return self.send_json({"status": "error", "message": f"Erro ao remover aposentado: {str(e)}"}, 500)
+
+            # Destaques das Temporadas Escolhidos pelo Treinador
+            if path == "/api/hall-of-fame/add_highlight":
+                try:
+                    res = database.add_season_highlight(save_id, payload)
+                    return self.send_json({
+                        "status": "success",
+                        "id": res.get("id"),
+                        "message": "Destaque da temporada registrado com sucesso no Hall da Fama!"
+                    })
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro ao registrar destaque: {str(e)}"}, 500)
+
+            if path == "/api/hall-of-fame/delete_highlight":
+                try:
+                    highlight_id = int(payload.get("id", 0))
+                    database.delete_season_highlight(highlight_id)
+                    return self.send_json({
+                        "status": "success",
+                        "message": "Destaque da temporada removido com sucesso!"
+                    })
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro ao remover destaque: {str(e)}"}, 500)
+
+            # Prêmios Individuais de Jogadores
+            if path == "/api/hall-of-fame/add_award":
+                try:
+                    res = database.add_player_award(save_id, payload)
+                    return self.send_json({
+                        "status": "success",
+                        "id": res.get("id"),
+                        "message": "Prêmio individual adicionado à galeria!"
+                    })
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro ao adicionar prêmio: {str(e)}"}, 500)
+
+            if path == "/api/hall-of-fame/delete_award":
+                try:
+                    award_id = int(payload.get("id", 0))
+                    database.delete_player_award(award_id)
+                    return self.send_json({
+                        "status": "success",
+                        "message": "Prêmio individual removido com sucesso!"
+                    })
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro ao remover prêmio: {str(e)}"}, 500)
 
             if path == "/api/manager/add_trophy":
                 try:

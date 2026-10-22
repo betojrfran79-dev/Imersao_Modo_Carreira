@@ -1093,6 +1093,7 @@ function renderSquadTableRows(squadList) {
         </td>
         <td class="text-center"><span class="badge-tag">${formatPosition(p.position)}</span></td>
         <td class="text-center"><span class="badge-ovr">${p.overall_rating || 75}</span></td>
+        <td class="text-center"><span class="badge-pot">${p.potential || 80}</span></td>
         <td class="text-gold font-bold" title="Estimativa aproximada calculada pelo algoritmo oficial da EA FC (OVR, POT, Idade)">
           ${formatCurrency(p.market_value)}
           <small style="font-size: 0.65rem; color: var(--text-dim); font-weight: normal; display: block;">(estimativa)</small>

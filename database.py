@@ -3515,8 +3515,24 @@ def get_detailed_squad_stats(save_id, season_year=None, comp_name=None):
     WHERE save_id = ? AND season_year != '57053'
     """, (save_id,))
     comps = [r["competition_name"] for r in cur.fetchall()]
-
     conn.close()
+
+    import fcm_resolver
+    for p in rows:
+        m_val = float(p.get("market_value") or 0.0)
+        w_wage = float(p.get("weekly_wage") or 0.0)
+        if m_val <= 0:
+            calc_m, calc_w, _ = fcm_resolver.calculate_market_value_and_wage(
+                p.get("overall_rating", 70),
+                p.get("potential", p.get("overall_rating", 70)),
+                2026 - 25,
+                2026,
+                p.get("position", "ATA")
+            )
+            p["market_value"] = float(calc_m)
+            if w_wage <= 0:
+                p["weekly_wage"] = float(calc_w)
+        p["is_estimated_value"] = True
 
     return {
         "season_year": effective_season,
@@ -5135,7 +5151,18 @@ def search_live_scout_players(save_id, params):
 
             m_val = float(r["market_value"] or 0.0)
             w_wage = float(r["weekly_wage"] or 0.0)
+            if m_val <= 0.0:
+                import fcm_resolver
+                calc_m, calc_w, _ = fcm_resolver.calculate_market_value_and_wage(
+                    r["overall_rating"], r["potential"], 2026 - int(r["age"] or 24), 2026, r["position"]
+                )
+                m_val = float(calc_m)
+                if w_wage <= 0.0:
+                    w_wage = float(calc_w)
+
             r_clause = float(r["release_clause"] or 0.0)
+            if r_clause <= 0.0 and m_val > 0.0:
+                r_clause = float(m_val * 1.5)
             c_until = int(r["contract_valid_until"] or 2030) if "contract_valid_until" in r.keys() else 2030
 
             results.append({
@@ -5158,9 +5185,10 @@ def search_live_scout_players(save_id, params):
                 "skill_moves": r["skill_moves"],
                 "market_value": m_val,
                 "weekly_wage": w_wage,
+                "is_estimated_value": True,
                 "release_clause": r_clause,
                 "contract_valid_until": c_until,
-                "contract_status_note": f"Válido até {c_until}" if c_until > 0 else f"Sob consulta ({r['team_name']})",
+                "contract_status_note": f"Passe estimado: R$ {m_val:,.0f} (Aprox.)" if m_val > 0 else (f"Válido até {c_until}" if c_until > 0 else f"Sob consulta ({r['team_name']})"),
                 "highlight_tags": highlight_tags[:3],
                 "stats": {
                     "pace": pace,

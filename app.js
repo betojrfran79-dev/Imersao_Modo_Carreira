@@ -1093,8 +1093,10 @@ function renderSquadTableRows(squadList) {
         </td>
         <td class="text-center"><span class="badge-tag">${formatPosition(p.position)}</span></td>
         <td class="text-center"><span class="badge-ovr">${p.overall_rating || 75}</span></td>
-        <td class="text-center"><span class="badge-pot">${p.potential || 80}</span></td>
-        <td class="text-gold font-bold">${formatCurrency(p.market_value)}</td>
+        <td class="text-gold font-bold" title="Estimativa aproximada calculada pelo algoritmo oficial da EA FC (OVR, POT, Idade)">
+          ${formatCurrency(p.market_value)}
+          <small style="font-size: 0.65rem; color: var(--text-dim); font-weight: normal; display: block;">(estimativa)</small>
+        </td>
         <td class="text-center">${p.appearances || 0}</td>
         <td class="text-center font-bold">${p.goals || 0}</td>
         <td class="text-center">${p.assists || 0}</td>
@@ -1680,8 +1682,11 @@ async function loadHallOfFameData() {
               ` : ''}
               <img class="award-player-face" src="${a.face_url}" onerror="this.src='/api/avatar/youth/${a.player_id}'" alt="${escapeHtml(a.player_name)}">
               <div class="award-details">
-                <span class="award-tag-type"><i data-lucide="${icon}" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${escapeHtml(a.award_type)}</span>
-                <span class="award-title-text font-bold" style="color: #fff;">${escapeHtml(a.award_title)}</span>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <span class="award-tag-type"><i data-lucide="${icon}" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${escapeHtml(a.award_type)}</span>
+                  ${a.competition_name ? `<span class="shc-season-pill" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.1); font-size: 0.65rem; padding: 1px 6px;"><i data-lucide="trophy" style="width: 9px; height: 9px; vertical-align: middle;"></i> ${escapeHtml(a.competition_name)}</span>` : ''}
+                </div>
+                <span class="award-title-text font-bold" style="color: #fff; font-size: 0.88rem;">${escapeHtml(a.award_title)}</span>
                 <span class="award-player-name">${escapeHtml(a.player_name)} • ${a.season_year}</span>
                 ${a.stat_value ? `<span class="award-stat-val" style="color: var(--accent-gold); font-size: 0.72rem;">${escapeHtml(a.stat_value)}</span>` : ''}
               </div>
@@ -6677,6 +6682,7 @@ function renderScoutPlayerCards(players, source = "live_editor") {
           <td>
             <div class="font-bold text-gold" style="font-size: 0.86rem;">${formattedVal}</div>
             <div style="font-size: 0.7rem; color: var(--text-dim);">${formattedWage}/sem</div>
+            ${rawVal > 0 ? `<div style="font-size: 0.65rem; color: #38bdf8; margin-top: 1px;">(passe estimado)</div>` : ''}
           </td>
 
           <!-- 14. Ações -->
@@ -6773,7 +6779,7 @@ function renderScoutPlayerCards(players, source = "live_editor") {
           <!-- Financial Row -->
           <div class="spc-financial-row">
             <div>
-              <span style="font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase;">Passe:</span>
+              <span style="font-size: 0.68rem; color: #38bdf8; text-transform: uppercase; font-weight: 600;">Passe Estimado:</span>
               <span class="spc-market-val">${formattedVal}</span>
             </div>
             <div>

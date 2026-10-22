@@ -922,7 +922,7 @@
                   <th class="sortable-th text-center" data-sort="position"><span>Posição</span><span class="sort-icon"></span></th>
                   <th class="sortable-th text-center" data-sort="overall_rating"><span>OVR</span><span class="sort-icon"></span></th>
                   <th class="sortable-th text-center" data-sort="potential"><span>POT</span><span class="sort-icon"></span></th>
-                  <th class="sortable-th" data-sort="market_value"><span>Valor de Mercado</span><span class="sort-icon"></span></th>
+                  <th class="sortable-th" data-sort="market_value"><span title="Estimativa do valor de passe calculada pelo algoritmo da EA FC (OVR, POT, Idade)">Passe Estimado (Aprox.)</span><span class="sort-icon"></span></th>
                   <th class="sortable-th text-center" data-sort="appearances"><span>Jogos</span><span class="sort-icon"></span></th>
                   <th class="sortable-th text-center" data-sort="goals"><span>Gols</span><span class="sort-icon"></span></th>
                   <th class="sortable-th text-center" data-sort="assists"><span>Assistências</span><span class="sort-icon"></span></th>
@@ -1660,7 +1660,7 @@
                         <th class="text-center" title="Drible / Condução"><span>DRI</span></th>
                         <th class="text-center" title="Defesa / Combate"><span>DEF</span></th>
                         <th class="text-center" title="Físico / Força"><span>FIS</span></th>
-                        <th><span>Status de Mercado</span></th>
+                        <th title="Estimativa do valor de passe calculada pelo algoritmo oficial da EA FC"><span>Passe Estimado (Aprox.)</span></th>
                         <th class="text-center" style="min-width: 140px;"><span>Ações</span></th>
                       </tr>
                     </thead>
@@ -2506,8 +2506,12 @@
 
         <div class="psm-header-actions">
           <div class="psm-market-box">
+            <div style="font-size: 0.68rem; color: #38bdf8; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">
+              <i data-lucide="tag" style="width: 11px; height: 11px; vertical-align: middle;"></i> Estimativa de Passe (Aprox.)
+            </div>
             <div class="psm-val-main" id="spmMarketVal">Sob Consulta</div>
             <div class="psm-wage-sub" id="spmWageVal">Salário: A Negociar</div>
+            <div style="font-size: 0.65rem; color: var(--text-dim); margin-top: 3px;">* Estimativa via algoritmo EA FC</div>
           </div>
           <button type="button" class="btn-primary btn-sm" id="btnSpmShortlist">
             <i data-lucide="star"></i> <span id="btnSpmShortlistText">Observar</span>
@@ -3510,8 +3514,16 @@
             <input type="text" id="awardInputTitle" class="vault-input" placeholder="Ex: Bola de Ouro da Série B" value="Craque da Temporada" required>
           </div>
           <div class="form-group">
-            <label for="awardInputCompetition">Competição / Torneio</label>
-            <input type="text" id="awardInputCompetition" class="vault-input" placeholder="Ex: Série B, Brasileirão, Estadual">
+            <label for="awardInputCompetition">Competição / Campeonato Oficial</label>
+            <input type="text" id="awardInputCompetition" class="vault-input" placeholder="Ex: Brasileirão Série B, Campeonato Carioca, Copa do Brasil">
+            <div style="display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px;">
+              <button type="button" class="btn-quick-val" onclick="document.getElementById('awardInputCompetition').value='Brasileirão Série B'">Série B</button>
+              <button type="button" class="btn-quick-val" onclick="document.getElementById('awardInputCompetition').value='Brasileirão Série A'">Série A</button>
+              <button type="button" class="btn-quick-val" onclick="document.getElementById('awardInputCompetition').value='Campeonato Carioca'">Carioca</button>
+              <button type="button" class="btn-quick-val" onclick="document.getElementById('awardInputCompetition').value='Copa do Brasil'">Copa do Brasil</button>
+              <button type="button" class="btn-quick-val" onclick="document.getElementById('awardInputCompetition').value='Copa Libertadores'">Libertadores</button>
+              <button type="button" class="btn-quick-val" onclick="document.getElementById('awardInputCompetition').value='Copa Sul-Americana'">Sul-Americana</button>
+            </div>
           </div>
         </div>
 

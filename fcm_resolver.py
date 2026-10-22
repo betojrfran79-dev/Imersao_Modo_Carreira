@@ -484,12 +484,15 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
                 except Exception:
                     pass
 
-    # 3. Se ainda sem salário e possui clube ativo, calibra proporcionalmente ao OVR/POT da carreira (padrão oficial EA FC)
-    if w_wage <= 0 and team_name not in ("Sem Clube", "Livre no Mercado", "Passes livres", "Passes Livres", ""):
-        calc_m, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026)
+    # 3. Se valor de mercado ou salário estiverem zerados, calcula estimativa oficial proporcional ao OVR/POT/Idade da EA
+    if m_val <= 0:
+        calc_m, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026, pos)
+        m_val = float(calc_m)
+        if w_wage <= 0:
+            w_wage = float(calc_w)
+    elif w_wage <= 0 and team_name not in ("Sem Clube", "Livre no Mercado", "Passes livres", "Passes Livres", ""):
+        _, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026, pos)
         w_wage = float(calc_w)
-        if m_val <= 0:
-            m_val = float(calc_m)
 
     if r_clause <= 0 and m_val > 0:
         r_clause = float(m_val * 1.5)
@@ -1402,7 +1405,7 @@ def search_scout_players(params, current_year=2026):
 
     for r in rows:
         name = r["commonname"] if r["commonname"] else f"{r['firstname']} {r['lastname']}".strip()
-        _, _, age = calculate_market_value_and_wage(r["overallrating"], r["potential"], r["birthdate"], current_year, r["Position"])
+        calc_market_val, calc_wage, age = calculate_market_value_and_wage(r["overallrating"], r["potential"], r["birthdate"], current_year, r["Position"])
 
         if min_ovr and r["overallrating"] < min_ovr:
             continue
@@ -1488,11 +1491,11 @@ def search_scout_players(params, current_year=2026):
             "weight": r["weight"],
             "preferred_foot": "Canhoto" if r["preferredfoot"] == 2 else "Destro",
             "weak_foot": r["weakfootabilitytypecode"],
-            "skill_moves": r["skillmoves"],
-            "market_value": 0.0,
-            "weekly_wage": 0.0,
-            "release_clause": 0.0,
-            "contract_status_note": f"Valor do passe sob consulta diretamente com o {r['teamname'] or 'clube atual'}",
+            "market_value": float(calc_market_val),
+            "weekly_wage": float(calc_wage),
+            "is_estimated_value": True,
+            "release_clause": float(calc_market_val * 1.5),
+            "contract_status_note": f"Passe estimado: R$ {calc_market_val:,.0f} (Aprox.)",
             "highlight_tags": highlight_tags[:3],
             "stats": {
                 "pace": pace,

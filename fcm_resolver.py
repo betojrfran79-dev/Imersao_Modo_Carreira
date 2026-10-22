@@ -486,12 +486,12 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
 
     # 3. Se valor de mercado ou salário estiverem zerados, calcula estimativa oficial proporcional ao OVR/POT/Idade da EA
     if m_val <= 0:
-        calc_m, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026, pos)
+        calc_m, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026, pos1)
         m_val = float(calc_m)
         if w_wage <= 0:
             w_wage = float(calc_w)
     elif w_wage <= 0 and team_name not in ("Sem Clube", "Livre no Mercado", "Passes livres", "Passes Livres", ""):
-        _, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026, pos)
+        _, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026, pos1)
         w_wage = float(calc_w)
 
     if r_clause <= 0 and m_val > 0:

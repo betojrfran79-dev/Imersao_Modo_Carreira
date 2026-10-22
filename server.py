@@ -2329,16 +2329,44 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 })
 
             if path == "/api/scout/shortlist/add":
-                p_id = payload.get("player_id")
+                p_id = int(payload.get("player_id", 0))
                 p_name = payload.get("player_name") or payload.get("name")
+                if not p_name or str(p_name).startswith("Jogador #"):
+                    resolved = fcm_resolver.resolve_player_name(p_id)
+                    if resolved and not resolved.startswith("Jogador #"):
+                        p_name = resolved
                 t_name = payload.get("team_name", "")
                 pos = payload.get("position", "ATA")
-                ovr = payload.get("overall_rating") or payload.get("ovr", 75)
-                pot = payload.get("potential") or payload.get("pot", 80)
-                val = payload.get("market_value", 0.0)
-                wage = payload.get("weekly_wage", 0.0)
-                age = payload.get("age", 24)
+                ovr = int(payload.get("overall_rating") or payload.get("ovr", 75))
+                pot = int(payload.get("potential") or payload.get("pot", 80))
+                val = float(payload.get("market_value", 0.0))
+                wage = float(payload.get("weekly_wage", 0.0))
+                age = int(payload.get("age", 24))
                 notes = payload.get("notes", "")
+
+                # Se veio com dados faltantes, enriquece pelo fcm_resolver
+                if not t_name or val <= 0:
+                    try:
+                        p_full = fcm_resolver.get_full_player_profile(p_id, save_id)
+                        if p_full:
+                            if not p_name or str(p_name).startswith("Jogador #"):
+                                p_name = p_full.get("player_name", p_name)
+                            if not t_name:
+                                t_name = p_full.get("team_name", "")
+                            if pos == "ATA" and p_full.get("position"):
+                                pos = p_full.get("position")
+                            if ovr == 75 and p_full.get("overall_rating"):
+                                ovr = p_full.get("overall_rating")
+                            if pot == 80 and p_full.get("potential"):
+                                pot = p_full.get("potential")
+                            if val <= 0 and p_full.get("market_value"):
+                                val = p_full.get("market_value")
+                            if wage <= 0 and p_full.get("weekly_wage"):
+                                wage = p_full.get("weekly_wage")
+                            if age == 24 and p_full.get("age"):
+                                age = p_full.get("age")
+                    except Exception:
+                        pass
                 
                 success = database.add_to_shortlist(save_id, p_id, p_name, t_name, pos, ovr, pot, val, wage, age, notes)
                 return self.send_json({"status": "success" if success else "error", "message": f"{p_name} adicionado à Lista de Observação!"})

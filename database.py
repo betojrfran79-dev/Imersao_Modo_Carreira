@@ -4393,7 +4393,22 @@ def get_shortlist(save_id):
     try:
         cur.execute("SELECT * FROM scout_shortlist WHERE save_id = ? ORDER BY added_at DESC", (save_id,))
         rows = cur.fetchall()
-        return [dict(r) for r in rows]
+        result = []
+        import fcm_resolver
+        for r in rows:
+            d = dict(r)
+            p_name = str(d.get("player_name") or "")
+            if not p_name or p_name.startswith("Jogador #"):
+                real_name = fcm_resolver.resolve_player_name(d["player_id"])
+                if real_name and not real_name.startswith("Jogador #"):
+                    d["player_name"] = real_name
+                    try:
+                        cur.execute("UPDATE scout_shortlist SET player_name = ? WHERE id = ?", (real_name, d["id"]))
+                        conn.commit()
+                    except Exception:
+                        pass
+            result.append(d)
+        return result
     except Exception as e:
         print(f"Erro ao listar shortlist: {e}")
         return []

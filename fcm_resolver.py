@@ -990,8 +990,8 @@ def calculate_market_value_and_wage(ovr, pot, birthdate_or_year, current_year=20
     ovr = max(40, min(99, int(ovr or 70)))
     pot = max(ovr, min(99, int(pot or ovr)))
 
-    # Algoritmo calibrado com o Live Editor / EA FC
-    base = 120000.0 * (1.26 ** max(0, ovr - 60))
+    # Algoritmo calibrado com o Live Editor / EA FC (Calibração precisa 1.70x pelos dados reais do jogo)
+    base = 205000.0 * (1.26 ** max(0, ovr - 60))
     pot_bonus = 1.0 + (max(0, pot - ovr) * 0.085)
     
     if age <= 20:

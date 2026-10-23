@@ -1654,6 +1654,7 @@ function generateFutCardHtml(player, type = 'silver', recordBadge = '', topTag =
 // 8. CARREGAR HALL DA FAMA ETERNO (DESTAQUES, PRÊMIOS & MOTM)
 // -------------------------------------------------------------
 let cachedSeasonHighlights = [];
+let cachedPlayerAwards = [];
 
 async function loadHallOfFameData() {
   try {
@@ -1661,43 +1662,10 @@ async function loadHallOfFameData() {
     if (!res.ok) return;
     const data = await res.json();
 
-    // 1. Galeria de Prêmios Individuais de Jogadores (Bola de Ouro, Chuteira de Ouro, etc.)
-    const awardsGrid = document.getElementById("hofPlayerAwardsGrid");
-    if (awardsGrid) {
-      if (data.player_awards && data.player_awards.length > 0) {
-        awardsGrid.innerHTML = data.player_awards.map(a => {
-          let icon = 'sparkles';
-          const type = (a.award_type || '').toUpperCase();
-          if (type.includes('BOLA') || type.includes('CRAQUE')) icon = 'trophy';
-          else if (type.includes('CHUTEIRA') || type.includes('GOL')) icon = 'flame';
-          else if (type.includes('GARÇOM') || type.includes('ASSIST')) icon = 'sparkles';
-          else if (type.includes('MOTM') || type.includes('JOGO')) icon = 'star';
-          else if (type.includes('LUVA') || type.includes('GK')) icon = 'shield';
-
-          return `
-            <div class="award-card" style="position: relative; cursor: pointer;" onclick="openPlayerModal(${a.player_id})">
-              ${a.id ? `
-                <button class="btn-xs text-danger" onclick="event.stopPropagation(); deletePlayerAward(${a.id}, '${escapeJs(a.award_title)}')" title="Excluir Prêmio" style="position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 2px 5px; cursor: pointer; color: #ef4444; z-index: 3;">
-                  <i data-lucide="trash-2" style="width: 11px; height: 11px;"></i>
-                </button>
-              ` : ''}
-              <img class="award-player-face" src="${a.face_url}" onerror="this.src='/api/avatar/youth/${a.player_id}'" alt="${escapeHtml(a.player_name)}">
-              <div class="award-details">
-                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                  <span class="award-tag-type"><i data-lucide="${icon}" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${escapeHtml(a.award_type)}</span>
-                  ${a.competition_name ? `<span class="shc-season-pill" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.1); font-size: 0.65rem; padding: 1px 6px;"><i data-lucide="trophy" style="width: 9px; height: 9px; vertical-align: middle;"></i> ${escapeHtml(a.competition_name)}</span>` : ''}
-                </div>
-                <span class="award-title-text font-bold" style="color: #fff; font-size: 0.88rem;">${escapeHtml(a.award_title)}</span>
-                <span class="award-player-name">${escapeHtml(a.player_name)} • ${a.season_year}</span>
-                ${a.stat_value ? `<span class="award-stat-val" style="color: var(--accent-gold); font-size: 0.72rem;">${escapeHtml(a.stat_value)}</span>` : ''}
-              </div>
-            </div>
-          `;
-        }).join('');
-      } else {
-        awardsGrid.innerHTML = `<span class="empty-hint">Nenhum prêmio individual registrado ainda. Prêmios automáticos são sincronizados ao final de cada temporada e você também pode registrar prêmios no botão acima.</span>`;
-      }
-    }
+    // 1. Galeria de Prêmios Individuais de Jogadores (Filtro por Temporada, padrão: mais recente)
+    cachedPlayerAwards = data.player_awards || [];
+    populateAwardSeasonFilter(cachedPlayerAwards);
+    filterPlayerAwards();
 
     // 2. Galeria de Destaques das Temporadas (Critérios do Treinador)
     cachedSeasonHighlights = data.season_highlights || [];
@@ -5122,8 +5090,86 @@ async function deleteRetiredPlayer(playerId, playerName) {
 }
 
 // ==============================================================================
-// 21.1 DESTAQUES DAS TEMPORADAS & PRÊMIOS INDIVIDUAIS (HALL DA FAMA)
+// 21.1 PRÊMIOS INDIVIDUAIS & DESTAQUES DAS TEMPORADAS (HALL DA FAMA)
 // ==============================================================================
+function populateAwardSeasonFilter(awardsList) {
+  const filterSelect = document.getElementById("hofAwardSeasonFilter");
+  if (!filterSelect) return;
+  const currentVal = filterSelect.value;
+  const seasons = [...new Set((awardsList || []).map(a => String(a.season_year)).filter(Boolean))].sort().reverse();
+
+  let html = '';
+  // Regra solicitada: por padrão, deixa sempre à mostra os prêmios da última temporada (mais recente)
+  const defaultSeason = seasons.length > 0 ? seasons[0] : "GERAL";
+  const selectedSeason = (currentVal && (seasons.includes(currentVal) || currentVal === "GERAL")) ? currentVal : defaultSeason;
+
+  seasons.forEach(s => {
+    html += `<option value="${s}" ${s === selectedSeason ? 'selected' : ''}>Temporada ${s}</option>`;
+  });
+  html += `<option value="GERAL" ${selectedSeason === "GERAL" ? 'selected' : ''}>Todas as Temporadas (Geral)</option>`;
+
+  filterSelect.innerHTML = html;
+}
+
+function filterPlayerAwards() {
+  const filterSelect = document.getElementById("hofAwardSeasonFilter");
+  const selectedSeason = filterSelect ? filterSelect.value : "GERAL";
+  if (!selectedSeason || selectedSeason === "GERAL") {
+    renderPlayerAwards(cachedPlayerAwards, "GERAL");
+  } else {
+    const filtered = (cachedPlayerAwards || []).filter(a => String(a.season_year) === String(selectedSeason));
+    renderPlayerAwards(filtered, selectedSeason);
+  }
+}
+
+function renderPlayerAwards(awardsList, currentSeasonFilter = null) {
+  const awardsGrid = document.getElementById("hofPlayerAwardsGrid");
+  if (!awardsGrid) return;
+
+  if (!awardsList || awardsList.length === 0) {
+    awardsGrid.innerHTML = `
+      <div class="empty-hint" style="grid-column: 1 / -1; padding: 2rem 1rem; text-align: center;">
+        <i data-lucide="sparkles" style="width: 32px; height: 32px; opacity: 0.35; margin-bottom: 0.5rem; display: inline-block;"></i>
+        <p>Nenhum prêmio individual registrado ${currentSeasonFilter && currentSeasonFilter !== 'GERAL' ? `para a Temporada ${currentSeasonFilter}` : 'ainda'}.</p>
+        <p style="font-size: 0.78rem; color: var(--text-dim); margin-top: 4px;">Prêmios automáticos são sincronizados ao final de cada temporada e você também pode registrar prêmios no botão <b>"+ Prêmio Individual"</b> acima.</p>
+      </div>
+    `;
+    initLucideIcons();
+    return;
+  }
+
+  awardsGrid.innerHTML = awardsList.map(a => {
+    let icon = 'sparkles';
+    const type = (a.award_type || '').toUpperCase();
+    if (type.includes('BOLA') || type.includes('CRAQUE')) icon = 'trophy';
+    else if (type.includes('CHUTEIRA') || type.includes('GOL')) icon = 'flame';
+    else if (type.includes('GARÇOM') || type.includes('ASSIST')) icon = 'sparkles';
+    else if (type.includes('MOTM') || type.includes('JOGO')) icon = 'star';
+    else if (type.includes('LUVA') || type.includes('GK')) icon = 'shield';
+
+    return `
+      <div class="award-card" style="position: relative; cursor: pointer;" onclick="openPlayerModal(${a.player_id})">
+        ${a.id ? `
+          <button class="btn-xs text-danger" onclick="event.stopPropagation(); deletePlayerAward(${a.id}, '${escapeJs(a.award_title)}')" title="Excluir Prêmio" style="position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; padding: 2px 5px; cursor: pointer; color: #ef4444; z-index: 3;">
+            <i data-lucide="trash-2" style="width: 11px; height: 11px;"></i>
+          </button>
+        ` : ''}
+        <img class="award-player-face" src="${a.face_url}" onerror="this.src='/api/avatar/youth/${a.player_id}'" alt="${escapeHtml(a.player_name)}">
+        <div class="award-details">
+          <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span class="award-tag-type"><i data-lucide="${icon}" style="width: 10px; height: 10px; vertical-align: middle;"></i> ${escapeHtml(a.award_type)}</span>
+            ${a.competition_name ? `<span class="shc-season-pill" style="color: #38bdf8; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.1); font-size: 0.65rem; padding: 1px 6px;"><i data-lucide="trophy" style="width: 9px; height: 9px; vertical-align: middle;"></i> ${escapeHtml(a.competition_name)}</span>` : ''}
+          </div>
+          <span class="award-title-text font-bold" style="color: #fff; font-size: 0.88rem;">${escapeHtml(a.award_title)}</span>
+          <span class="award-player-name">${escapeHtml(a.player_name)} • ${a.season_year}</span>
+          ${a.stat_value ? `<span class="award-stat-val" style="color: var(--accent-gold); font-size: 0.72rem;">${escapeHtml(a.stat_value)}</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+  initLucideIcons();
+}
+
 function populateHighlightSeasonFilter(highlightsList) {
   const filterSelect = document.getElementById("hofHighlightSeasonFilter");
   if (!filterSelect) return;
@@ -5191,6 +5237,9 @@ function filterSeasonHighlights() {
     renderSeasonHighlights(filtered);
   }
 }
+
+window.filterPlayerAwards = filterPlayerAwards;
+window.filterSeasonHighlights = filterSeasonHighlights;
 
 function initSeasonHighlightModal() {
   const modal = document.getElementById("modalAddSeasonHighlight");

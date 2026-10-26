@@ -1,0 +1,59 @@
+==============================================================================
+🏆 IMERSÃO MODO CARREIRA - EA FC & FC MANIA (VERSÃO 1.0 FINAL)
+==============================================================================
+
+Parabéns! Você está com o pacote oficial e final do Imersão Modo Carreira.
+Este pacote contém todos os módulos mais recentes:
+- Hall da Fama Eterno com Destaques das Temporadas e Homem do Jogo (MOTM)
+- Galeria de Prêmios Individuais (Bola de Ouro, Chuteira de Ouro, etc.)
+- Scout Nacional e Internacional com Estimativa de Passe (Algoritmo EA FC)
+- Central de Mídias Sociais & Redes com IA
+- Base de Jovens Talentos (Youth Academy)
+- Python Portátil Embutido (não precisa instalar nada no seu Windows)
+
+------------------------------------------------------------------------------
+OPÇÃO A: SE VOCÊ JÁ TINHA UMA VERSÃO ANTERIOR (COMO ATUALIZAR)
+------------------------------------------------------------------------------
+Se você já usava o aplicativo e quer apenas atualizar com todas as novidades:
+
+1. Feche o aplicativo e certifique-se de que a janela preta do servidor esteja fechada.
+2. Copie todos os arquivos deste arquivo ZIP e cole dentro da sua pasta atual
+   do aplicativo (ex: Desktop\App_Modo_carreira).
+3. Quando o Windows perguntar se deseja substituir os arquivos, clique em:
+   👉 "Substituir os arquivos no destino".
+4. SEU PROGRESSO E SEUS SAVES ESTÃO PROTEGIDOS:
+   O seu arquivo de banco de dados (career_vault.db) NÃO é sobrescrito, portanto
+   todas as suas temporadas e dados da carreira continuam intactos!
+5. Dê dois cliques em "INICIAR_VAULT.bat" (ou no atalho da Área de Trabalho).
+6. Pronto! Ao abrir no navegador, aperte Ctrl + F5 uma vez para limpar o cache.
+
+------------------------------------------------------------------------------
+OPÇÃO B: SE É SUA PRIMEIRA VEZ (INSTALAÇÃO LIMPA DO ZERO)
+------------------------------------------------------------------------------
+Se você está instalando pela primeira vez em um novo computador:
+
+1. Extraia o conteúdo deste arquivo ZIP em qualquer pasta do seu computador
+   (Recomendado: C:\Imersao_Modo_Carreira ou na sua Área de Trabalho).
+2. Abra a pasta extraída e dê dois cliques no arquivo:
+   👉 INSTALAR_PRIMEIRA_VEZ.bat
+3. O instalador vai criar automaticamente o atalho oficial com o ícone do jogo
+   na sua Área de Trabalho.
+4. Para abrir o aplicativo no dia a dia, basta dar dois cliques no atalho
+   "Imersao Modo Carreira - EA FC" na sua Área de Trabalho.
+5. O navegador abrirá automaticamente com o aplicativo pronto para usar!
+
+------------------------------------------------------------------------------
+COMO SINCRONIZAR COM O SEU JOGO NO MODO CARREIRA (LIVE EDITOR):
+------------------------------------------------------------------------------
+1. Copie o arquivo "EXTRAIR_DADOS_CARREIRA.lua" (da pasta do aplicativo) para:
+   📁 C:\Program Files\EA Games\EA SPORTS FC 26\FCM 26\Live Editor\lua\
+2. Abra o EA FC 26 no seu Modo Carreira pelo launcher do FCM / Live Editor.
+3. Aperte F9 no teclado para abrir o menu do Live Editor.
+4. Vá na aba "Lua Scripts", selecione "EXTRAIR_DADOS_CARREIRA.lua" e clique em "Run Script".
+   (Dica: Marque a caixinha "Autorun" ao lado do script).
+5. O script criará automaticamente no seu Desktop a pasta "Imersao_Modo_Carreira".
+6. No aplicativo, clique no botão "Sincronizar" (ou aperte F5).
+   Tudo do seu clube será carregado com fidelidade total!
+
+Dúvidas ou suporte: Roberto / Imersão Modo Carreira
+==============================================================================

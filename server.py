@@ -291,13 +291,12 @@ Atualizado em: {now_str}
 ================================================================================
 
 1. ONDE SALVAR O SCRIPT LUA NO SEU PC:
-   No Patch FC Mania (FCM), a pasta do Live Editor fica localizada DENTRO da pasta
-   do seu jogo EA SPORTS FC:
+   No Patch FC Mania (FCM 26), a pasta do Live Editor fica localizada em:
    
-   C:\\Program Files\\EA Games\\EA SPORTS FC\\Live Editor\\lua\\scripts\\
-   (ou C:\\Arquivos de Programas\\EA Games\\EA SPORTS FC\\Live Editor\\lua\\scripts\\)
+   C:\\Program Files\\EA Games\\EA SPORTS FC 26\\FCM 26\\Live Editor\\lua\\
+   (ou na subpasta \\scripts\\)
 
-   Basta copiar o arquivo "EXTRAIR_DADOS_CARREIRA.lua" para dentro da pasta "scripts" acima!
+   Basta copiar o arquivo "EXTRAIR_DADOS_CARREIRA.lua" para dentro da pasta "lua" acima!
 
 2. COMO EXECUTAR NO JOGO:
    a) Abra o EA SPORTS FC pelo Launcher do Live Editor com o Patch FCM.
@@ -387,11 +386,16 @@ pause
 
     # Também tentar copiar direto na pasta do Live Editor se ela existir no disco!
     possible_fcm_paths = [
+        r"C:\Program Files\EA Games\EA SPORTS FC 26\FCM 26\Live Editor\lua",
+        r"C:\Program Files\EA Games\EA SPORTS FC 26\FCM 26\Live Editor\lua\scripts",
+        r"C:\Program Files\EA Games\EA SPORTS FC 25\FCM 25\Live Editor\lua",
+        r"C:\Program Files\EA Games\EA SPORTS FC 25\FCM 25\Live Editor\lua\scripts",
         r"C:\Program Files\EA Games\EA SPORTS FC\Live Editor\lua\scripts",
         r"C:\Program Files\EA Games\EA SPORTS FC 25\Live Editor\lua\scripts",
         r"C:\Program Files\EA Games\EA SPORTS FC 24\Live Editor\lua\scripts",
         r"C:\Program Files (x86)\EA Games\EA SPORTS FC\Live Editor\lua\scripts",
         r"C:\FC 26 Live Editor\lua\scripts",
+        r"C:\FC 26 Live Editor\lua",
         r"C:\FC 25 Live Editor\lua\scripts",
         r"C:\FC 24 Live Editor\lua\scripts",
         r"D:\Program Files\EA Games\EA SPORTS FC\Live Editor\lua\scripts",
@@ -411,7 +415,7 @@ pause
 def open_in_windows_explorer(folder_path):
     if not folder_path:
         desks = get_all_user_desktop_dirs()
-        folder_path = os.path.join(desks[0], "Dados_Carreira_FC") if desks else r"C:\Users\Roberto\Desktop\Dados_Carreira_FC"
+        folder_path = os.path.join(desks[0], "Imersao_Modo_Carreira") if desks else os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Desktop", "Imersao_Modo_Carreira")
         
     try:
         norm_p = os.path.normpath(os.path.abspath(folder_path))
@@ -1458,7 +1462,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
 
                 return self.send_json({
                     "status": "success",
-                    "message": "Dados reais do jogo importados com sucesso da pasta Dados_Carreira_FC!",
+                    "message": "Dados reais do jogo importados com sucesso da pasta Imersao_Modo_Carreira!",
                     "file_path": target_file,
                     "manager_name": payload.get("manager_name", "Técnico"),
                     "team_name": payload.get("team_name", "Clube"),
@@ -1595,15 +1599,21 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             # SETUP / GUIA DE INÍCIO RÁPIDO & STATUS DO SISTEMA
             # ========================================================
             if path == "/api/setup/status":
-                uprof = os.environ.get("USERPROFILE", "C:\\Users\\Roberto")
-                desk_folder = os.path.join(uprof, "Desktop", "Dados_Carreira_FC")
-                onedrive_desk = os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC")
-                legacy_desk = os.path.join(uprof, "Desktop", "Imersão_Carreira_FC")
+                uprof = os.environ.get("USERPROFILE", os.path.expanduser("~"))
+                desk_folder = os.path.join(uprof, "Desktop", "Imersao_Modo_Carreira")
+                onedrive_desk = os.path.join(uprof, "OneDrive", "Desktop", "Imersao_Modo_Carreira")
+                desk_pt = os.path.join(uprof, "Área de Trabalho", "Imersao_Modo_Carreira")
+                onedrive_pt = os.path.join(uprof, "OneDrive", "Área de Trabalho", "Imersao_Modo_Carreira")
+                legacy_desk = os.path.join(uprof, "Desktop", "Dados_Carreira_FC")
                 
                 if os.path.exists(desk_folder):
                     active_folder = desk_folder
                 elif os.path.exists(onedrive_desk):
                     active_folder = onedrive_desk
+                elif os.path.exists(desk_pt):
+                    active_folder = desk_pt
+                elif os.path.exists(onedrive_pt):
+                    active_folder = onedrive_pt
                 elif os.path.exists(legacy_desk):
                     active_folder = legacy_desk
                 else:
@@ -1611,7 +1621,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 folder_exists = os.path.exists(active_folder)
 
                 live_files = []
-                for fname in ["jogadores_contratos.csv", "SCOUT_LIVE_DATABASE.json", "TRANSFER_HISTORY.csv", "MATCH_REPORT.csv"]:
+                for fname in ["DADOS_CARREIRA.json", "FC_CAREER_VAULT_BACKUP.json", "jogadores_contratos.csv", "SCOUT_LIVE_DATABASE.json", "TRANSFER_HISTORY.csv", "MATCH_REPORT.csv"]:
                     if os.path.exists(os.path.join(active_folder, fname)):
                         live_files.append(fname)
 
@@ -1791,12 +1801,27 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                                     if pid > 0 and pid not in seen:
                                         seen.add(pid)
                                         has_face = fcm_resolver.check_player_has_miniface(pid)
+                                        y_age = 17
+                                        if p.get("age"):
+                                            try:
+                                                y_age = int(p.get("age"))
+                                            except Exception:
+                                                pass
+                                        elif p.get("birthdate_raw"):
+                                            try:
+                                                import youth_academy_engine
+                                                calc_age, _ = youth_academy_engine.decode_ea_birthdate_to_age(p.get("birthdate_raw"))
+                                                if calc_age:
+                                                    y_age = calc_age
+                                            except Exception:
+                                                pass
+
                                         players.append({
                                             "player_id": pid,
                                             "name": p.get("name") or p.get("player_name") or f"Jovem #{pid}",
                                             "overall": int(p.get("overall") or p.get("overall_rating") or 55),
                                             "position": p.get("position") or "ATA",
-                                            "age": 17,
+                                            "age": y_age,
                                             "team_id": int(yj.get("team_id") or 0),
                                             "team_name": yj.get("team_name") or "Academia de Base",
                                             "source": "Divisões de Base",
@@ -3100,13 +3125,13 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
             # SETUP / WIZARD POST ACTIONS
             # ========================================================
             if path == "/api/setup/open_folder":
-                uprof = os.environ.get("USERPROFILE", "C:\\Users\\Roberto")
+                uprof = os.environ.get("USERPROFILE", os.path.expanduser("~"))
                 raw_path = payload.get("folder_path", "").strip() if payload else ""
                 
                 if not raw_path:
-                    desk_candidate = os.path.join(uprof, "Desktop", "Dados_Carreira_FC")
-                    onedrive_candidate = os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC")
-                    legacy_candidate = os.path.join(uprof, "Desktop", "Imersão_Carreira_FC")
+                    desk_candidate = os.path.join(uprof, "Desktop", "Imersao_Modo_Carreira")
+                    onedrive_candidate = os.path.join(uprof, "OneDrive", "Desktop", "Imersao_Modo_Carreira")
+                    legacy_candidate = os.path.join(uprof, "Desktop", "Dados_Carreira_FC")
                     if os.path.exists(desk_candidate):
                         folder_to_open = desk_candidate
                     elif os.path.exists(onedrive_candidate):
@@ -3134,7 +3159,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
             if path == "/api/setup/prepare_desktop_folder":
                 try:
                     deployed_folders, deployed_files = deploy_scripts_to_all_desktops()
-                    primary_folder = deployed_folders[0] if deployed_folders else os.path.join(os.environ.get("USERPROFILE", r"C:\Users\Roberto"), "Desktop", "Dados_Carreira_FC")
+                    primary_folder = deployed_folders[0] if deployed_folders else os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Desktop", "Imersao_Modo_Carreira")
                     opened = open_in_windows_explorer(primary_folder)
                     return self.send_json({
                         "status": "success",
@@ -3142,7 +3167,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                         "deployed_folders": deployed_folders,
                         "total_files_copied": len(deployed_files),
                         "opened": opened,
-                        "message": f"Sucesso! Pasta Dados_Carreira_FC preparada e script EXTRAIR_DADOS_CARREIRA.lua gravado ({len(deployed_folders)} pastas atualizadas)."
+                        "message": f"Sucesso! Pasta Imersao_Modo_Carreira preparada na Área de Trabalho e script EXTRAIR_DADOS_CARREIRA.lua gravado ({len(deployed_folders)} pastas atualizadas)."
                     })
                 except Exception as err:
                     return self.send_json({"status": "error", "message": f"Erro ao preparar pasta: {err}"}, 500)

@@ -2822,7 +2822,15 @@ def get_hall_of_fame(save_id):
         award_type, award_title, competition_name, date_earned, stat_value
     FROM player_awards
     WHERE save_id = ?
-    ORDER BY season_year DESC, id DESC
+    ORDER BY season_year DESC,
+        CASE 
+            WHEN award_type LIKE '%Bola de Ouro%' THEN 1
+            WHEN award_type LIKE '%Chuteira de Ouro%' THEN 2
+            WHEN award_type LIKE '%Garçom%' THEN 3
+            WHEN award_type LIKE '%Luva de Ouro%' OR award_type LIKE '%Paredão%' THEN 4
+            WHEN award_type LIKE '%Rei do Jogo%' OR award_type LIKE '%MOTM%' THEN 5
+            ELSE 6
+        END ASC, id DESC
     """, (save_id,))
     player_awards = [dict(r) for r in cur.fetchall()]
 
@@ -2864,6 +2872,7 @@ def get_hall_of_fame(save_id):
 def sync_season_awards(save_id):
     """
     Sincroniza automaticamente a galeria de prêmios individuais da carreira a partir dos desempenhos reais de cada temporada.
+    Mantém os prêmios sempre atualizados com os líderes vigentes da temporada (recalcula dinamicamente).
     Critérios oficiais:
     - Artilheiro da Temporada (Chuteira de Ouro)
     - Melhor Jogador da Temporada (Bola de Ouro / Craque)
@@ -2877,6 +2886,36 @@ def sync_season_awards(save_id):
         cur.execute("SELECT DISTINCT season_year FROM player_season_stats WHERE save_id = ? AND season_year NOT IN ('57053')", (save_id,))
         seasons = [r[0] for r in cur.fetchall() if r[0] and len(str(r[0])) == 4]
 
+        def _upsert_award(s_year, p_id, p_name, t_name, a_type, a_title, comp_name, stat_val):
+            # Busca se já existe um prêmio desse tipo para a temporada
+            cur.execute("""
+                SELECT id FROM player_awards
+                WHERE save_id = ? AND season_year = ? AND award_type = ?
+                ORDER BY id ASC
+            """, (save_id, s_year, a_type))
+            existing_rows = cur.fetchall()
+            
+            d_earned = f"31/12/{s_year}"
+            if not existing_rows:
+                cur.execute("""
+                    INSERT INTO player_awards (save_id, season_year, player_id, player_name, team_name, award_type, award_title, competition_name, date_earned, stat_value)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (save_id, s_year, p_id, p_name, t_name or 'Meu Clube', a_type, a_title, comp_name, d_earned, stat_val))
+            else:
+                # Atualiza a primeira linha com o líder vigente da temporada
+                primary_id = existing_rows[0][0]
+                cur.execute("""
+                    UPDATE player_awards
+                    SET player_id = ?, player_name = ?, team_name = ?, award_title = ?, competition_name = ?, stat_value = ?, date_earned = ?
+                    WHERE id = ?
+                """, (p_id, p_name, t_name or 'Meu Clube', a_title, comp_name, stat_val, d_earned, primary_id))
+                
+                # Se houver duplicatas automáticas antigas, remove as excedentes
+                if len(existing_rows) > 1:
+                    extra_ids = [r[0] for r in existing_rows[1:]]
+                    placeholders = ','.join('?' for _ in extra_ids)
+                    cur.execute(f"DELETE FROM player_awards WHERE id IN ({placeholders})", extra_ids)
+
         for s in seasons:
             # 1. Artilheiro da Temporada (Chuteira de Ouro)
             cur.execute("""
@@ -2888,95 +2927,109 @@ def sync_season_awards(save_id):
             """, (save_id, s))
             top_g = cur.fetchone()
             if top_g and top_g[3] > 0:
-                cur.execute("""
-                    SELECT id FROM player_awards
-                    WHERE save_id = ? AND season_year = ? AND award_type = 'Chuteira de Ouro'
-                """, (save_id, s))
-                if not cur.fetchone():
-                    cur.execute("""
-                        INSERT INTO player_awards (save_id, season_year, player_id, player_name, team_name, award_type, award_title, competition_name, date_earned, stat_value)
-                        VALUES (?, ?, ?, ?, ?, 'Chuteira de Ouro', 'Artilheiro da Temporada', 'Temporada Regular', ?, ?)
-                    """, (save_id, s, top_g[0], top_g[1], top_g[2] or 'Meu Clube', f"31/12/{s}", f"{top_g[3]} Gols em {top_g[4]} Jogos"))
+                stat_str = f"{top_g[3]} Gols em {top_g[4]} Jogos"
+                _upsert_award(s, top_g[0], top_g[1], top_g[2], 'Chuteira de Ouro', 'Artilheiro da Temporada', 'Temporada Regular', stat_str)
 
             # 2. Melhor Jogador da Temporada (Bola de Ouro / Craque)
             cur.execute("""
                 SELECT player_id, player_name, team_name, avg_rating, appearances, goals, assists
                 FROM player_season_stats
-                WHERE save_id = ? AND season_year = ? AND appearances >= 8 AND avg_rating >= 6.8
+                WHERE save_id = ? AND season_year = ? AND appearances >= 5 AND avg_rating >= 6.8
                 ORDER BY avg_rating DESC, appearances DESC
                 LIMIT 1
             """, (save_id, s))
             best_p = cur.fetchone()
-            if best_p:
+            if not best_p:
                 cur.execute("""
-                    SELECT id FROM player_awards
-                    WHERE save_id = ? AND season_year = ? AND award_type = 'Bola de Ouro'
+                    SELECT player_id, player_name, team_name, avg_rating, appearances, goals, assists
+                    FROM player_season_stats
+                    WHERE save_id = ? AND season_year = ? AND appearances >= 2 AND avg_rating > 6.0
+                    ORDER BY avg_rating DESC, appearances DESC
+                    LIMIT 1
                 """, (save_id, s))
-                if not cur.fetchone():
-                    cur.execute("""
-                        INSERT INTO player_awards (save_id, season_year, player_id, player_name, team_name, award_type, award_title, competition_name, date_earned, stat_value)
-                        VALUES (?, ?, ?, ?, ?, 'Bola de Ouro', 'Melhor da Temporada', 'Desempenho Geral', ?, ?)
-                    """, (save_id, s, best_p[0], best_p[1], best_p[2] or 'Meu Clube', f"31/12/{s}", f"Nota {best_p[3]} ({best_p[4]}J, {best_p[5]}G, {best_p[6]}A)"))
+                best_p = cur.fetchone()
+
+            if best_p:
+                stat_str = f"Nota {best_p[3]} ({best_p[4]}J, {best_p[5]}G, {best_p[6]}A)"
+                _upsert_award(s, best_p[0], best_p[1], best_p[2], 'Bola de Ouro', 'Melhor da Temporada', 'Desempenho Geral', stat_str)
 
             # 3. Líder em Assistências (Garçom do Ano)
             cur.execute("""
                 SELECT player_id, player_name, team_name, assists, appearances
                 FROM player_season_stats
-                WHERE save_id = ? AND season_year = ? AND assists >= 3
+                WHERE save_id = ? AND season_year = ? AND assists > 0
                 ORDER BY assists DESC, appearances ASC
                 LIMIT 1
             """, (save_id, s))
             top_a = cur.fetchone()
             if top_a and top_a[3] > 0:
-                cur.execute("""
-                    SELECT id FROM player_awards
-                    WHERE save_id = ? AND season_year = ? AND award_type = 'Garçom do Ano'
-                """, (save_id, s))
-                if not cur.fetchone():
-                    cur.execute("""
-                        INSERT INTO player_awards (save_id, season_year, player_id, player_name, team_name, award_type, award_title, competition_name, date_earned, stat_value)
-                        VALUES (?, ?, ?, ?, ?, 'Garçom do Ano', 'Líder em Assistências', 'Temporada Regular', ?, ?)
-                    """, (save_id, s, top_a[0], top_a[1], top_a[2] or 'Meu Clube', f"31/12/{s}", f"{top_a[3]} Assistências em {top_a[4]} Jogos"))
+                stat_str = f"{top_a[3]} Assistências em {top_a[4]} Jogos"
+                _upsert_award(s, top_a[0], top_a[1], top_a[2], 'Garçom do Ano', 'Líder em Assistências', 'Temporada Regular', stat_str)
 
             # 4. Rei do Jogo (Mais vezes Man of the Match - MOTM)
             cur.execute("""
                 SELECT player_id, player_name, team_name, motms, appearances
                 FROM player_season_stats
-                WHERE save_id = ? AND season_year = ? AND motms >= 2
+                WHERE save_id = ? AND season_year = ? AND motms > 0
                 ORDER BY motms DESC, appearances ASC
                 LIMIT 1
             """, (save_id, s))
             top_m = cur.fetchone()
             if top_m and top_m[3] > 0:
-                cur.execute("""
-                    SELECT id FROM player_awards
-                    WHERE save_id = ? AND season_year = ? AND award_type = 'Rei do Jogo (MOTM)'
-                """, (save_id, s))
-                if not cur.fetchone():
-                    cur.execute("""
-                        INSERT INTO player_awards (save_id, season_year, player_id, player_name, team_name, award_type, award_title, competition_name, date_earned, stat_value)
-                        VALUES (?, ?, ?, ?, ?, 'Rei do Jogo (MOTM)', 'Mais vezes Homem do Jogo', 'Partidas Oficiais', ?, ?)
-                    """, (save_id, s, top_m[0], top_m[1], top_m[2] or 'Meu Clube', f"31/12/{s}", f"{top_m[3]}x Eleito Homem do Jogo"))
+                stat_str = f"{top_m[3]}x Eleito Homem do Jogo ({top_m[4]}J)"
+                _upsert_award(s, top_m[0], top_m[1], top_m[2], 'Rei do Jogo (MOTM)', 'Mais vezes Homem do Jogo', 'Partidas Oficiais', stat_str)
 
             # 5. Luva de Ouro (Paredão / Clean Sheets)
+            # Jogos oficiais em que a equipe do usuário não levou gols na temporada s
             cur.execute("""
-                SELECT player_id, player_name, team_name, clean_sheets, saves, appearances
-                FROM player_season_stats
-                WHERE save_id = ? AND season_year = ? AND position IN ('GOL', 'GK', 'GL') AND (clean_sheets > 0 OR saves > 0)
-                ORDER BY clean_sheets DESC, saves DESC, appearances ASC
-                LIMIT 1
+                SELECT COUNT(*) FROM matches 
+                WHERE save_id = ? AND season_year = ? AND (
+                    (user_team_id = home_team_id AND away_score = 0) OR
+                    (user_team_id = away_team_id AND home_score = 0)
+                )
             """, (save_id, s))
-            top_gk = cur.fetchone()
-            if top_gk and (top_gk[3] > 0 or top_gk[4] > 0):
+            season_cs_row = cur.fetchone()
+            season_match_clean_sheets = season_cs_row[0] if season_cs_row else 0
+
+            # Goleiros cadastrados na temporada s
+            cur.execute("""
+                SELECT player_id, player_name, team_name, clean_sheets, saves, appearances, goals_conceded
+                FROM player_season_stats
+                WHERE save_id = ? AND season_year = ? AND position IN ('GOL', 'GK', 'GL')
+                ORDER BY appearances DESC, clean_sheets DESC, saves DESC
+            """, (save_id, s))
+            gks = [dict(r) for r in cur.fetchall()]
+
+            if not gks:
                 cur.execute("""
-                    SELECT id FROM player_awards
-                    WHERE save_id = ? AND season_year = ? AND award_type = 'Luva de Ouro'
+                    SELECT player_id, player_name, team_name, clean_sheets, saves, appearances, goals_conceded
+                    FROM player_season_stats
+                    WHERE save_id = ? AND season_year = ? AND (clean_sheets > 0 OR saves > 0)
+                    ORDER BY appearances DESC, clean_sheets DESC, saves DESC
                 """, (save_id, s))
-                if not cur.fetchone():
-                    cur.execute("""
-                        INSERT INTO player_awards (save_id, season_year, player_id, player_name, team_name, award_type, award_title, competition_name, date_earned, stat_value)
-                        VALUES (?, ?, ?, ?, ?, 'Luva de Ouro', 'Paredão da Temporada', 'Defesa Sólida', ?, ?)
-                    """, (save_id, s, top_gk[0], top_gk[1], top_gk[2] or 'Meu Clube', f"31/12/{s}", f"{top_gk[3]} Clean Sheets • {top_gk[4]} Defesas"))
+                gks = [dict(r) for r in cur.fetchall()]
+
+            if gks:
+                # Se clean_sheets estiver zerado nos stats da temporada mas o time teve jogos sem sofrer gols
+                total_db_cs = sum(g.get("clean_sheets", 0) for g in gks)
+                for g in gks:
+                    apps = g.get("appearances", 0)
+                    cs_val = g.get("clean_sheets", 0)
+                    if (total_db_cs == 0 or cs_val < season_match_clean_sheets) and season_match_clean_sheets > 0 and apps >= season_match_clean_sheets:
+                        g["clean_sheets"] = max(cs_val, season_match_clean_sheets)
+                    elif total_db_cs == 0 and season_match_clean_sheets > 0 and apps > 0:
+                        g["clean_sheets"] = min(season_match_clean_sheets, apps)
+
+                # Ordena para definir o paredão da temporada: quem tem mais clean sheets, depois mais defesas, depois mais jogos
+                gks.sort(key=lambda x: (x.get("clean_sheets", 0), x.get("saves", 0), x.get("appearances", 0)), reverse=True)
+                top_gk = gks[0]
+                gk_cs = top_gk.get("clean_sheets", 0)
+                gk_saves = top_gk.get("saves", 0)
+                gk_apps = top_gk.get("appearances", 0)
+
+                if gk_cs > 0 or gk_saves > 0 or gk_apps > 0:
+                    stat_str = f"{gk_cs} Clean Sheets • {gk_saves} Defesas ({gk_apps} Jogos)"
+                    _upsert_award(s, top_gk["player_id"], top_gk["player_name"], top_gk["team_name"], 'Luva de Ouro', 'Paredão da Temporada', 'Defesa Sólida', stat_str)
 
         conn.commit()
     except Exception as e:
@@ -4441,6 +4494,9 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
     if csv_path:
         search_paths.append(csv_path)
     search_paths.extend([
+        os.path.join(uprof, "Desktop", "Imersao_Modo_Carreira", "jogadores_contratos.csv"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Imersao_Modo_Carreira", "jogadores_contratos.csv"),
+        os.path.join(uprof, "Área de Trabalho", "Imersao_Modo_Carreira", "jogadores_contratos.csv"),
         os.path.join(uprof, "Desktop", "Dados_Carreira_FC", "jogadores_contratos.csv"),
         os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC", "jogadores_contratos.csv"),
         os.path.join(uprof, "Desktop", "jogadores_contratos.csv"),
@@ -4475,6 +4531,9 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
     # Carregar atributos reais extraídos pelo Live Editor da tabela players em memória (se disponível)
     live_attrs_map = {}
     json_search_paths = [
+        os.path.join(uprof, "Desktop", "Imersao_Modo_Carreira", "SCOUT_LIVE_DATABASE.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Imersao_Modo_Carreira", "SCOUT_LIVE_DATABASE.json"),
+        os.path.join(uprof, "Área de Trabalho", "Imersao_Modo_Carreira", "SCOUT_LIVE_DATABASE.json"),
         os.path.join(uprof, "Desktop", "Dados_Carreira_FC", "SCOUT_LIVE_DATABASE.json"),
         os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC", "SCOUT_LIVE_DATABASE.json"),
         os.path.join(uprof, "Desktop", "Imersão_Carreira_FC", "SCOUT_LIVE_DATABASE.json"),

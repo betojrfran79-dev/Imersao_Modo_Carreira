@@ -4,9 +4,66 @@
 import os
 import json
 import sqlite3
-from datetime import datetime
+from datetime import datetime, date, timedelta
 import fcm_resolver
 import database
+
+GREGORIAN_BASE = date(1582, 10, 15)
+
+def parse_save_date(data_dict):
+    """Extrai a data de referência do save como objeto date."""
+    if not isinstance(data_dict, dict):
+        return None
+    for key in ("current_date", "game_date", "start_date"):
+        val = data_dict.get(key)
+        if val and isinstance(val, str) and "/" in val:
+            try:
+                p = val.split("/")
+                if len(p) == 3:
+                    return date(int(p[2]), int(p[1]), int(p[0]))
+            except Exception:
+                pass
+    s_year = data_dict.get("season_year")
+    if s_year:
+        try:
+            return date(int(s_year), 6, 1)
+        except Exception:
+            pass
+    return None
+
+def get_active_save_date():
+    """Tenta obter a data do save ativo lendo os arquivos DADOS_CARREIRA.json."""
+    for cp in find_career_files():
+        try:
+            with open(cp, "r", encoding="utf-8", errors="ignore") as f:
+                cdata = json.load(f)
+                d = parse_save_date(cdata)
+                if d:
+                    return d
+        except Exception:
+            pass
+    return date(2028, 5, 1)
+
+def decode_ea_birthdate_to_age(raw_days, ref_date=None):
+    """
+    Decodifica o formato de data da EA Sports FC (dias desde a reforma Gregoriana em 15/10/1582)
+    e calcula a idade real e precisa do jogador.
+    """
+    if not raw_days:
+        return 17, ""
+    try:
+        raw_int = int(raw_days)
+        if raw_int <= 0:
+            return 17, ""
+        bdate = GREGORIAN_BASE + timedelta(days=raw_int)
+        bdate_str = bdate.strftime("%d/%m/%Y")
+        if not ref_date:
+            ref_date = get_active_save_date()
+        age = ref_date.year - bdate.year - ((ref_date.month, ref_date.day) < (bdate.month, bdate.day))
+        age = max(14, min(24, age))
+        return age, bdate_str
+    except Exception:
+        return 17, ""
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -410,9 +467,10 @@ def load_youth_players():
                 cdata = json.load(f)
                 yp = cdata.get("youth_players")
                 if yp and len(yp) > 0:
+                    ref_date = parse_save_date(cdata)
                     formatted = []
                     for pl in yp:
-                        fp = format_youth_player(pl)
+                        fp = format_youth_player(pl, ref_date)
                         save_youth_snapshot(fp, cdata.get("save_id", "carreira_ativa"))
                         formatted.append(fp)
                     return formatted
@@ -426,9 +484,10 @@ def load_youth_players():
                 data = json.load(f)
                 players = data.get("players", [])
                 if players:
+                    ref_date = parse_save_date(data)
                     formatted = []
                     for pl in players:
-                        fp = format_youth_player(pl)
+                        fp = format_youth_player(pl, ref_date)
                         save_youth_snapshot(fp)
                         formatted.append(fp)
                     return formatted
@@ -436,10 +495,10 @@ def load_youth_players():
             print(f"[YOUTH] Erro ao ler {p}: {e}")
     return []
 
-def format_youth_player(raw):
+def format_youth_player(raw, current_save_date=None):
     """
     Formata o jogador da base com posições 100% traduzidas em Português,
-    as 7 categorias oficiais do FCM, atributos do card e metadados biográficos.
+    as 7 categorias oficiais do FCM, atributos do card, idade real decodificada e metadados biográficos.
     """
     ovr = int(raw.get("overall", 50))
     pot = int(raw.get("potential", 70))
@@ -502,9 +561,23 @@ def format_youth_player(raw):
         radar_values = [pac, sho, pas, dri, defn, phy]
 
     age = 17
-    birth_raw = raw.get("birthdate_raw")
+    birthdate_str = raw.get("birthdate", "")
+    raw_age = raw.get("age")
+    if raw_age is not None:
+        try:
+            ia = int(raw_age)
+            if 14 <= ia <= 30:
+                age = ia
+        except Exception:
+            pass
+
+    birth_raw = raw.get("birthdate_raw") or raw.get("birthdate")
     if birth_raw:
-        age = 17
+        calc_age, b_str = decode_ea_birthdate_to_age(birth_raw, current_save_date)
+        if calc_age and (raw_age is None or not (14 <= age <= 30)):
+            age = calc_age
+        if b_str and not birthdate_str:
+            birthdate_str = b_str
 
     pid = raw.get("playerid")
     pvar = raw.get("potentialvariance")
@@ -539,6 +612,8 @@ def format_youth_player(raw):
         "raw_potential": pot,
         "growth_speed": growth_speed,
         "age": age,
+        "birthdate": birthdate_str,
+        "birthdate_raw": raw.get("birthdate_raw"),
         "height": raw.get("height", 175),
         "weight": raw.get("weight", 70),
         "preferred_foot": raw.get("preferred_foot", "Destro"),

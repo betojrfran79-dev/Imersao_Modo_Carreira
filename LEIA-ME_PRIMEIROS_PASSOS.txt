@@ -1,31 +1,61 @@
-==============================================================================
-🏆 IMERSAO MODO CARREIRA - EA FC & FC MANIA
-==============================================================================
-
-COMO INSTALAR (FEITO APENAS UMA VEZ):
-
-1. Extraia todo o conteudo deste arquivo ZIP em qualquer pasta do seu PC
-   (Exemplo: C:\Imersao_Modo_Carreira ou dentro da sua pasta Documentos).
-
-2. Entre na pasta extraida e de DOIS CLIQUES no arquivo:
-   👉 INSTALAR_PRIMEIRA_VEZ.bat
-
-3. Pronto! O atalho oficial com o icone do app sera criado automaticamente
-   na sua Area de Trabalho e tambem dentro desta pasta.
-   (Se preferir, voce tambem pode clicar com o botao direito no atalho
-   'Imersao Modo Carreira - EA FC' e escolher 'Enviar para > Area de trabalho').
-
-COMO USAR NO DIA A DIA:
-- De dois cliques no atalho 'Imersao Modo Carreira - EA FC' na sua Area de Trabalho.
-- O navegador abrira automaticamente ja com o aplicativo pronto para uso!
-- NAO e necessario instalar o Python (o interpretador portatil ja vem incluso).
-
-COMO SINCRONIZAR COM O SEU JOGO (LIVE EDITOR):
-1. Com o EA FC aberto no seu Modo Carreira, aperte F9 para abrir o Live Editor.
-2. Va na aba de scripts Lua e execute o arquivo EXTRAIR_DADOS_CARREIRA.lua.
-3. O script criara na sua Area de Trabalho a pasta 'Imersao_Modo_Carreira'
-   com o seu arquivo 'DADOS_CARREIRA.json'.
-4. No aplicativo, clique no botao 'Sincronizar' (ou apenas recarregue a pagina).
-   Todos os seus dados reais de elenco, tabela e partidas serao carregados!
-
+==============================================================================
+🏆 IMERSAO MODO CARREIRA - EA FC 26 & FC MANIA
+==============================================================================
+
+ENTENDA AS DUAS PASTAS DO SISTEMA:
+1. 📁 PASTA DO APLICATIVO (Programa): "App_Modo_carreira"
+   - É a pasta que você extrai do arquivo ZIP.
+   - Contém o sistema, telas, servidor e o script "EXTRAIR_DADOS_CARREIRA.lua".
+   - Você pode extraí-la em qualquer lugar (ex: na sua Área de Trabalho, em C:\ ou Documentos).
+
+2. 📁 PASTA DE DADOS DO JOGO (Save): "Imersao_Modo_Carreira"
+   - É criada 100% automaticamente pelo Live Editor na sua Área de Trabalho.
+   - Você NÃO precisa criar esta pasta manualmente!
+   - Nela ficam gravados o seu arquivo "DADOS_CARREIRA.json" e planilhas do seu save.
+
+------------------------------------------------------------------------------
+OPÇÃO A: SE É SUA PRIMEIRA VEZ (INSTALAÇÃO LIMPA)
+------------------------------------------------------------------------------
+1. Extraia o conteúdo deste arquivo ZIP (pasta "App_Modo_carreira") no seu PC.
+2. Entre na pasta extraída e dê DOIS CLIQUES no arquivo:
+   👉 INSTALAR_PRIMEIRA_VEZ.bat
+3. Pronto! O atalho oficial "Imersao Modo Carreira - EA FC" será criado na sua
+   Área de Trabalho com o ícone do jogo.
+
+------------------------------------------------------------------------------
+OPÇÃO B: SE VOCÊ JÁ ERA BETA TESTER (ATUALIZAÇÃO DE VERSÃO)
+------------------------------------------------------------------------------
+1. Você NÃO precisa executar "INSTALAR_PRIMEIRA_VEZ.bat" novamente!
+2. Apenas feche o aplicativo (se estiver aberto).
+3. Extraia o novo ZIP e substitua os arquivos dentro da sua pasta atual do aplicativo.
+4. SEUS DADOS E SAVES ESTÃO PROTEGIDOS:
+   O seu arquivo de banco de dados (career_vault.db) NÃO é apagado nem sobrescrito!
+5. Copie o novo arquivo "EXTRAIR_DADOS_CARREIRA.lua" para a pasta do Live Editor (veja abaixo).
+6. Abra o aplicativo diretamente pelo seu atalho habitual da Área de Trabalho.
+
+------------------------------------------------------------------------------
+ONDE COLOCAR O SCRIPT LUA NO SEU JOGO (PATCH FCM 26):
+------------------------------------------------------------------------------
+1. Dentro da pasta do aplicativo, localize o arquivo:
+   👉 EXTRAIR_DADOS_CARREIRA.lua
+2. Copie e cole esse arquivo na pasta lua do Live Editor:
+   📁 C:\Program Files\EA Games\EA SPORTS FC 26\FCM 26\Live Editor\lua\
+   (ou na subpasta \scripts\, caso exista).
+
+------------------------------------------------------------------------------
+COMO USAR NO DIA A DIA:
+------------------------------------------------------------------------------
+1. Abra o aplicativo dando dois cliques no atalho da sua Área de Trabalho:
+   👉 "Imersao Modo Carreira - EA FC"
+   (O navegador abrirá automaticamente com o app pronto para uso!).
+
+2. No jogo (EA FC 26 aberto com Live Editor):
+   - Pressione F9 para abrir o menu do Live Editor.
+   - Vá na aba "Lua Scripts", selecione "EXTRAIR_DADOS_CARREIRA.lua" e clique em "Run Script".
+   - (Dica Pro: Marque a caixinha "Autorun" ao lado do script para extrair sempre no automático!).
+   - O script criará na sua Área de Trabalho a pasta "Imersao_Modo_Carreira" com o arquivo "DADOS_CARREIRA.json".
+
+3. No aplicativo, clique no botão "Sincronizar" (ou aperte F5).
+   Pronto! Todos os dados reais da carreira (elenco, tabela, finanças e scout) são carregados!
+
 ==============================================================================

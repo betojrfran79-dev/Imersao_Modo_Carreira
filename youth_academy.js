@@ -122,7 +122,7 @@ function renderYouthPlayersList(players) {
           <div class="ypc-meta">
             <span class="ypc-badge-ovr">GER ${p.overall}</span>
             <span class="ypc-badge-pot ${potColor}">POT ${potDisplay}</span>
-            <span class="ypc-foot">${speedTag || p.preferred_foot}</span>
+            <span class="ypc-foot">${p.age ? p.age + ' anos' : (speedTag || p.preferred_foot)}</span>
           </div>
         </div>
         <i data-lucide="chevron-right" class="ypc-arrow"></i>
@@ -187,7 +187,12 @@ window.showYouthPlayerProfile = function(playerId) {
       potEl.classList.remove("text-gold");
     }
   }
-  if (ageEl) ageEl.textContent = `${p.age || 17} anos`;
+  if (ageEl) {
+    ageEl.textContent = `${p.age || 17} anos`;
+    if (p.birthdate) {
+      ageEl.title = `Nascimento: ${p.birthdate}`;
+    }
+  }
   if (footEl) footEl.textContent = p.preferred_foot;
 
   // Preenche Metadados Rápidos

@@ -657,7 +657,7 @@ end
 -- ==============================================================================
 -- 🌟 EXTRAÇÃO COMPLETA DA ACADEMIA DE BASE (CAREER_YOUTHPLAYERS)
 -- ==============================================================================
-local function ExtractYouthAcademyPlayers()
+local function ExtractYouthAcademyPlayers(cur_date, current_year)
     local extracted = {}
     pcall(function()
         local y_tbl = LE.db:GetTable("career_youthplayers")
@@ -733,7 +733,28 @@ local function ExtractYouthAcademyPlayers()
                     p_data.skill_moves = (raw_sm < 5) and (raw_sm + 1) or raw_sm
                     p_data.height = p_tbl:GetRecordFieldValue(pr, "height") or 0
                     p_data.weight = p_tbl:GetRecordFieldValue(pr, "weight") or 0
-                    p_data.birthdate_raw = p_tbl:GetRecordFieldValue(pr, "birthdate") or 0
+                    local bdate = p_tbl:GetRecordFieldValue(pr, "birthdate") or 0
+                    p_data.birthdate_raw = bdate
+                    local player_age = 16
+                    local bdate_str = ""
+                    if bdate and bdate > 0 then
+                        pcall(function()
+                            local d = DATE:new()
+                            d:FromGregorianDays(bdate)
+                            if d.year and d.year > 1900 then
+                                bdate_str = string.format("%02d/%02d/%04d", d.day, d.month, d.year)
+                                local c_year = current_year or (cur_date and cur_date.year) or 2028
+                                if d.year <= c_year then
+                                    player_age = c_year - d.year
+                                    if cur_date and (d.month > cur_date.month or (d.month == cur_date.month and d.day > cur_date.day)) then
+                                        player_age = player_age - 1
+                                    end
+                                end
+                            end
+                        end)
+                    end
+                    p_data.age = math.max(14, math.min(23, player_age))
+                    p_data.birthdate = bdate_str
 
                     local attr_fields = {
                         "finishing", "shotpower", "longshots", "volleys", "penalties", "freekickaccuracy",
@@ -1414,7 +1435,7 @@ function ExtractAndSyncFullCareer(is_silent)
     end)
 
     -- 7. Extração das Joias da Base da Academia (career_youthplayers)
-    payload.youth_players = ExtractYouthAcademyPlayers()
+    payload.youth_players = ExtractYouthAcademyPlayers(cur_date, current_year)
     LOGGER:LogInfo(string.format("[Career Vault] 🌟 Joias da Academia de Base Extraídas: %d", #payload.youth_players))
 
     -- Exportar também o arquivo standalone BASE_JOVENS_EXTRAIDA.json

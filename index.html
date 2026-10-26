@@ -242,29 +242,63 @@
         <!-- Setup Step-by-Step Grid -->
         <div class="setup-steps-grid">
 
-          <!-- PASSO 1: CONFIGURAR PASTA DE EXTRAÇÃO -->
+          <!-- PASSO 1: INSTALAÇÃO LIMPA VS ATUALIZAÇÃO (BETA TESTER) -->
           <div class="setup-card step-card">
             <div class="step-header">
               <div class="step-number">1</div>
               <div class="step-title-group">
-                <h3 class="step-title">Pasta de Extração de Dados no seu PC</h3>
-                <p class="step-desc">O aplicativo lê os dados da sua carreira gerados pelo Live Editor diretamente desta pasta dedicada na Área de Trabalho (separada dos arquivos do programa).</p>
+                <h3 class="step-title">Instalação & Configuração de Pastas</h3>
+                <p class="step-desc">Entenda como funciona caso seja sua primeira vez ou se você já participava do Beta Test.</p>
               </div>
             </div>
             
             <div class="step-body">
-              <div class="setup-info-box">
-                <div class="info-icon"><i data-lucide="info"></i></div>
+              <!-- Grid de Cenários: Primeira Vez vs Beta Tester -->
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+                
+                <!-- Cenário A: Primeira Vez -->
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 1rem;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem;">
+                    <span style="font-size: 1.1rem;">🌟</span>
+                    <strong style="color: #34d399; font-size: 0.95rem;">Primeira Vez (Instalação Limpa)</strong>
+                  </div>
+                  <ul style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 6px;">
+                    <li>Extraia a pasta <strong>App_Modo_carreira</strong> do ZIP no seu PC.</li>
+                    <li>Dê dois cliques no instalador <code>INSTALAR_PRIMEIRA_VEZ.bat</code> para criar o atalho oficial na sua Área de Trabalho com o ícone do jogo.</li>
+                    <li><strong style="color: #fff;">Você NÃO precisa criar nenhuma pasta na Área de Trabalho!</strong></li>
+                    <li>Ao executar o script no jogo pela primeira vez (Passos 2 e 3), a pasta <code>Imersao_Modo_Carreira</code> é <strong>criada 100% automaticamente</strong> no Desktop com todos os dados do seu clube!</li>
+                  </ul>
+                </div>
+
+                <!-- Cenário B: Beta Tester -->
+                <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 1rem;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem;">
+                    <span style="font-size: 1.1rem;">🔄</span>
+                    <strong style="color: #38bdf8; font-size: 0.95rem;">Já era Beta Tester (Atualização)</strong>
+                  </div>
+                  <ul style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 6px;">
+                    <li><strong style="color: #facc15;">NÃO precisa rodar o INSTALAR_PRIMEIRA_VEZ.bat novamente.</strong></li>
+                    <li>Basta fechar o app, extrair o novo ZIP e substituir os arquivos dentro da sua pasta atual do aplicativo.</li>
+                    <li><strong style="color: #34d399;">Seus dados e temporadas estão protegidos!</strong> O banco de dados (<code>career_vault.db</code>) não é apagado nem sobrescrito.</li>
+                    <li>Apenas copie o novo script <code>EXTRAIR_DADOS_CARREIRA.lua</code> para a pasta do Live Editor e abra pelo seu atalho habitual.</li>
+                  </ul>
+                </div>
+
+              </div>
+
+              <!-- Pasta onde os dados ficam guardados -->
+              <div class="setup-info-box" style="margin-bottom: 1rem;">
+                <div class="info-icon"><i data-lucide="folder-check"></i></div>
                 <div class="info-content">
-                  <strong>Pasta exclusiva para dados do save:</strong>
-                  <p>O Live Editor salva planilhas e relatórios como <code>FC_CAREER_VAULT_BACKUP.json</code>, <code>jogadores_contratos.csv</code> e <code>SCOUT_LIVE_DATABASE.json</code> dentro de <code>Dados_Carreira_FC</code>.</p>
+                  <strong>Onde os dados do seu save ficam guardados:</strong>
+                  <p>O Live Editor salva planilhas e relatórios (como <code>DADOS_CARREIRA.json</code>, contratos e scout) diretamente na pasta <code>Imersao_Modo_Carreira</code> na sua Área de Trabalho.</p>
                 </div>
               </div>
 
               <div class="path-display-group">
-                <label class="input-label">Caminho da Pasta de Dados no seu Computador:</label>
+                <label class="input-label">Pasta de Dados da Carreira na Área de Trabalho:</label>
                 <div class="path-input-wrap">
-                  <input type="text" id="setupFolderPathInput" class="path-input" readonly value="C:\Users\Roberto\Desktop\Dados_Carreira_FC">
+                  <input type="text" id="setupFolderPathInput" class="path-input" readonly value="Carregando caminho da Área de Trabalho...">
                   <button class="btn-copy-path" id="btnCopyFolderPath" title="Copiar Caminho">
                     <i data-lucide="copy"></i> Copiar
                   </button>
@@ -273,7 +307,7 @@
 
               <div class="step-actions">
                 <button class="btn-primary" id="btnPrepareDesktopFolder">
-                  <i data-lucide="folder-plus"></i> Criar Pasta Dados_Carreira_FC & Colocar Scripts no Desktop
+                  <i data-lucide="folder-plus"></i> Criar Pasta Imersao_Modo_Carreira no Desktop
                 </button>
               </div>
             </div>
@@ -284,30 +318,32 @@
             <div class="step-header">
               <div class="step-number">2</div>
               <div class="step-title-group">
-                <h3 class="step-title">Onde Colocar o Script Lua no Live Editor (Patch FCM / EA SPORTS FC)</h3>
-                <p class="step-desc">No Patch do FC Mania (FCM), a pasta do Live Editor fica localizada <strong>dentro da pasta do seu jogo EA SPORTS FC</strong>. Você só precisa de <strong>um único script</strong>: o <code>EXTRAIR_DADOS_CARREIRA.lua</code>.</p>
+                <h3 class="step-title">Onde Colocar o Script Lua no Live Editor (Patch FCM 26 / EA SPORTS FC)</h3>
+                <p class="step-desc">Copie o arquivo <code>EXTRAIR_DADOS_CARREIRA.lua</code> (da pasta do aplicativo) e cole na pasta <strong>lua</strong> do Live Editor dentro do jogo.</p>
               </div>
             </div>
 
             <div class="step-body">
               <div class="folder-tree-box">
-                <div class="tree-header"><i data-lucide="folder-tree"></i> Estrutura de Pastas no Patch FCM (EA FC 24, FC 25, FC 26, FC 27+):</div>
-                <pre class="tree-content">📁 C:\Program Files\EA Games\EA SPORTS FC\ (ou C:\Arquivos de Programas\EA Games\EA SPORTS FC\)
-  └── 📁 Live Editor\  (Pasta do Live Editor integrada ao FCM)
+                <div class="tree-header"><i data-lucide="folder-tree"></i> Estrutura de Pastas Oficial no Patch FCM 26 / EA SPORTS FC:</div>
+                <pre class="tree-content">📁 C:\Program Files\EA Games\EA SPORTS FC 26\FCM 26\
+  └── 📁 Live Editor\
         └── 📁 lua\
-              └── 📁 scripts\
-                    └── 📄 <span class="highlight-file">EXTRAIR_DADOS_CARREIRA.lua</span>  (Script Mestre Único)</pre>
+              └── 📄 <span class="highlight-file">EXTRAIR_DADOS_CARREIRA.lua</span>  (Cole o script aqui dentro!)</pre>
               </div>
 
               <div class="path-display-group">
-                <label class="input-label">Caminho Padrão do Live Editor no Patch FCM:</label>
+                <label class="input-label">Caminho Padrão da Pasta Lua no Live Editor (FCM 26):</label>
                 <div class="path-input-wrap">
-                  <input type="text" id="setupLiveEditorPathInput" class="path-input" readonly value="C:\Program Files\EA Games\EA SPORTS FC\Live Editor\lua\scripts">
+                  <input type="text" id="setupLiveEditorPathInput" class="path-input" readonly value="C:\Program Files\EA Games\EA SPORTS FC 26\FCM 26\Live Editor\lua">
                   <button class="btn-copy-path" id="btnCopyLiveEditorPath" title="Copiar Caminho do Live Editor">
                     <i data-lucide="copy"></i> Copiar
                   </button>
                 </div>
               </div>
+              <small style="display: block; font-size: 0.75rem; color: var(--text-dim); margin-top: -0.25rem; margin-bottom: 1rem;">
+                💡 <em>Nota: Caso o seu Live Editor possua a subpasta <code>scripts</code> (ex: <code>lua\scripts\</code>), você também pode colar diretamente nela. Ambas funcionam perfeitamente!</em>
+              </small>
 
               <!-- ALERTA IMPORTANTE: ATUALIZAÇÕES DO SCRIPT LUA -->
               <div class="setup-lua-update-alert">
@@ -2627,7 +2663,7 @@
           <div class="sac-icon"><i data-lucide="zap"></i></div>
           <div class="sac-content">
             <h4>Sincronizar do Desktop (1 Clique)</h4>
-            <p>Lê automaticamente o arquivo <code>FC_CAREER_VAULT_BACKUP.json</code> da pasta <code>Dados_Carreira_FC</code> na Área de Trabalho.</p>
+            <p>Lê automaticamente os dados da pasta <code>Imersao_Modo_Carreira</code> na Área de Trabalho.</p>
           </div>
           <button class="btn-primary" style="margin-top: 0.75rem; width: 100%;">
             <i data-lucide="refresh-cw"></i> Sincronizar Agora

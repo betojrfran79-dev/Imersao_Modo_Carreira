@@ -453,6 +453,39 @@ def open_in_windows_explorer(folder_path):
         print(f"[Career Vault] Erro geral ao abrir pasta {folder_path}: {e}")
     return False
 
+_last_imported_mtime = 0
+
+def check_and_auto_import_desktop():
+    global _last_imported_mtime
+    uprof = os.environ.get("USERPROFILE", "C:\\Users\\Roberto")
+    search_files = [
+        os.path.join(uprof, "Desktop", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+        os.path.join(uprof, "Desktop", "DADOS_CARREIRA.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "DADOS_CARREIRA.json"),
+        os.path.join(uprof, "OneDrive", "Área de Trabalho", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+        os.path.join(uprof, "Área de Trabalho", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+        os.path.join(BASE_DIR, "DADOS_CARREIRA.json")
+    ]
+    for fp in search_files:
+        if os.path.exists(fp):
+            try:
+                mt = os.path.getmtime(fp)
+                if mt > _last_imported_mtime:
+                    _last_imported_mtime = mt
+                    with open(fp, "r", encoding="utf-8") as f:
+                        payload = json.load(f)
+                    save_id = payload.get("save_id", "carreira_ativa")
+                    database.sync_full_career(save_id, payload)
+                    if payload.get("upcoming_matches") or payload.get("proximos_jogos"):
+                        fixs = payload.get("upcoming_matches") or payload.get("proximos_jogos") or []
+                        database.save_calendar_fixtures(save_id, fixs, payload.get("season_year", "2029"))
+                    database.sync_live_standings_from_json(save_id, payload.get("season_year", "2029"))
+                    print(f"[Auto-Import] Sincronizado automaticamente de {fp}")
+                    break
+            except Exception as e:
+                print(f"[Auto-Import] Erro ao ler {fp}: {e}")
+
 class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=BASE_DIR, **kwargs)
@@ -904,6 +937,9 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 repo_fallback = os.path.join(REPO_HEADS_DIR, "notfound.png")
                 return self.serve_image(fallback, repo_fallback)
 
+            if path in ["/api/dashboard", "/api/match/scout-dossier", "/api/standings/current", "/api/matches/history"]:
+                check_and_auto_import_desktop()
+
             # 4. API Dashboard (Visão do Momento)
             if path == "/api/dashboard":
                 conn = database.get_db()
@@ -1055,6 +1091,13 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                         for m in m_list:
                             m["home_crest"] = fcm_resolver.get_crest_image_path_or_url(m["home_team_id"])
                             m["away_crest"] = fcm_resolver.get_crest_image_path_or_url(m["away_team_id"])
+                return self.send_json(data)
+
+            # 6.5 API Prognósticos e Probabilidades (Matemática do Campeonato)
+            if path in ["/api/projections", "/api/prognosticos"]:
+                comp = query.get("comp", [None])[0]
+                year = query.get("year", [season_year])[0]
+                data = database.get_competition_projections(save_id, comp, year)
                 return self.send_json(data)
 
             # 7. API Transfers (Transferências e Balanço)
@@ -1238,7 +1281,8 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             if path.startswith("/api/scout/player/"):
                 try:
                     player_id = int(path.replace("/api/scout/player/", ""))
-                    profile = fcm_resolver.get_full_player_profile(player_id, save_id)
+                    save_id_req = query.get("save_id", [save_id])[0]
+                    profile = fcm_resolver.get_full_player_profile(player_id, save_id_req)
                     return self.send_json(profile)
                 except ValueError:
                     return self.send_json({"error": "ID de jogador inválido"}, 400)
@@ -1252,6 +1296,13 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     return self.send_json(h2h)
                 except ValueError:
                     return self.send_json({"error": "ID de clube inválido"}, 400)
+
+            # 13.5 API Scout Dossier (ScoutPad Pro)
+            if path == "/api/match/scout-dossier":
+                opp_id_str = query.get("opponent_id", [None])[0]
+                opp_id = int(opp_id_str) if opp_id_str and opp_id_str.isdigit() else None
+                dossier = database.get_match_scout_dossier(save_id, opp_id, season_year)
+                return self.send_json(dossier)
 
             # 14. API Opponents
             if path == "/api/opponents":
@@ -1564,9 +1615,11 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     "limit": query.get("limit", [20])[0]
                 }
                 
+                cur_year, _ = database.get_active_career_context(save_id_req)
+
                 # Se o usuário escolheu expressamente modo offline (Base FCM)
                 if source_req in ["offline", "fcm", "fcm_database"]:
-                    players = fcm_resolver.search_scout_players(search_params)
+                    players = fcm_resolver.search_scout_players(search_params, current_year=cur_year, save_id=save_id_req)
                     source = "fcm_database"
                 else:
                     # 1. Prioridade para a base extraída pelo Live Editor (Save Ativo)
@@ -1575,7 +1628,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     
                     # 2. Se a base do Live Editor ainda não tem registros, consulta a base do FC Mania
                     if not players or len(players) == 0:
-                        players = fcm_resolver.search_scout_players(search_params)
+                        players = fcm_resolver.search_scout_players(search_params, current_year=cur_year, save_id=save_id_req)
                         source = "fcm_database"
 
                 if not players:
@@ -2040,8 +2093,14 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 if payload.get("upcoming_matches") or payload.get("proximos_jogos"):
                     fixs = payload.get("upcoming_matches") or payload.get("proximos_jogos") or []
                     database.save_calendar_fixtures(save_id, fixs, payload.get("season_year", "2028"))
+                try:
+                    database.sync_live_standings_from_json(save_id, payload.get("season_year", "2029"))
+                except Exception as e:
+                    logging.warning(f"Erro auto-sync standings no sync/full: {e}")
                 if payload.get("scout_players"):
-                    threading.Thread(target=database.sync_live_scout_players, args=(save_id, payload.get("scout_players"), payload.get("season_year", "2026")), daemon=True).start()
+                    threading.Thread(target=database.sync_live_scout_players, args=(save_id, payload.get("scout_players"), payload.get("season_year", "2028")), daemon=True).start()
+                else:
+                    threading.Thread(target=database.sync_scout_from_contratos_csv, args=(save_id,), daemon=True).start()
                 return self.send_json({
                     "status": "success",
                     "message": f"Backup da carreira '{payload.get('team_name', 'Clube')}' importado com sucesso!",
@@ -2823,7 +2882,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
 
             if path == "/api/hall-of-fame/delete_retired":
                 try:
-                    player_id = int(payload.get("player_id", 0))
+                    player_id = int(payload.get("player_id") or payload.get("id") or 0)
                     database.delete_retired_player(save_id, player_id)
                     return self.send_json({
                         "status": "success",
@@ -2837,6 +2896,8 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
             if path == "/api/hall-of-fame/add_highlight":
                 try:
                     res = database.add_season_highlight(save_id, payload)
+                    if not res.get("success"):
+                        return self.send_json({"status": "error", "message": res.get("error", "Erro ao registrar destaque")}, 500)
                     return self.send_json({
                         "status": "success",
                         "id": res.get("id"),
@@ -2848,7 +2909,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
 
             if path == "/api/hall-of-fame/delete_highlight":
                 try:
-                    highlight_id = int(payload.get("id", 0))
+                    highlight_id = int(payload.get("id") or payload.get("highlight_id") or 0)
                     database.delete_season_highlight(highlight_id)
                     return self.send_json({
                         "status": "success",
@@ -2862,6 +2923,8 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
             if path == "/api/hall-of-fame/add_award":
                 try:
                     res = database.add_player_award(save_id, payload)
+                    if not res.get("success"):
+                        return self.send_json({"status": "error", "message": res.get("error", "Erro ao adicionar prêmio")}, 500)
                     return self.send_json({
                         "status": "success",
                         "id": res.get("id"),
@@ -2873,7 +2936,7 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
 
             if path == "/api/hall-of-fame/delete_award":
                 try:
-                    award_id = int(payload.get("id", 0))
+                    award_id = int(payload.get("id") or payload.get("award_id") or 0)
                     database.delete_player_award(award_id)
                     return self.send_json({
                         "status": "success",

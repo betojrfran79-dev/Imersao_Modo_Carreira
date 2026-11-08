@@ -428,9 +428,13 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
     pot = int(raw.get("potential") or raw.get("pot") or (fcm_p.get("potential") if fcm_p else ovr) or ovr)
 
     # 6. Idade e Datas Formatadas
-    calc_age = int(raw.get("age") or 24)
+    cur_year, cur_date = get_active_career_context(save_id)
     raw_birth = fcm_p.get("birthdate") if fcm_p and fcm_p.get("birthdate") else raw.get("birthdate")
     birthdate_formatted = format_date_pt(raw_birth) if raw_birth else ""
+    if raw_birth:
+        calc_age = calculate_player_age(raw_birth, ref_date=cur_date, ref_year=cur_year)
+    else:
+        calc_age = int(raw.get("age") or 24)
 
     raw_join = fcm_p.get("playerjointeamdate") if fcm_p and fcm_p.get("playerjointeamdate") else raw.get("playerjointeamdate")
     join_date_formatted = format_date_pt(raw_join) if raw_join else ""
@@ -486,12 +490,12 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
 
     # 3. Se valor de mercado ou salário estiverem zerados, calcula estimativa oficial proporcional ao OVR/POT/Idade da EA
     if m_val <= 0:
-        calc_m, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026, pos1)
+        calc_m, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(cur_year - calc_age), cur_year, pos1, ref_date=cur_date)
         m_val = float(calc_m)
         if w_wage <= 0:
             w_wage = float(calc_w)
     elif w_wage <= 0 and team_name not in ("Sem Clube", "Livre no Mercado", "Passes livres", "Passes Livres", ""):
-        _, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(2026 - calc_age), 2026, pos1)
+        _, calc_w, _ = calculate_market_value_and_wage(ovr, pot, raw_birth or str(cur_year - calc_age), cur_year, pos1, ref_date=cur_date)
         w_wage = float(calc_w)
 
     if r_clause <= 0 and m_val > 0:
@@ -976,16 +980,105 @@ SCOUT_PERSONAS = [
     }
 ]
 
-def calculate_market_value_and_wage(ovr, pot, birthdate_or_year, current_year=2026, pos="ATA"):
-    age = 24
-    if isinstance(birthdate_or_year, str) and len(birthdate_or_year) >= 4:
-        try:
-            b_year = int(birthdate_or_year[:4])
-            age = max(16, min(45, current_year - b_year))
-        except Exception:
-            age = 24
-    elif isinstance(birthdate_or_year, (int, float)) and birthdate_or_year > 1900:
-        age = max(16, min(45, current_year - int(birthdate_or_year)))
+def get_active_career_context(save_id="carreira_ativa"):
+    """
+    Retorna (season_year_int, current_date_obj) da carreira ativa no jogo.
+    Lê com prioridade do DADOS_CARREIRA.json mais recente e da tabela seasons.
+    """
+    import datetime
+    cur_year = 2028
+    cur_date = None
+
+    uprof = os.environ.get("USERPROFILE", "C:\\Users\\Roberto")
+    career_json_paths = [
+        os.path.join(uprof, "Desktop", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+        os.path.join(uprof, "Área de Trabalho", "Imersao_Modo_Carreira", "DADOS_CARREIRA.json"),
+        os.path.join(uprof, "Desktop", "Dados_Carreira_FC", "DADOS_CARREIRA.json"),
+        os.path.join(BASE_DIR, "DADOS_CARREIRA.json"),
+    ]
+    for jp in career_json_paths:
+        if os.path.exists(jp):
+            try:
+                with open(jp, "r", encoding="utf-8", errors="ignore") as f:
+                    dj = json.load(f)
+                    sy = dj.get("season_year")
+                    if sy:
+                        cur_year = int(str(sy).split("/")[0])
+                    cd = dj.get("current_date") or dj.get("game_date")
+                    if cd and "/" in cd:
+                        p = cd.split("/")
+                        if len(p) == 3:
+                            cur_date = datetime.date(int(p[2]), int(p[1]), int(p[0]))
+                            cur_year = cur_date.year
+                    break
+            except Exception:
+                pass
+
+    if not cur_date:
+        vault_db = os.path.join(BASE_DIR, "career_vault.db")
+        if os.path.exists(vault_db):
+            try:
+                conn_v = sqlite3.connect(vault_db)
+                cur_v = conn_v.cursor()
+                cur_v.execute("SELECT season_year FROM seasons WHERE save_id = ? AND is_active = 1 LIMIT 1", (save_id,))
+                r = cur_v.fetchone()
+                if not r:
+                    cur_v.execute("SELECT season_year FROM seasons WHERE save_id = ? ORDER BY id DESC LIMIT 1", (save_id,))
+                    r = cur_v.fetchone()
+                if r and r[0]:
+                    cur_year = int(str(r[0]).split("/")[0])
+                conn_v.close()
+            except Exception:
+                pass
+        cur_date = datetime.date(cur_year, 11, 1)
+
+    return cur_year, cur_date
+
+def calculate_player_age(birthdate, ref_date=None, ref_year=None):
+    """
+    Calcula a idade exata do atleta com base na data de referência do save.
+    Suporta:
+    - string no formato 'YYYY-MM-DD'
+    - dias gregorianos da EA (> 30000)
+    - ano inteiro (1900-2100)
+    """
+    import datetime
+    GREGORIAN_BASE = datetime.date(1582, 10, 15)
+    if not ref_date and not ref_year:
+        ref_year, ref_date = get_active_career_context()
+    elif not ref_date:
+        ref_date = datetime.date(ref_year, 11, 1)
+    elif not ref_year:
+        ref_year = ref_date.year
+
+    if not birthdate:
+        return 24
+
+    try:
+        if isinstance(birthdate, str) and "-" in birthdate:
+            parts = [int(p) for p in birthdate.split("-")]
+            if len(parts) >= 3:
+                bdate = datetime.date(parts[0], parts[1], parts[2])
+                age = ref_date.year - bdate.year - ((ref_date.month, ref_date.day) < (bdate.month, bdate.day))
+                return max(15, min(48, age))
+        elif isinstance(birthdate, (int, float)) and birthdate > 30000:
+            bdate = GREGORIAN_BASE + datetime.timedelta(days=int(birthdate))
+            age = ref_date.year - bdate.year - ((ref_date.month, ref_date.day) < (bdate.month, bdate.day))
+            return max(15, min(48, age))
+        elif isinstance(birthdate, (int, float)) and 1900 < birthdate < 2100:
+            return max(15, min(48, ref_year - int(birthdate)))
+    except Exception:
+        pass
+    return 24
+
+def calculate_market_value_and_wage(ovr, pot, birthdate_or_year, current_year=None, pos="ATA", ref_date=None):
+    if not current_year or not ref_date:
+        dyn_year, dyn_date = get_active_career_context()
+        if not current_year: current_year = dyn_year
+        if not ref_date: ref_date = dyn_date
+
+    age = calculate_player_age(birthdate_or_year, ref_date=ref_date, ref_year=current_year)
         
     ovr = max(40, min(99, int(ovr or 70)))
     pot = max(ovr, min(99, int(pot or ovr)))
@@ -1027,10 +1120,16 @@ def calculate_market_value_and_wage(ovr, pot, birthdate_or_year, current_year=20
 
     return market_val, wage_base, age
 
-def search_scout_players(params, current_year=2026):
+def search_scout_players(params, current_year=None, save_id="carreira_ativa"):
     """
     Busca profunda no banco de 25.049+ atletas do FC Mania (o mesmo do sigalapelota-fcmania).
+    Garante idade 100% atualizada de acordo com a temporada ativa do usuário.
     """
+    if not current_year:
+        current_year, cur_date = get_active_career_context(save_id)
+    else:
+        import datetime
+        cur_date = datetime.date(current_year, 11, 1)
     db_path = find_fcm_db()
     if not db_path:
         return []
@@ -1405,7 +1504,7 @@ def search_scout_players(params, current_year=2026):
 
     for r in rows:
         name = r["commonname"] if r["commonname"] else f"{r['firstname']} {r['lastname']}".strip()
-        calc_market_val, calc_wage, age = calculate_market_value_and_wage(r["overallrating"], r["potential"], r["birthdate"], current_year, r["Position"])
+        calc_market_val, calc_wage, age = calculate_market_value_and_wage(r["overallrating"], r["potential"], r["birthdate"], current_year, r["Position"], ref_date=cur_date)
 
         if min_ovr and r["overallrating"] < min_ovr:
             continue
@@ -2716,11 +2815,11 @@ def process_scout_chat(user_msg, persona_id="carlos", save_context=None, gemini_
             source = "live_editor"
         else:
             # 4. Se a base do Live Editor ainda não tem registros, busca na base FC Mania
-            players = search_scout_players(params)
+            players = search_scout_players(params, save_id=save_id)
             source = "fcm_database"
     except Exception as e:
         print(f"Aviso na busca scout: {e}")
-        players = search_scout_players(params)
+        players = search_scout_players(params, save_id=save_id)
         source = "fcm_database"
 
     verdict = format_scout_results_verdict(players, custom_name, source, params, language=lang)

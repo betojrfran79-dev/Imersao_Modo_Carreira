@@ -15,7 +15,7 @@ import time
 from datetime import datetime
 
 AUTORUN_DIR = r"C:\FC 26 Live Editor\lua\autorun"
-DESKTOP_FOLDER = os.path.join(os.environ.get("USERPROFILE", "C:\\Users\\Roberto"), "Desktop", "Dados_Carreira_FC")
+DESKTOP_FOLDER = os.path.join(os.environ.get("USERPROFILE", os.path.expanduser("~")), "Desktop", "Imersao_Modo_Carreira")
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def ensure_autorun_dirs():
@@ -182,7 +182,7 @@ local function GetEAFCOfficialMarketValue(ovr, pot, age)
     return math.floor(base * age_mult)
 end
 
-local function DecodePlayerAge(birthdate, cur_y)
+local function DecodePlayerAge(birthdate, cur_date_obj, cur_y)
     if not birthdate or birthdate <= 0 then return 24 end
     local ok, d = pcall(function()
         local dt = DATE:new()
@@ -191,6 +191,11 @@ local function DecodePlayerAge(birthdate, cur_y)
     end)
     if ok and d and d.year and d.year > 1900 and d.year < 2035 then
         local calc_age = cur_y - d.year
+        if cur_date_obj and cur_date_obj.month and d.month then
+            if (cur_date_obj.month < d.month) or (cur_date_obj.month == d.month and (cur_date_obj.day or 1) < (d.day or 1)) then
+                calc_age = calc_age - 1
+            end
+        end
         if calc_age >= 15 and calc_age <= 50 then return calc_age end
     end
     return 24
@@ -255,7 +260,7 @@ pcall(function()
                 local ovr = p_tbl:GetRecordFieldValue(r, "overallrating") or 70
                 local pot = p_tbl:GetRecordFieldValue(r, "potential") or ovr
                 local bdate = p_tbl:GetRecordFieldValue(r, "birthdate") or 0
-                local age = DecodePlayerAge(bdate, current_year)
+                local age = DecodePlayerAge(bdate, cur_date, current_year)
                 local val = GetEAFCOfficialMarketValue(ovr, pot, age)
 
                 -- Posições
@@ -436,6 +441,8 @@ local json_payload = json.encode(payload)
 -- 5. Gravar resultados no Desktop e pasta do App
 local userprofile = os.getenv('USERPROFILE') or "C:"
 local out_files = {{
+    string.format("%s\\\\Desktop\\\\Imersao_Modo_Carreira\\\\SCOUT_QUERY_RESULTS.json", userprofile),
+    string.format("%s\\\\OneDrive\\\\Desktop\\\\Imersao_Modo_Carreira\\\\SCOUT_QUERY_RESULTS.json", userprofile),
     string.format("%s\\\\Desktop\\\\Dados_Carreira_FC\\\\SCOUT_QUERY_RESULTS.json", userprofile),
     string.format("%s\\\\OneDrive\\\\Desktop\\\\Dados_Carreira_FC\\\\SCOUT_QUERY_RESULTS.json", userprofile),
     string.format("%s\\\\Desktop\\\\Imersão_Carreira_FC\\\\SCOUT_QUERY_RESULTS.json", userprofile),
@@ -520,10 +527,12 @@ def clear_previous_query_results():
     """
     Remove arquivos de resultados anteriores para garantir que os próximos dados recebidos sejam 100% frescos.
     """
-    uprof = os.environ.get("USERPROFILE", "C:\\Users\\Roberto")
+    uprof = os.environ.get("USERPROFILE", os.path.expanduser("~"))
     candidates = [
         os.path.join(APP_DIR, "scout_query_results.json"),
         os.path.join(DESKTOP_FOLDER, "SCOUT_QUERY_RESULTS.json"),
+        os.path.join(uprof, "Desktop", "Imersao_Modo_Carreira", "SCOUT_QUERY_RESULTS.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Imersao_Modo_Carreira", "SCOUT_QUERY_RESULTS.json"),
         os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC", "SCOUT_QUERY_RESULTS.json"),
         os.path.join(uprof, "OneDrive", "Desktop", "Imersão_Carreira_FC", "SCOUT_QUERY_RESULTS.json")
     ]
@@ -538,10 +547,12 @@ def get_latest_scout_query_results():
     """
     Verifica se há um arquivo recente de resultados gerado pelo Live Editor (SCOUT_QUERY_RESULTS.json).
     """
-    uprof = os.environ.get("USERPROFILE", "C:\\Users\\Roberto")
+    uprof = os.environ.get("USERPROFILE", os.path.expanduser("~"))
     candidates = [
         os.path.join(APP_DIR, "scout_query_results.json"),
         os.path.join(DESKTOP_FOLDER, "SCOUT_QUERY_RESULTS.json"),
+        os.path.join(uprof, "Desktop", "Imersao_Modo_Carreira", "SCOUT_QUERY_RESULTS.json"),
+        os.path.join(uprof, "OneDrive", "Desktop", "Imersao_Modo_Carreira", "SCOUT_QUERY_RESULTS.json"),
         os.path.join(uprof, "OneDrive", "Desktop", "Dados_Carreira_FC", "SCOUT_QUERY_RESULTS.json"),
         os.path.join(uprof, "OneDrive", "Desktop", "Imersão_Carreira_FC", "SCOUT_QUERY_RESULTS.json")
     ]

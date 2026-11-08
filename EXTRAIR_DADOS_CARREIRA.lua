@@ -1222,7 +1222,7 @@ function ExtractAndSyncFullCareer(is_silent)
                         is_user_match = true
                     end
 
-                    if is_user_match then
+                    if (is_user_match or (is_done and h_id > 0 and a_id > 0)) then
                         local comp_id = MEMORY:ReadShort(cur + 0x08)
                         local comp_name = GetCompetitionNameByObjID(comp_id) or payload.league_name
                         if not comp_name or comp_name == "" or comp_name:find("^COBJ") then
@@ -1301,45 +1301,48 @@ function ExtractAndSyncFullCareer(is_silent)
                                 home_score = h_score,
                                 away_score = a_score,
                                 user_team_id = user_team_id,
+                                is_user_match = is_user_match and 1 or 0,
                                 motm_player_id = 0,
                                 motm_player_name = "",
                                 scorers = {}
                             })
 
-                            if not competitions_calc[comp_name] then
-                                competitions_calc[comp_name] = {
-                                    competition_name = comp_name,
-                                    season_year = match_season_str,
-                                    games_played = 0,
-                                    wins = 0,
-                                    draws = 0,
-                                    losses = 0,
-                                    goals_for = 0,
-                                    goals_against = 0,
-                                    points = 0,
-                                    final_position = "Em Disputa",
-                                    status = "EM_DISPUTA"
-                                }
-                            end
+                            if is_user_match then
+                                if not competitions_calc[comp_name] then
+                                    competitions_calc[comp_name] = {
+                                        competition_name = comp_name,
+                                        season_year = match_season_str,
+                                        games_played = 0,
+                                        wins = 0,
+                                        draws = 0,
+                                        losses = 0,
+                                        goals_for = 0,
+                                        goals_against = 0,
+                                        points = 0,
+                                        final_position = "Em Disputa",
+                                        status = "EM_DISPUTA"
+                                    }
+                                end
 
-                            local c = competitions_calc[comp_name]
-                            c.games_played = c.games_played + 1
-                            local u_score = is_home and h_score or a_score
-                            local opp_score = is_home and a_score or h_score
-                            c.goals_for = c.goals_for + u_score
-                            c.goals_against = c.goals_against + opp_score
+                                local c = competitions_calc[comp_name]
+                                c.games_played = c.games_played + 1
+                                local u_score = is_home and h_score or a_score
+                                local opp_score = is_home and a_score or h_score
+                                c.goals_for = c.goals_for + u_score
+                                c.goals_against = c.goals_against + opp_score
 
-                            if u_score > opp_score then
-                                c.wins = c.wins + 1
-                                c.points = c.points + 3
-                            elseif u_score == opp_score then
-                                c.draws = c.draws + 1
-                                c.points = c.points + 1
-                            else
-                                c.losses = c.losses + 1
+                                if u_score > opp_score then
+                                    c.wins = c.wins + 1
+                                    c.points = c.points + 3
+                                elseif u_score == opp_score then
+                                    c.draws = c.draws + 1
+                                    c.points = c.points + 1
+                                else
+                                    c.losses = c.losses + 1
+                                end
                             end
-                        else
-                            -- Próxima Partida Agendada
+                        elseif is_user_match then
+                            -- Próxima Partida Agendada (somente para o clube do usuário)
                             table.insert(payload.upcoming_matches, {
                                 fixture_id = MEMORY:ReadShort(cur + 0x06) or 0,
                                 data = match_date_str,
@@ -1364,10 +1367,158 @@ function ExtractAndSyncFullCareer(is_silent)
                 end
             end
 
-            -- 4. Standings / Classificação removidos da extração conforme solicitado
-            payload.tabelas_classificacao = {}
-            payload.confrontos_mata_mata = {}
-            payload.standings = {}
+            -- ==============================================================================
+            -- 4. EXTRAÇÃO OFICIAL DE TABELAS DE CLASSIFICAÇÃO DA MEMÓRIA DO FC (LIVE EDITOR)
+            -- ==============================================================================
+            local all_standings = {}
+            local user_comps = {}
+
+            if std_begin and std_begin ~= 0 and max_std >= 0 then
+                for i = 0, max_std do
+                    local cur = std_begin + (itemSize * i)
+                    local is_used = MEMORY:ReadBool(cur + 0x16)
+                    local team_id = MEMORY:ReadInt(cur + 0x04)
+
+                    if is_used and team_id and team_id > 0 then
+                        local comp_obj_id = MEMORY:ReadShort(cur + 0x02)
+                        local pts = MEMORY:ReadShort(cur + 0x14) or 0
+
+                        local hw = MEMORY:ReadChar(cur + 0x09) or 0
+                        local hd = MEMORY:ReadChar(cur + 0x0A) or 0
+                        local hl = MEMORY:ReadChar(cur + 0x0B) or 0
+                        local hgf = MEMORY:ReadChar(cur + 0x0C) or 0
+                        local hga = MEMORY:ReadChar(cur + 0x0D) or 0
+
+                        local aw = MEMORY:ReadChar(cur + 0x0E) or 0
+                        local ad = MEMORY:ReadChar(cur + 0x0F) or 0
+                        local al = MEMORY:ReadChar(cur + 0x10) or 0
+                        local agf = MEMORY:ReadChar(cur + 0x11) or 0
+                        local aga = MEMORY:ReadChar(cur + 0x12) or 0
+
+                        local team_name = string.format("Time #%d", team_id)
+                        pcall(function()
+                            local tn = GetTeamName(team_id)
+                            if tn and tn ~= "" then team_name = tn end
+                        end)
+
+                        local comp_name = "Competição"
+                        pcall(function()
+                            if comp_obj_id == 1606 or comp_obj_id == 1608 then
+                                comp_name = "Supercopa do Brasil"
+                            elseif GetCompetitionNameByObjID then
+                                local cn = GetCompetitionNameByObjID(comp_obj_id)
+                                if cn and cn ~= "" and not cn:find("^COBJ") then comp_name = cn end
+                            end
+                        end)
+
+                        if (user_team_id > 0 and team_id == user_team_id) or (team_name:lower():find("madureira") ~= nil) then
+                            user_comps[comp_obj_id] = comp_name
+                        end
+
+                        local j = hw + hd + hl + aw + ad + al
+                        local v = hw + aw
+                        local e = hd + ad
+                        local d = hl + al
+                        local gp = hgf + agf
+                        local gc = hga + aga
+                        local sg = gp - gc
+
+                        if not all_standings[comp_obj_id] then
+                            all_standings[comp_obj_id] = {
+                                comp_obj_id = comp_obj_id,
+                                comp_name = comp_name,
+                                teams = {}
+                            }
+                        end
+
+                        table.insert(all_standings[comp_obj_id].teams, {
+                            team_id = team_id,
+                            team_name = team_name,
+                            points = pts,
+                            played = j,
+                            wins = v,
+                            draws = e,
+                            losses = d,
+                            goals_for = gp,
+                            goals_against = gc,
+                            goal_diff = sg,
+                            is_user = (team_id == user_team_id or (team_name:lower():find("madureira") ~= nil))
+                        })
+                    end
+                end
+            end
+
+            -- Ordenar cada tabela por Pontos > Vitórias > Saldo > Gols Pró
+            local result_competitions = {}
+            for c_id, comp_data in pairs(all_standings) do
+                table.sort(comp_data.teams, function(a, b)
+                    if a.points ~= b.points then return a.points > b.points end
+                    if a.wins ~= b.wins then return a.wins > b.wins end
+                    if a.goal_diff ~= b.goal_diff then return a.goal_diff > b.goal_diff end
+                    if a.goals_for ~= b.goals_for then return a.goals_for > b.goals_for end
+                    return a.team_name < b.team_name
+                end)
+                for pos, t in ipairs(comp_data.teams) do
+                    t.position = pos
+                end
+                comp_data.is_user_comp = (user_comps[c_id] ~= nil)
+                table.insert(result_competitions, comp_data)
+            end
+
+            payload.tabelas_classificacao = result_competitions
+            payload.standings = result_competitions
+
+            -- Gravar automaticamente TABELAS_AO_VIVO.json e TABELAS_AO_VIVO.txt em todos os diretórios possíveis
+            pcall(function()
+                local d_dir = string.format("%s\\Desktop", os.getenv("USERPROFILE") or "C:")
+                local out_j = string.format("%s\\TABELAS_AO_VIVO.json", d_dir)
+                local out_t = string.format("%s\\TABELAS_AO_VIVO.txt", d_dir)
+                local out_j_target = string.format("%s\\TABELAS_AO_VIVO.json", target_folder)
+                local payl_tables = {
+                    exported_at = os.date("%d/%m/%Y %H:%M:%S"),
+                    user_team_id = user_team_id,
+                    competitions = result_competitions
+                }
+                local encoded_j = json.encode(payl_tables)
+                local fj = io.open(out_j, "w+")
+                if fj then
+                    fj:write(encoded_j)
+                    fj:close()
+                end
+                if target_folder and target_folder ~= d_dir then
+                    local fj2 = io.open(out_j_target, "w+")
+                    if fj2 then
+                        fj2:write(encoded_j)
+                        fj2:close()
+                    end
+                end
+
+                local ft = io.open(out_t, "w+")
+                if ft then
+                    ft:write("====================================================================\n")
+                    ft:write("🏆 TABELAS DE CLASSIFICAÇÃO EXTRAÍDAS AUTOMATICAMENTE PELO VAULT MASTER\n")
+                    ft:write("====================================================================\n\n")
+                    for _, comp in ipairs(result_competitions) do
+                        if comp.is_user_comp or #comp.teams <= 24 then
+                            local tag = comp.is_user_comp and "⭐ [SUA COMPETIÇÃO]" or "[OUTRA LIGA]"
+                            ft:write(string.format("📌 %s - %s (Total de Clubes: %d)\n", comp.comp_name, tag, #comp.teams))
+                            ft:write("--------------------------------------------------------------------\n")
+                            ft:write(string.format("%-4s %-26s %-4s %-4s %-4s %-4s %-4s %-5s %-5s\n", "POS", "CLUBE", "PTS", "J", "V", "E", "D", "SG", "GP"))
+                            ft:write("--------------------------------------------------------------------\n")
+                            for _, t in ipairs(comp.teams) do
+                                local prefix = t.is_user and "👉 " or "   "
+                                local name = string.format("%s%s", prefix, t.team_name)
+                                ft:write(string.format("%-4d %-26s %-4d %-4d %-4d %-4d %-4d %-5d %-5d\n", t.position, name:sub(1, 25), t.points, t.played, t.wins, t.draws, t.losses, t.goal_diff, t.goals_for))
+                            end
+                            ft:write("\n\n")
+                        end
+                    end
+                    ft:close()
+                end
+            end)
+
+            LOGGER:LogInfo(string.format("[Career Vault] 📊 Tabelas de Classificação Extraídas da Memória: %d competições", #result_competitions))
+
         end
     end
 

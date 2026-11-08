@@ -143,7 +143,7 @@ local function GetEAFCOfficialMarketValue(ovr, pot, age)
     return math.floor(base * age_mult)
 end
 
-local function DecodePlayerAge(birthdate, cur_y)
+local function DecodePlayerAge(birthdate, cur_date, cur_y)
     if not birthdate or birthdate <= 0 then return 24 end
     local ok, d = pcall(function()
         local dt = DATE:new()
@@ -152,7 +152,10 @@ local function DecodePlayerAge(birthdate, cur_y)
     end)
     if ok and d and d.year and d.year > 1900 and d.year < 2035 then
         local calc_age = cur_y - d.year
-        if calc_age >= 15 and calc_age <= 50 then
+        if cur_date and (d.month > cur_date.month or (d.month == cur_date.month and d.day > cur_date.day)) then
+            calc_age = calc_age - 1
+        end
+        if calc_age >= 14 and calc_age <= 50 then
             return calc_age
         end
     end
@@ -206,7 +209,7 @@ pcall(function()
 
                 -- Idade & Valor Oficial EA FC
                 local bdate = p_tbl:GetRecordFieldValue(r, "birthdate") or 0
-                local age = DecodePlayerAge(bdate, current_year)
+                local age = DecodePlayerAge(bdate, cur_date, current_year)
                 local val = GetEAFCOfficialMarketValue(ovr, pot, age)
 
                 -- Contrato (Salário Real)

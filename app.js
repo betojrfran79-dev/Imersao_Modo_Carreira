@@ -205,6 +205,7 @@ function initTabsNavigation() {
       if (tabTarget === "scout") loadScoutHubData();
       if (tabTarget === "midias-sociais" && window.loadSocialMediaTab) window.loadSocialMediaTab();
       if (tabTarget === "minifaces") loadMinifacesStudio();
+      if (tabTarget === "prognosticos") loadPrognosticosDashboard();
 
       initLucideIcons();
     });
@@ -357,6 +358,9 @@ async function loadDashboardData() {
       leadersList.innerHTML = `<span class="empty-hint">Nenhum dado estatístico registrado no elenco ainda.</span>`;
     }
 
+    // Carregar Mini Standings no Dashboard
+    loadStandings(seasonYear);
+
     initLucideIcons();
   } catch (err) {
     console.error("Erro ao carregar Dashboard:", err);
@@ -463,6 +467,350 @@ function groupCompetitionsByParent(standingsData) {
   });
 
   return groups;
+}
+
+// ==============================================================================
+// TABELAS DE CLASSIFICAÇÃO & MATA-MATA (AO VIVO)
+// ==============================================================================
+let currentStandingsData = null;
+let selectedStandingsComp = null;
+
+async function loadStandings(seasonYear = null) {
+  try {
+    const sYear = seasonYear || currentSeasonYear || "2029";
+    const res = await fetch(`${API_BASE}/standings/current?save_id=${currentSaveId}&season_year=${sYear}`);
+    if (!res.ok) throw new Error("Erro na resposta do servidor");
+    
+    currentStandingsData = await res.json();
+    populateStandingsCompDropdown();
+    renderSelectedCompetitionStandings();
+    renderDashboardMiniStandings();
+    initLucideIcons();
+  } catch (err) {
+    console.error("Erro ao carregar tabelas de classificação:", err);
+  }
+}
+
+function populateStandingsCompDropdown() {
+  const select = document.getElementById("standingsCompSelect");
+  if (!select || !currentStandingsData) return;
+
+  const comps = currentStandingsData.competitions || {};
+  const knockouts = currentStandingsData.knockouts || {};
+
+  const allCompNames = new Set([
+    ...Object.keys(comps),
+    ...Object.keys(knockouts)
+  ]);
+
+  const userTeamName = (cachedDashboardData?.save?.current_team_name || "Madureira").toLowerCase();
+  
+  const sortedNames = Array.from(allCompNames).filter(name => {
+    if (!name || name.startsWith("Liga #") || name.startsWith("Competi") || name.toLowerCase() === "null") {
+      return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const aList = comps[a] || [];
+    const bList = comps[b] || [];
+    const aHasUser = aList.some(r => r.is_user_team === 1 || (r.team_name && r.team_name.toLowerCase().includes(userTeamName)));
+    const bHasUser = bList.some(r => r.is_user_team === 1 || (r.team_name && r.team_name.toLowerCase().includes(userTeamName)));
+    if (aHasUser && !bHasUser) return -1;
+    if (!aHasUser && bHasUser) return 1;
+    if (a.toLowerCase().includes("brasileir")) return -1;
+    if (b.toLowerCase().includes("brasileir")) return 1;
+    return a.localeCompare(b, 'pt-BR');
+  });
+
+  if (sortedNames.length === 0) {
+    select.innerHTML = '<option value="">Nenhuma competição ativa encontrada</option>';
+    return;
+  }
+
+  select.innerHTML = sortedNames.map(name => {
+    return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+  }).join('');
+
+  if (!selectedStandingsComp || !sortedNames.includes(selectedStandingsComp)) {
+    const pref = sortedNames.find(n => n.toLowerCase().includes("brasileir")) || sortedNames[0];
+    selectedStandingsComp = pref;
+  }
+  select.value = selectedStandingsComp;
+}
+
+function onStandingsCompChange() {
+  const select = document.getElementById("standingsCompSelect");
+  if (select) {
+    selectedStandingsComp = select.value;
+    renderSelectedCompetitionStandings();
+  }
+}
+
+function renderSelectedCompetitionStandings() {
+  if (!currentStandingsData) return;
+  const select = document.getElementById("standingsCompSelect");
+  if (select && select.value) selectedStandingsComp = select.value;
+
+  const compName = selectedStandingsComp;
+  if (!compName) return;
+
+  const comps = currentStandingsData.competitions || {};
+  const knockouts = currentStandingsData.knockouts || {};
+  const seasonYear = currentStandingsData.season_year || "2029";
+
+  const rows = comps[compName] || [];
+  let koStages = knockouts[compName] || null;
+  if (!koStages) {
+    const baseKey = Object.keys(knockouts).find(k => compName.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(compName.toLowerCase()));
+    if (baseKey) {
+      koStages = knockouts[baseKey];
+    }
+  }
+
+  // Atualizar Hero Banner
+  const heroTitle = document.getElementById("standingsHeroTitle");
+  if (heroTitle) heroTitle.textContent = compName;
+
+  const sBadge = document.getElementById("standingsSeasonBadge");
+  if (sBadge) sBadge.innerHTML = `<i data-lucide="radio"></i> Temporada ${seasonYear}`;
+
+  const heroDesc = document.getElementById("standingsHeroDesc");
+  if (heroDesc) {
+    if (compName.toLowerCase().includes("brasileir")) {
+      heroDesc.textContent = "Campeonato Brasileiro • Disputa por título nacional, vagas na Copa Libertadores, Sul-Americana e permanência na elite.";
+    } else if (compName.toLowerCase().includes("carioc")) {
+      heroDesc.textContent = "Campeonato Estadual • Fase de grupos e mata-mata pelo troféu estadual.";
+    } else {
+      heroDesc.textContent = "Competição oficial da temporada.";
+    }
+  }
+
+  const leaderEl = document.getElementById("standingsLeaderName");
+  const userPosEl = document.getElementById("standingsUserPos");
+  const clubsCountEl = document.getElementById("standingsTotalClubs");
+
+  if (clubsCountEl) clubsCountEl.textContent = rows.length > 0 ? rows.length : (koStages ? "Mata-Mata" : "0");
+  if (leaderEl) {
+    if (rows.length > 0) {
+      leaderEl.textContent = `${rows[0].team_name} (${rows[0].points} pts)`;
+    } else if (koStages && koStages["Final"]) {
+      const finalMatch = koStages["Final"][0];
+      leaderEl.textContent = finalMatch && finalMatch.winner_team_id === 112810 ? "Madureira (Campeão)" : (finalMatch ? finalMatch.home_team_name : "--");
+    } else {
+      leaderEl.textContent = "--";
+    }
+  }
+
+  const userRow = rows.find(r => r.is_user_team === 1 || (r.team_name && r.team_name.toLowerCase().includes("madureira")));
+  if (userPosEl) {
+    if (userRow) {
+      userPosEl.textContent = `${userRow.position}º Lugar (${userRow.points} pts)`;
+    } else if (koStages) {
+      userPosEl.textContent = "🏆 Campeão Estadual";
+    } else {
+      userPosEl.textContent = "--";
+    }
+  }
+
+  // Renderizar Tabela de Pontos
+  const tableCard = document.getElementById("standingsTableCard");
+  const tbody = document.getElementById("standingsTableBody");
+
+  if (rows.length > 0) {
+    if (tableCard) tableCard.style.display = "block";
+    if (tbody) {
+      const isBrasileirao = compName.toLowerCase().includes("brasileir") && compName.toLowerCase().includes("série a");
+      const totalTeams = rows.length;
+
+      tbody.innerHTML = rows.map(r => {
+        const isUser = r.is_user_team === 1 || (r.team_name && r.team_name.toLowerCase().includes("madureira"));
+        const nextOppId = currentStandingsData?.next_opponent_id || cachedCalendarData?.proximos_jogos?.[0]?.adversario_id || null;
+        const nextOppName = (currentStandingsData?.next_opponent_name || cachedCalendarData?.proximos_jogos?.[0]?.adversario || "").toLowerCase();
+        const isOpponent = (nextOppId && r.team_id === nextOppId) || (nextOppName && r.team_name && r.team_name.toLowerCase() === nextOppName);
+        
+        let rowClass = "";
+        if (isUser) rowClass = "row-user-team";
+        else if (isOpponent) rowClass = "row-opponent-team";
+
+        let zoneClass = "zone-normal";
+        let zoneLabel = "";
+        if (isBrasileirao) {
+          if (r.position <= 4) {
+            zoneClass = "zone-g4";
+            zoneLabel = "Libertadores";
+          } else if (r.position <= 6) {
+            zoneClass = "zone-g6";
+            zoneLabel = "Pré-Libertadores";
+          } else if (r.position <= 12) {
+            zoneClass = "zone-sula";
+            zoneLabel = "Sul-Americana";
+          } else if (r.position >= 17) {
+            zoneClass = "zone-z4";
+            zoneLabel = "Rebaixamento";
+          }
+        } else {
+          if (r.position <= 4) zoneClass = "zone-g4";
+          else if (r.position >= totalTeams) zoneClass = "zone-z4";
+        }
+
+        let formPillsHtml = "";
+        if (r.form) {
+          const letters = r.form.split(",").map(x => x.trim().toUpperCase()).filter(Boolean).slice(-5);
+          formPillsHtml = letters.map(l => {
+            const c = l === "V" ? "win" : (l === "E" ? "draw" : "loss");
+            return `<span class="form-pill ${c}">${l}</span>`;
+          }).join('');
+        }
+
+        const crestUrl = r.crest_url || `/assets/crest/l${r.team_id}.png`;
+        const sg = (r.goal_diff > 0 ? `+${r.goal_diff}` : r.goal_diff);
+
+        return `
+          <tr class="${rowClass}">
+            <td class="text-center font-bold">
+              <span class="pos-badge ${zoneClass}" title="${zoneLabel}">${r.position}</span>
+            </td>
+            <td>
+              <div class="team-cell" style="display: flex; align-items: center; gap: 8px;">
+                <img class="team-crest-sm" style="width: 24px; height: 24px; object-fit: contain;" src="${crestUrl}" onerror="this.src='/assets/default_crest.png'" alt="${escapeHtml(r.team_name)}">
+                <span class="team-name-label ${isUser ? 'font-bold text-cyan' : ''}">${escapeHtml(r.team_name)}</span>
+                ${isUser ? '<span class="badge-mini user" style="background: rgba(6,182,212,0.2); color: #22d3ee; border: 1px solid rgba(6,182,212,0.4); padding: 1px 6px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; margin-left: 6px;">MEU CLUBE</span>' : ''}
+                ${isOpponent ? '<span class="badge-mini opp" style="background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.4); padding: 1px 6px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; margin-left: 6px;">PRÓXIMO RIVAL</span>' : ''}
+              </div>
+            </td>
+            <td class="text-center">${r.played}</td>
+            <td class="text-center text-win" style="color: #4ade80;">${r.wins}</td>
+            <td class="text-center text-draw" style="color: #facc15;">${r.draws}</td>
+            <td class="text-center text-loss" style="color: #f87171;">${r.losses}</td>
+            <td class="text-center">${r.goals_for}</td>
+            <td class="text-center">${r.goals_against}</td>
+            <td class="text-center ${r.goal_diff > 0 ? 'text-win' : (r.goal_diff < 0 ? 'text-loss' : '')}" style="${r.goal_diff > 0 ? 'color: #4ade80;' : (r.goal_diff < 0 ? 'color: #f87171;' : '')}">${sg}</td>
+            <td class="text-center font-bold cell-pts" style="color: #fbbf24; font-size: 1rem;">${r.points}</td>
+            <td class="text-center">
+              <div class="form-pills-row" style="display: flex; gap: 4px; justify-content: center;">${formPillsHtml || '<span style="color: var(--text-dim, #64748b); font-size: 0.75rem;">-</span>'}</div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  } else {
+    if (tableCard) tableCard.style.display = "none";
+  }
+
+  // Renderizar Fases Eliminatórias (Mata-Mata)
+  const koCard = document.getElementById("standingsKnockoutCard");
+  const koContainer = document.getElementById("standingsKnockoutContainer");
+
+  if (koStages && Object.keys(koStages).length > 0) {
+    if (koCard) koCard.style.display = "block";
+    if (koContainer) {
+      koContainer.innerHTML = Object.keys(koStages).map(stName => {
+        const matches = koStages[stName] || [];
+        return `
+          <div class="ko-stage-block" style="margin-bottom: 1.25rem;">
+            <h4 class="ko-stage-title" style="display: flex; align-items: center; gap: 8px; color: #38bdf8; margin-bottom: 0.75rem; font-size: 0.95rem;">
+              <i data-lucide="shield" style="width: 16px; height: 16px;"></i> ${escapeHtml(stName)}
+            </h4>
+            <div class="ko-matches-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+              ${matches.map(m => {
+                const isUser = m.is_user_match === 1 || (m.home_team_name?.toLowerCase().includes("madureira") || m.away_team_name?.toLowerCase().includes("madureira"));
+                const homeWon = m.winner_team_id && m.winner_team_id === m.home_team_id;
+                const awayWon = m.winner_team_id && m.winner_team_id === m.away_team_id;
+
+                return `
+                  <div class="ko-match-card ${isUser ? 'user-clash' : ''}" style="background: rgba(15,23,42,0.6); border: 1px solid ${isUser ? 'rgba(56,189,248,0.5)' : 'rgba(255,255,255,0.08)'}; border-radius: 8px; padding: 0.75rem;">
+                    <div class="ko-teams-wrap" style="display: flex; flex-direction: column; gap: 6px;">
+                      <div class="ko-team-row" style="display: flex; justify-content: space-between; align-items: center; ${homeWon ? 'font-weight: 700; color: #4ade80;' : ''}">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <img src="${m.home_crest || '/assets/default_crest.png'}" onerror="this.src='/assets/default_crest.png'" style="width: 20px; height: 20px; object-fit: contain;">
+                          <span style="font-size: 0.86rem;">${escapeHtml(m.home_team_name)}</span>
+                        </div>
+                        <span style="font-size: 0.92rem; font-weight: 700;">${m.home_score ?? '-'}</span>
+                      </div>
+                      <div class="ko-team-row" style="display: flex; justify-content: space-between; align-items: center; ${awayWon ? 'font-weight: 700; color: #4ade80;' : ''}">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <img src="${m.away_crest || '/assets/default_crest.png'}" onerror="this.src='/assets/default_crest.png'" style="width: 20px; height: 20px; object-fit: contain;">
+                          <span style="font-size: 0.86rem;">${escapeHtml(m.away_team_name)}</span>
+                        </div>
+                        <span style="font-size: 0.92rem; font-weight: 700;">${m.away_score ?? '-'}</span>
+                      </div>
+                    </div>
+                    ${m.aggregate_info ? `<div class="ko-agg-tag" style="margin-top: 6px; font-size: 0.75rem; color: #94a3b8; text-align: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 4px;">${escapeHtml(m.aggregate_info)}</div>` : ''}
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  } else {
+    if (koCard) koCard.style.display = "none";
+  }
+
+  initLucideIcons();
+}
+
+function renderDashboardMiniStandings() {
+  const container = document.getElementById("dashMiniStandingsBody");
+  if (!container || !currentStandingsData) return;
+
+  const comps = currentStandingsData.competitions || {};
+  const compKey = Object.keys(comps).find(k => k.toLowerCase().includes("brasileir")) || Object.keys(comps)[0];
+  if (!compKey) {
+    container.innerHTML = '<div style="padding: 1rem; color: #94a3b8; font-size: 0.85rem;">Nenhuma tabela de liga ativa no momento.</div>';
+    return;
+  }
+
+  const titleEl = document.getElementById("dashStandingsCompTitle");
+  if (titleEl) titleEl.textContent = `${compKey} • Classificação Atual`;
+
+  const rows = comps[compKey] || [];
+  if (rows.length === 0) return;
+
+  const top4 = rows.slice(0, 4);
+  const userIdx = rows.findIndex(r => r.is_user_team === 1 || (r.team_name && r.team_name.toLowerCase().includes("madureira")));
+
+  let displayRows = [...top4];
+  if (userIdx >= 4) {
+    if (userIdx > 4) {
+      displayRows.push({ isDivider: true });
+    }
+    displayRows.push(rows[userIdx]);
+    if (userIdx + 1 < rows.length) {
+      displayRows.push(rows[userIdx + 1]);
+    }
+  }
+
+  container.innerHTML = `
+    <div class="mini-standings-table" style="display: flex; flex-direction: column; gap: 4px; padding: 0.5rem 0;">
+      ${displayRows.map(r => {
+        if (r.isDivider) {
+          return '<div style="text-align: center; color: #64748b; font-size: 0.75rem; padding: 2px 0;">• • •</div>';
+        }
+        const isUser = r.is_user_team === 1 || (r.team_name && r.team_name.toLowerCase().includes("madureira"));
+        const crest = r.crest_url || `/assets/crest/l${r.team_id}.png`;
+        const zoneColor = r.position <= 4 ? '#22c55e' : (r.position >= 17 ? '#ef4444' : '#64748b');
+
+        return `
+          <div class="mini-standings-row" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; border-radius: 6px; ${isUser ? 'background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.4);' : 'background: rgba(255,255,255,0.02);'}">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="font-weight: 700; width: 18px; text-align: center; font-size: 0.82rem; color: ${zoneColor};">${r.position}</span>
+              <img src="${crest}" onerror="this.src='/assets/default_crest.png'" style="width: 20px; height: 20px; object-fit: contain;">
+              <span style="font-size: 0.85rem; font-weight: ${isUser ? '700' : '500'}; color: ${isUser ? '#38bdf8' : '#f1f5f9'};">${escapeHtml(r.team_name)}</span>
+              ${isUser ? '<span style="font-size: 0.65rem; background: #0284c7; color: #fff; padding: 1px 4px; border-radius: 3px; font-weight: 700;">VOCÊ</span>' : ''}
+            </div>
+            <div style="display: flex; align-items: center; gap: 14px; font-size: 0.8rem; color: #94a3b8;">
+              <span>${r.played} J</span>
+              <span style="color: #4ade80;">${r.wins} V</span>
+              <span>SG: ${r.goal_diff > 0 ? '+' + r.goal_diff : r.goal_diff}</span>
+              <strong style="color: #fbbf24; font-size: 0.88rem; width: 44px; text-align: right;">${r.points} pts</strong>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
 }
 
 function renderLiveStandings(standingsData) {
@@ -1683,7 +2031,7 @@ async function loadHallOfFameData() {
       el.innerHTML = list.slice(1, 6).map((p, idx) => `
         <div class="rank-item" onclick="openPlayerModal(${p.player_id})" style="cursor: pointer;">
           <span class="rank-idx">${idx + 2}º</span>
-          <img class="rank-face" src="${p.face_url}" onerror="this.src='/assets/heads/notfound.png'" alt="">
+          <img class="rank-face" src="${p.face_url || '/assets/heads/notfound.png'}" onerror="this.src='/assets/heads/notfound.png'" alt="">
           <div class="rank-info">
             <span class="rank-name">${escapeHtml(p.player_name)}</span>
             <span class="rank-sub">${subFormatter(p)}</span>
@@ -1748,18 +2096,18 @@ async function loadHallOfFameData() {
         contribLeadWrap.innerHTML = generateFutCardHtml(
           leader,
           'silver',
-          `⚡ ${leader.total_contributions} G+A (${leader.total_goals}G + ${leader.total_assists}A)`,
-          'LÍDER EM PARTICIPAÇÕES'
+          `🔥 ${leader.total_contributions || (leader.total_goals + leader.total_assists)} G+A`,
+          'LÍDER EM G+A'
         );
       } else {
-        contribLeadWrap.innerHTML = `<span class="empty-hint">Sem participações</span>`;
+        contribLeadWrap.innerHTML = `<span class="empty-hint">Sem dados de participações</span>`;
       }
     }
     renderRankList(
       "hofContribList",
       topContrib,
-      p => `<span class="text-green font-bold">${p.total_contributions} G+A</span>`,
-      p => `${p.total_goals}G + ${p.total_assists}A (${p.total_apps} J)`
+      p => `<span class="text-gold font-bold">${p.total_contributions || (p.total_goals + p.total_assists)}</span>`,
+      p => `${p.total_goals}G + ${p.total_assists}A • ${p.total_apps} J`
     );
 
     // 6. Mais Jogos na História
@@ -1772,20 +2120,20 @@ async function loadHallOfFameData() {
           leader,
           'silver',
           `🛡️ ${leader.total_apps} PARTIDAS`,
-          'MAIS JOGOS'
+          'RECORDISTA DE JOGOS'
         );
       } else {
-        appsLeadWrap.innerHTML = `<span class="empty-hint">Sem partidas</span>`;
+        appsLeadWrap.innerHTML = `<span class="empty-hint">Sem partidas registradas</span>`;
       }
     }
     renderRankList(
       "hofAppearancesList",
       topApps,
-      p => `${p.total_apps} J`,
+      p => `<span class="text-gold font-bold">${p.total_apps} J</span>`,
       p => `${formatPosition(p.position)} • Nota ${p.career_avg || '-'}`
     );
 
-    // 7. Paredões (Clean Sheets)
+    // 7. Paredões (Goleiros / Clean Sheets)
     const topGk = data.top_goalkeepers || [];
     const gkLeadWrap = document.getElementById("hofGkCardLead");
     if (gkLeadWrap) {
@@ -1794,21 +2142,21 @@ async function loadHallOfFameData() {
         gkLeadWrap.innerHTML = generateFutCardHtml(
           leader,
           'silver',
-          `🧤 ${leader.total_cleansheets || 0} CLEAN SHEETS`,
+          `🧤 ${leader.total_cleansheets || 0} JOGOS SEM SOFRER GOL`,
           'PAREDÃO DO CLUBE'
         );
       } else {
-        gkLeadWrap.innerHTML = `<span class="empty-hint">Sem goleiros registrados</span>`;
+        gkLeadWrap.innerHTML = `<span class="empty-hint">Sem dados de goleiros</span>`;
       }
     }
     renderRankList(
       "hofGoalkeepersList",
       topGk,
-      p => `<span class="text-success font-bold">${p.total_cleansheets || 0} CS</span>`,
+      p => `<span class="text-gold font-bold">${p.total_cleansheets || 0} CS</span>`,
       p => `${p.total_saves || 0} Defesas • ${p.total_apps} J`
     );
 
-    // 8. Reis do Jogo (Mais vezes Man of the Match / Homem da Partida)
+    // 8. Reis da Partida (MOTM / Homem do Jogo)
     const topMotms = data.top_motms || [];
     const motmLeadWrap = document.getElementById("hofMotmCardLead");
     if (motmLeadWrap) {
@@ -1861,9 +2209,7 @@ async function loadHallOfFameData() {
   } catch (err) {
     console.error("Erro ao carregar Hall da Fama:", err);
   }
-}
-
-// -------------------------------------------------------------
+}// -------------------------------------------------------------
 // 9. MODAL: HISTÓRICO DE CARREIRA DO JOGADOR DO CLUBE NO SAVE
 // -------------------------------------------------------------
 function initPlayerModal() {
@@ -5092,28 +5438,38 @@ async function deleteRetiredPlayer(playerId, playerName) {
 // ==============================================================================
 // 21.1 PRÊMIOS INDIVIDUAIS & DESTAQUES DAS TEMPORADAS (HALL DA FAMA)
 // ==============================================================================
+let userSelectedAwardSeason = null;
+
 function populateAwardSeasonFilter(awardsList) {
   const filterSelect = document.getElementById("hofAwardSeasonFilter");
   if (!filterSelect) return;
-  const currentVal = filterSelect.value;
+
   const seasons = [...new Set((awardsList || []).map(a => String(a.season_year)).filter(Boolean))].sort().reverse();
+  const activeSeason = cachedDashboardData?.active_season || (seasons.length > 0 ? seasons[0] : "2029");
+
+  // Por padrão solicitado pelo usuário: sempre exibe a temporada atual para manter a tela limpa e sem poluição
+  let selectedSeason = userSelectedAwardSeason;
+  if (!selectedSeason || (!seasons.includes(selectedSeason) && selectedSeason !== "GERAL")) {
+    selectedSeason = seasons.includes(activeSeason) ? activeSeason : (seasons.length > 0 ? seasons[0] : "GERAL");
+  }
 
   let html = '';
-  // Regra solicitada: por padrão, deixa sempre à mostra os prêmios da última temporada (mais recente)
-  const defaultSeason = seasons.length > 0 ? seasons[0] : "GERAL";
-  const selectedSeason = (currentVal && (seasons.includes(currentVal) || currentVal === "GERAL")) ? currentVal : defaultSeason;
-
   seasons.forEach(s => {
-    html += `<option value="${s}" ${s === selectedSeason ? 'selected' : ''}>Temporada ${s}</option>`;
+    const isCurrent = (s === activeSeason);
+    html += `<option value="${s}" ${s === selectedSeason ? 'selected' : ''}>Temporada ${s}${isCurrent ? ' (Atual)' : ''}</option>`;
   });
   html += `<option value="GERAL" ${selectedSeason === "GERAL" ? 'selected' : ''}>Todas as Temporadas (Geral)</option>`;
 
   filterSelect.innerHTML = html;
+  filterSelect.value = selectedSeason;
 }
 
 function filterPlayerAwards() {
   const filterSelect = document.getElementById("hofAwardSeasonFilter");
-  const selectedSeason = filterSelect ? filterSelect.value : "GERAL";
+  if (!filterSelect) return;
+  userSelectedAwardSeason = filterSelect.value;
+  const selectedSeason = filterSelect.value;
+
   if (!selectedSeason || selectedSeason === "GERAL") {
     renderPlayerAwards(cachedPlayerAwards, "GERAL");
   } else {
@@ -5368,6 +5724,7 @@ async function deleteSeasonHighlight(highlightId, playerName) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         save_id: currentSaveId,
+        id: highlightId,
         highlight_id: highlightId
       })
     });
@@ -5492,6 +5849,7 @@ async function deletePlayerAward(awardId, awardTitle) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         save_id: currentSaveId,
+        id: awardId,
         award_id: awardId
       })
     });
@@ -5696,7 +6054,12 @@ function renderDashboardNextMatch(proximosJogos) {
       awayMando.className = !isUserHome ? "team-mando-badge home" : "team-mando-badge away";
     }
 
-    // Configuração do botão H2H
+    // Configuração do botão ScoutPad Pro (Tablet Tático) e H2H
+    const btnTablet = document.getElementById("btnNextMatchTablet");
+    if (btnTablet) {
+      const oppId = isUserHome ? aId : hId;
+      btnTablet.onclick = () => openScoutPad(oppId);
+    }
     if (btnH2H) {
       const oppId = isUserHome ? aId : hId;
       const oppName = isUserHome ? aName : hName;
@@ -5902,6 +6265,7 @@ function navigateToTab(tabName) {
     const targetPane = document.getElementById(`pane-${tabName}`);
     if (targetPane) targetPane.classList.add("active");
     if (tabName === "calendar") loadCalendarData();
+    if (tabName === "standings") loadStandings();
     if (tabName === "h2h") loadOpponentsList();
     initLucideIcons();
   }
@@ -7238,6 +7602,7 @@ function switchTab(tabTarget) {
   if (tabTarget === "h2h") loadOpponentsList();
   if (tabTarget === "scout") loadScoutHubData();
   if (tabTarget === "dashboard") loadDashboardData();
+  if (tabTarget === "standings") loadStandings();
   if (tabTarget === "minifaces") loadMinifacesStudio();
 
   initLucideIcons();
@@ -7912,3 +8277,595 @@ async function refreshMinifaces() {
     if (btn) btn.disabled = false;
   }
 }
+
+
+// ==========================================================================
+// SCOUTPAD PRO - TABLET TÁTICO & INTELIGÊNCIA PRÉ-JOGO
+// ==========================================================================
+
+let activeScoutDossier = null;
+
+async function openScoutPad(opponentId = null) {
+  const modal = document.getElementById("scoutpadModal");
+  if (!modal) return;
+
+  // Atualizar relógio do sistema operacional do tablet
+  const clockEl = document.getElementById("spClock");
+  if (clockEl) {
+    const now = new Date();
+    clockEl.textContent = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  showToast("Carregando Dossiê Tático do ScoutPad Pro...", "info");
+
+  try {
+    const sId = currentSaveId || 'carreira_ativa';
+    const yr = cachedDashboardData?.active_season || '2029';
+    let url = `/api/match/scout-dossier?save_id=${encodeURIComponent(sId)}&season_year=${encodeURIComponent(yr)}`;
+    if (opponentId) {
+      url += `&opponent_id=${encodeURIComponent(opponentId)}`;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Erro ao buscar dossiê de scout");
+    const data = await res.json();
+    activeScoutDossier = data;
+
+    renderScoutPadDossier(data);
+    switchScoutPadTab('overview');
+
+    modal.style.display = "flex";
+    if (window.lucide) lucide.createIcons();
+    showToast("Dossiê Tático pronto para análise!", "success");
+  } catch (err) {
+    console.error("Erro ao carregar ScoutPad:", err);
+    showToast("Não foi possível carregar os dados do ScoutPad.", "error");
+  }
+}
+
+function closeScoutPad() {
+  const modal = document.getElementById("scoutpadModal");
+  if (modal) modal.style.display = "none";
+}
+
+function switchScoutPadTab(tabKey) {
+  const tabMap = {
+    overview: { btn: "spTabNavOverview", panel: "spPanelOverview" },
+    h2h: { btn: "spTabNavH2H", panel: "spPanelH2H" },
+    squad: { btn: "spTabNavSquad", panel: "spPanelSquad" },
+    tactics: { btn: "spTabNavTactics", panel: "spPanelTactics" }
+  };
+
+  Object.keys(tabMap).forEach(t => {
+    const btn = document.getElementById(tabMap[t].btn);
+    const panel = document.getElementById(tabMap[t].panel);
+    if (btn) {
+      if (t === tabKey) btn.classList.add("active");
+      else btn.classList.remove("active");
+    }
+    if (panel) {
+      if (t === tabKey) panel.classList.add("active");
+      else panel.classList.remove("active");
+    }
+  });
+  if (window.lucide) lucide.createIcons();
+}
+
+function renderScoutPadDossier(data) {
+  if (!data) return;
+
+  const user = data.user_club || {};
+  const opp = data.opponent || {};
+  const match = data.match || {};
+  const h2h = data.h2h || {};
+  const tactics = data.tactical_intelligence || {};
+
+  // 1. Header do Tablet
+  const userCrest = document.getElementById("spUserCrest");
+  if (userCrest) userCrest.src = user.crest_url || "/assets/default_crest.png";
+
+  const userClubName = document.getElementById("spUserClubName");
+  if (userClubName) userClubName.textContent = `${(user.team_name || "MADUREIRA").toUpperCase()} EC • SCOUT & DESEMPENHO`;
+
+  const compStage = document.getElementById("spCompStage");
+  if (compStage) compStage.textContent = `${match.competition || "Campeonato"} 2029 • ${match.stage || "Decisão"}`;
+
+  // 2. Banner de Duelo (Faceoff)
+  const homeCrest = document.getElementById("spHomeCrest");
+  const homeName = document.getElementById("spHomeName");
+  const homeMando = document.getElementById("spHomeMando");
+  const awayCrest = document.getElementById("spAwayCrest");
+  const awayName = document.getElementById("spAwayName");
+  const awayMando = document.getElementById("spAwayMando");
+  const spDate = document.getElementById("spDate");
+  const spVenue = document.getElementById("spVenue");
+  const spAggInfo = document.getElementById("spAggInfo");
+
+  const isHome = match.mando === "Casa";
+  // O lado esquerdo é SEMPRE o Mandante (quem joga em casa), o direito é SEMPRE o Visitante (quem joga fora)
+  if (homeCrest) homeCrest.src = isHome ? (user.crest_url || "/assets/default_crest.png") : (opp.crest_url || "/assets/default_crest.png");
+  if (homeName) homeName.textContent = isHome ? user.team_name : opp.team_name;
+  if (homeMando) {
+    homeMando.textContent = isHome ? "MANDANTE (MEU CLUBE)" : "MANDANTE (CASA)";
+    homeMando.className = "sp-mando-badge home";
+  }
+
+  if (awayCrest) awayCrest.src = !isHome ? (user.crest_url || "/assets/default_crest.png") : (opp.crest_url || "/assets/default_crest.png");
+  if (awayName) awayName.textContent = !isHome ? user.team_name : opp.team_name;
+  if (awayMando) {
+    awayMando.textContent = !isHome ? "VISITANTE (MEU CLUBE)" : "VISITANTE (FORA)";
+    awayMando.className = "sp-mando-badge away";
+  }
+
+  if (spDate) spDate.textContent = `${match.date || "--/--/----"} • ${match.time || "16:00"}`;
+  if (spVenue) spVenue.textContent = match.venue || "Estádio";
+  
+  if (spAggInfo) {
+    if (match.is_knockout && match.aggregate_info) {
+      spAggInfo.style.display = "inline-block";
+      spAggInfo.textContent = match.aggregate_info;
+    } else {
+      spAggInfo.style.display = "none";
+    }
+  }
+
+  // 3. Aba 1: Visão Geral & Momento
+  const stakesText = document.getElementById("spStakesText");
+  if (stakesText) stakesText.textContent = match.stakes_summary || "Partida regular do campeonato.";
+
+  const metricAdvantage = document.getElementById("spMetricAdvantage");
+  if (metricAdvantage) metricAdvantage.textContent = match.metric_advantage || "Disputa por 3 Pts";
+
+  const metricStatus = document.getElementById("spMetricStatus");
+  if (metricStatus) metricStatus.textContent = match.metric_status || (match.is_knockout ? "Mata-Mata" : "Campeonato Nacional");
+
+  const metricVenue = document.getElementById("spMetricVenue");
+  if (metricVenue) metricVenue.textContent = isHome ? "Conselheiro Galvão" : (opp.team_name ? `Estádio do ${opp.team_name}` : "Fora");
+
+  const metricLabelAdv = document.getElementById("spMetricLabelAdv");
+  if (metricLabelAdv) metricLabelAdv.textContent = match.is_knockout ? "Vantagem Agregada" : "Objetivo da Partida";
+
+  const legendHome = document.getElementById("spLegendHome");
+  if (legendHome) legendHome.textContent = user.team_name || "Madureira";
+  const legendAway = document.getElementById("spLegendAway");
+  if (legendAway) legendAway.textContent = opp.team_name || "Adversário";
+
+  const formHomeName = document.getElementById("spFormHomeName");
+  if (formHomeName) formHomeName.textContent = user.team_name || "Madureira";
+  const formHomeCrest = document.getElementById("spFormHomeCrest");
+  if (formHomeCrest) formHomeCrest.src = user.crest_url || "/assets/default_crest.png";
+
+  const formAwayName = document.getElementById("spFormAwayName");
+  if (formAwayName) formAwayName.textContent = opp.team_name || "Adversário";
+  const formAwayCrest = document.getElementById("spFormAwayCrest");
+  if (formAwayCrest) formAwayCrest.src = opp.crest_url || "/assets/default_crest.png";
+
+  // Badges e Pílulas de Forma Recente Factuais
+  const homeBadge = document.getElementById("spHomeFormBadge");
+  if (homeBadge) homeBadge.textContent = user.form_badge || "Excelente Momento";
+
+  const awayBadge = document.getElementById("spAwayFormBadge");
+  if (awayBadge) awayBadge.textContent = opp.form_badge || "Forma Recente";
+
+  const homePills = document.getElementById("spHomeFormPills");
+  if (homePills) {
+    const rf = user.recent_form || [];
+    if (rf.length > 0) {
+      homePills.innerHTML = rf.map(item => {
+        const cls = item.result === "V" ? "win" : (item.result === "E" ? "draw" : "loss");
+        const title = item.vs ? `${item.result} (${item.score} vs ${item.vs})` : item.result;
+        return `<span class="form-pill ${cls}" title="${escapeHtml(title)}">${item.result}</span>`;
+      }).join('');
+    }
+  }
+
+  const awayPills = document.getElementById("spAwayFormPills");
+  if (awayPills) {
+    const rf = opp.recent_form || [];
+    if (rf.length > 0) {
+      awayPills.innerHTML = rf.map(item => {
+        const cls = item.result === "V" ? "win" : (item.result === "E" ? "draw" : "loss");
+        const title = item.vs ? `${item.result} (${item.score || ''} vs ${item.vs})` : item.result;
+        return `<span class="form-pill ${cls}" title="${escapeHtml(title)}">${item.result}</span>`;
+      }).join('');
+    } else {
+      awayPills.innerHTML = `<span style="color: var(--text-dim, #64748b); font-size: 0.75rem;">Sem histórico registrado</span>`;
+    }
+  }
+
+  // Barras de Força Setorial
+  const uAvg = user.avg_ovr || 70;
+  const oRatings = opp.ratings || {};
+  const barAttH = document.getElementById("spBarHomeAtt");
+  const barAttA = document.getElementById("spBarAwayAtt");
+  if (barAttH && barAttA) {
+    barAttH.textContent = `${uAvg}`;
+    barAttH.style.width = `${Math.min(100, Math.max(20, uAvg))}%`;
+    barAttA.textContent = `${oRatings.att || 62}`;
+    barAttA.style.width = `${Math.min(100, Math.max(20, oRatings.att || 62))}%`;
+  }
+
+  const barMidH = document.getElementById("spBarHomeMid");
+  const barMidA = document.getElementById("spBarAwayMid");
+  if (barMidH && barMidA) {
+    barMidH.textContent = `${uAvg + 2}`;
+    barMidH.style.width = `${Math.min(100, Math.max(20, uAvg + 2))}%`;
+    barMidA.textContent = `${oRatings.mid || 63}`;
+    barMidA.style.width = `${Math.min(100, Math.max(20, oRatings.mid || 63))}%`;
+  }
+
+  const barDefH = document.getElementById("spBarHomeDef");
+  const barDefA = document.getElementById("spBarAwayDef");
+  if (barDefH && barDefA) {
+    barDefH.textContent = `${uAvg + 1}`;
+    barDefH.style.width = `${Math.min(100, Math.max(20, uAvg + 1))}%`;
+    barDefA.textContent = `${oRatings.def || 61}`;
+    barDefA.style.width = `${Math.min(100, Math.max(20, oRatings.def || 61))}%`;
+  }
+
+  const barGkH = document.getElementById("spBarHomeGk");
+  const barGkA = document.getElementById("spBarAwayGk");
+  if (barGkH && barGkA) {
+    barGkH.textContent = `${uAvg}`;
+    barGkH.style.width = `${Math.min(100, Math.max(20, uAvg))}%`;
+    barGkA.textContent = `${oRatings.gk || 61}`;
+    barGkA.style.width = `${Math.min(100, Math.max(20, oRatings.gk || 61))}%`;
+  }
+
+  // 4. Aba 2: Raio-X Histórico (H2H)
+  const h2hTotal = document.getElementById("spH2HTotal");
+  const h2hWins = document.getElementById("spH2HWins");
+  const h2hDraws = document.getElementById("spH2HDraws");
+  const h2hLosses = document.getElementById("spH2HLosses");
+  const h2hAprov = document.getElementById("spH2HAprov");
+  const h2hGoals = document.getElementById("spH2HGoals");
+
+  if (h2hTotal) h2hTotal.textContent = h2h.total_games ?? 0;
+  if (h2hWins) h2hWins.textContent = h2h.wins ?? 0;
+  if (h2hDraws) h2hDraws.textContent = h2h.draws ?? 0;
+  if (h2hLosses) h2hLosses.textContent = h2h.losses ?? 0;
+  if (h2hAprov) h2hAprov.textContent = `${h2h.aproveitamento_pct ?? 0}%`;
+  if (h2hGoals) h2hGoals.textContent = `${h2h.goals_for ?? 0} x ${h2h.goals_against ?? 0}`;
+
+  const h2hList = document.getElementById("spH2HMatchesList");
+  if (h2hList) {
+    const matches = h2h.matches || [];
+    if (matches.length === 0) {
+      h2hList.innerHTML = `<div style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.84rem;">Nenhum confronto anterior registrado no histórico da carreira.</div>`;
+    } else {
+      h2hList.innerHTML = matches.map(m => {
+        const uHome = m.user_team_id === m.home_team_id;
+        const uWon = uHome ? (m.home_score > m.away_score) : (m.away_score > m.home_score);
+        const isDraw = m.home_score === m.away_score;
+        const resClass = uWon ? "win" : (isDraw ? "draw" : "loss");
+        const resText = uWon ? "Vitória" : (isDraw ? "Empate" : "Derrota");
+
+        return `
+          <div class="sp-h2h-row">
+            <div class="sp-h2h-match-meta">
+              <span class="sp-h2h-date">${m.match_date}</span>
+              <span class="sp-h2h-comp">${m.competition_name || "Jogo"}</span>
+            </div>
+            <div class="sp-h2h-teams-score">
+              <span class="sp-h2h-team-item ${m.home_score > m.away_score ? 'winner' : ''}">${escapeHtml(m.home_team_name)}</span>
+              <span class="sp-h2h-score-tag">${m.home_score} x ${m.away_score}</span>
+              <span class="sp-h2h-team-item ${m.away_score > m.home_score ? 'winner' : ''}">${escapeHtml(m.away_team_name)}</span>
+            </div>
+            <span class="sp-h2h-result-badge ${resClass}">${resText}</span>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  // 5. Aba 3: Espionagem do Elenco (Squad Spy)
+  const squadCountEl = document.getElementById("spSquadTotalCount");
+  if (squadCountEl) squadCountEl.textContent = `${opp.total_squad || 0} Atletas no Elenco`;
+
+  const starsGrid = document.getElementById("spStarsGrid");
+  if (starsGrid) {
+    const stars = opp.top_stars || [];
+    if (stars.length === 0) {
+      starsGrid.innerHTML = `<div style="padding: 1rem; color: #64748b; font-size: 0.82rem;">Sem atletas de scout catalogados para este clube.</div>`;
+    } else {
+      starsGrid.innerHTML = stars.map(p => `
+        <div class="sp-star-card">
+          <img src="${p.face_url || '/assets/default_avatar.png'}" class="sp-star-face" onerror="this.src='/assets/default_avatar.png'">
+          <div class="sp-star-info">
+            <span class="sp-star-name">${escapeHtml(p.name)}</span>
+            <div class="sp-star-meta">
+              <span class="sp-pos-badge">${p.position}</span>
+              <span>${p.age} anos</span>
+              <span>Rit: ${p.pace || p.sprintspeed || '--'}</span>
+              <span>Fin: ${p.finishing || '--'}</span>
+            </div>
+          </div>
+          <div class="sp-star-ovr">${p.overall_rating}</div>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Velocistas Perigosos
+  const fastestList = document.getElementById("spFastestList");
+  if (fastestList) {
+    const fast = opp.fastest || [];
+    fastestList.innerHTML = fast.map(p => {
+      let speedBadge = `Ritmo ${p.pace || p.sprintspeed || 60}`;
+      if (p.def_speed_cat === 'Veloz') speedBadge += ' • Defensor Veloz';
+      else if (p.def_speed_cat === 'Ágil') speedBadge += ' • Defensor Ágil';
+      return `
+        <div class="sp-player-mini-row">
+          <span class="sp-mini-name">${escapeHtml(p.name)} (${p.position}) - OVR ${p.overall_rating}</span>
+          <span class="sp-mini-stat red">${speedBadge}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Vulnerabilidades na Defesa
+  const vulnList = document.getElementById("spVulnerabilitiesList");
+  if (vulnList) {
+    const vulns = opp.vulnerabilities || [];
+    if (vulns.length === 0) {
+      vulnList.innerHTML = `
+        <div style="padding: 0.75rem; color: #4ade80; font-size: 0.8rem; display: flex; align-items: center; gap: 8px; background: rgba(34, 197, 94, 0.08); border-radius: 6px; border: 1px solid rgba(34, 197, 94, 0.2);">
+          <span style="font-size: 1.1rem;">🛡️</span>
+          <span>Nenhum defensor lento (ritmo abaixo de 60) no elenco adversário.</span>
+        </div>
+      `;
+    } else {
+      vulnList.innerHTML = vulns.map(p => `
+        <div class="sp-player-mini-row">
+          <span class="sp-mini-name">${escapeHtml(p.name)} (${p.position}) - OVR ${p.overall_rating}</span>
+          <span class="sp-mini-stat yellow">Ritmo Lento (${p.pace || p.sprintspeed || 56}) • Explorar Costas</span>
+        </div>
+      `).join('');
+    }
+  }
+
+  // 6. Aba 4: Dossiê Tático da IA
+  const threatsEl = document.getElementById("spTacticsThreats");
+  if (threatsEl) threatsEl.textContent = tactics.threat_alert || "Atenção com contra-ataques adversários.";
+
+  const flawsEl = document.getElementById("spTacticsFlaws");
+  if (flawsEl) flawsEl.textContent = tactics.defensive_weakness || "Explorar espaços nas costas dos zagueiros e laterais rivais.";
+
+  const gameplanEl = document.getElementById("spTacticsGameplan");
+  if (gameplanEl) gameplanEl.textContent = tactics.recommended_gameplan || "Manter as linhas compactas e ditar o ritmo de jogo.";
+}
+
+function printScoutReport() {
+  window.print();
+}
+
+// ========================================================
+// ABA: PROGNÓSTICOS & CHANCES MATEMÁTICAS (INFOBOLA / UFMG)
+// ========================================================
+window.projectionsData = null;
+window.currentProjectionsFilter = "all";
+
+async function loadPrognosticosDashboard() {
+  try {
+    const res = await fetch("/api/projections");
+    if (!res.ok) throw new Error("Erro na requisição dos prognósticos");
+    const data = await res.json();
+    if (data.error) {
+      console.warn("Aviso prognósticos:", data.error);
+      return;
+    }
+
+    window.projectionsData = data;
+
+    // 1. Badge de Modelo e Rodada
+    const badgeEl = document.getElementById("progModelBadge");
+    if (badgeEl) {
+      badgeEl.innerHTML = `<i data-lucide="cpu" style="width: 14px; height: 14px; vertical-align: middle;"></i> Rodada ${data.current_round} • ${data.weight_mode}`;
+    }
+
+    // 2. Spotlight do Time do Usuário (Madureira)
+    const userTeam = data.user_team;
+    if (userTeam) {
+      const crestEl = document.getElementById("progUserCrest");
+      if (crestEl) crestEl.src = userTeam.crest_url || `/assets/crest/l${userTeam.team_id}.png`;
+
+      const nameEl = document.getElementById("progUserName");
+      if (nameEl) nameEl.textContent = userTeam.team_name;
+
+      const posBadgeEl = document.getElementById("progUserPosBadge");
+      if (posBadgeEl) {
+        posBadgeEl.textContent = `${userTeam.position}º Lugar (${userTeam.points} pts)`;
+        posBadgeEl.className = `pos-badge ${userTeam.position <= 4 ? 'zone-g4' : (userTeam.position <= 12 ? 'zone-sula' : (userTeam.position >= 17 ? 'zone-z4' : ''))}`;
+      }
+
+      const subEl = document.getElementById("progUserSub");
+      if (subEl) subEl.textContent = `${data.competition_name} • ${data.season_year} • ${userTeam.played} jogos disputados`;
+
+      // Aproveitamento Casa / Fora e Projeção
+      const effHomeEl = document.getElementById("progUserEffHome");
+      if (effHomeEl) effHomeEl.textContent = `${userTeam.eff_home}% (${userTeam.h_rem}j restam)`;
+
+      const effAwayEl = document.getElementById("progUserEffAway");
+      if (effAwayEl) effAwayEl.textContent = `${userTeam.eff_away}% (${userTeam.a_rem}j restam)`;
+
+      const projPtsEl = document.getElementById("progUserProjPts");
+      if (projPtsEl) projPtsEl.textContent = `${userTeam.proj_pts} pts`;
+
+      // 4 Metas
+      // Título
+      const pctTitleEl = document.getElementById("progUserPctTitle");
+      if (pctTitleEl) pctTitleEl.textContent = `${userTeam.prob_title}%`;
+      const barTitleEl = document.getElementById("progBarTitle");
+      if (barTitleEl) barTitleEl.style.width = `${Math.min(100, userTeam.prob_title)}%`;
+      const magicTitleEl = document.getElementById("progUserMagicTitle");
+      if (magicTitleEl) {
+        magicTitleEl.textContent = userTeam.magic_title > 0 ? `Meta corte: faltam ${userTeam.magic_title} pts` : "Meta de corte atingida!";
+      }
+
+      // Libertadores
+      const pctLibEl = document.getElementById("progUserPctLib");
+      if (pctLibEl) pctLibEl.textContent = `${userTeam.prob_libertadores}%`;
+      const barLibEl = document.getElementById("progBarLib");
+      if (barLibEl) barLibEl.style.width = `${Math.min(100, userTeam.prob_libertadores)}%`;
+      const magicLibEl = document.getElementById("progUserMagicLib");
+      if (magicLibEl) {
+        magicLibEl.textContent = userTeam.magic_liberta > 0 ? `Meta corte: faltam ${userTeam.magic_liberta} pts` : "Vaga virtualmente carimbada!";
+      }
+
+      // Sul-Americana
+      const pctSulaEl = document.getElementById("progUserPctSula");
+      if (pctSulaEl) pctSulaEl.textContent = `${userTeam.prob_sulamericana}%`;
+      const barSulaEl = document.getElementById("progBarSula");
+      if (barSulaEl) barSulaEl.style.width = `${Math.min(100, userTeam.prob_sulamericana)}%`;
+
+      // Z-4
+      const pctZ4El = document.getElementById("progUserPctZ4");
+      if (pctZ4El) pctZ4El.textContent = `${userTeam.prob_rebaixamento}%`;
+      const barZ4El = document.getElementById("progBarZ4");
+      if (barZ4El) barZ4El.style.width = `${Math.min(100, userTeam.prob_rebaixamento)}%`;
+      const magicSafeEl = document.getElementById("progUserMagicSafety");
+      if (magicSafeEl) {
+        magicSafeEl.textContent = userTeam.magic_safety > 0 ? `Segurança matemática: faltam ${userTeam.magic_safety} pts` : "Matematicamente livre do Z-4!";
+      }
+    }
+
+    // 3. Linhas de corte da rodada
+    const cuts = data.cut_offs || {};
+    const cTitle = document.getElementById("progCutTitle");
+    if (cTitle) cTitle.textContent = `${cuts.title || '--'} pts`;
+    const cLib = document.getElementById("progCutLib");
+    if (cLib) cLib.textContent = `${cuts.libertadores || '--'} pts`;
+    const cSula = document.getElementById("progCutSula");
+    if (cSula) cSula.textContent = `${cuts.sulamericana || '--'} pts`;
+    const cZ4 = document.getElementById("progCutZ4");
+    if (cZ4) cZ4.textContent = `${cuts.safety_z4 || '--'} pts`;
+
+    const cDesc = document.getElementById("progCutOffDesc");
+    if (cDesc) {
+      cDesc.textContent = `Linhas móveis na ${data.current_round}ª rodada calculadas com base nas posições de fronteira do campeonato.`;
+    }
+
+    // 4. Renderizar Tabela
+    filterProjectionsTable(window.currentProjectionsFilter || "all");
+    initLucideIcons();
+  } catch (err) {
+    console.error("Erro ao carregar prognósticos:", err);
+  }
+}
+
+function filterProjectionsTable(filterType) {
+  window.currentProjectionsFilter = filterType;
+
+  // Atualizar botões de filtro
+  const filterBtns = document.querySelectorAll("#progFilterGroup .filter-btn");
+  filterBtns.forEach(btn => {
+    if (btn.getAttribute("data-filter") === filterType) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  if (!window.projectionsData || !window.projectionsData.teams) return;
+
+  const allTeams = window.projectionsData.teams;
+  let filtered = allTeams;
+
+  if (filterType === "title") {
+    filtered = allTeams.filter(t => t.prob_title >= 0.5 || t.position <= 4);
+  } else if (filterType === "liberta") {
+    filtered = allTeams.filter(t => t.prob_libertadores >= 1.0 || t.position <= 8);
+  } else if (filterType === "z4") {
+    filtered = allTeams.filter(t => t.prob_rebaixamento >= 1.0 || t.position >= 15);
+  }
+
+  const countDisplay = document.getElementById("progTotalCountDisplay");
+  if (countDisplay) {
+    countDisplay.textContent = `Exibindo ${filtered.length} de ${allTeams.length} clubes`;
+  }
+
+  renderProjectionsTable(filtered);
+}
+
+function renderProjectionsTable(teams) {
+  const tbody = document.getElementById("progTableBody");
+  if (!tbody) return;
+
+  if (!teams || teams.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="11" class="text-center" style="padding: 1.5rem; color: #94a3b8;">Nenhum clube se enquadra no filtro selecionado.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = teams.map(t => {
+    const isUser = (t.is_user_team || t.team_id === (window.projectionsData?.user_team?.team_id));
+    const rowClass = isUser ? "user-row" : "";
+    const crestUrl = t.crest_url || `/assets/crest/l${t.team_id}.png`;
+
+    let zoneClass = "";
+    if (t.position <= 4) zoneClass = "zone-g4";
+    else if (t.position <= 6) zoneClass = "zone-g6";
+    else if (t.position <= 12) zoneClass = "zone-sula";
+    else if (t.position >= 17) zoneClass = "zone-z4";
+
+    return `
+      <tr class="${rowClass}">
+        <td class="text-center font-bold">
+          <span class="pos-badge ${zoneClass}">${t.position}</span>
+        </td>
+        <td>
+          <div class="team-cell" style="display: flex; align-items: center; gap: 8px;">
+            <img class="team-crest-sm" style="width: 24px; height: 24px; object-fit: contain;" src="${crestUrl}" onerror="this.src='/assets/default_crest.png'" alt="${escapeHtml(t.team_name)}">
+            <span class="team-name-label ${isUser ? 'font-bold text-cyan' : ''}">${escapeHtml(t.team_name)}</span>
+            ${isUser ? '<span class="badge-mini user" style="background: rgba(6,182,212,0.2); color: #22d3ee; border: 1px solid rgba(6,182,212,0.4); padding: 1px 6px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; margin-left: 4px;">MEU CLUBE</span>' : ''}
+          </div>
+        </td>
+        <td class="text-center font-bold" style="color: #fbbf24; font-size: 0.95rem;">${t.points}</td>
+        <td class="text-center text-muted" style="font-size: 0.85rem;">${t.played}</td>
+        <td class="text-center" style="font-size: 0.8rem; font-family: monospace;">
+          <span style="color: #4ade80;" title="Aproveitamento Mandante (Casa)">${t.eff_home}%</span>
+          <span style="color: #64748b;"> / </span>
+          <span style="color: #60a5fa;" title="Aproveitamento Visitante (Fora)">${t.eff_away}%</span>
+        </td>
+        <td class="text-center font-bold" style="color: #f1f5f9; font-size: 0.95rem;">
+          ${t.proj_pts}
+        </td>
+        <td>
+          <div class="prob-cell-bar">
+            <div class="prob-track">
+              <div class="prob-fill gold" style="width: ${Math.min(100, t.prob_title)}%;"></div>
+            </div>
+            <span class="prob-val-label gold">${t.prob_title}%</span>
+          </div>
+        </td>
+        <td>
+          <div class="prob-cell-bar">
+            <div class="prob-track">
+              <div class="prob-fill cyan" style="width: ${Math.min(100, t.prob_libertadores)}%;"></div>
+            </div>
+            <span class="prob-val-label cyan">${t.prob_libertadores}%</span>
+          </div>
+        </td>
+        <td>
+          <div class="prob-cell-bar">
+            <div class="prob-track">
+              <div class="prob-fill green" style="width: ${Math.min(100, t.prob_sulamericana)}%;"></div>
+            </div>
+            <span class="prob-val-label green">${t.prob_sulamericana}%</span>
+          </div>
+        </td>
+        <td>
+          <div class="prob-cell-bar">
+            <div class="prob-track">
+              <div class="prob-fill red" style="width: ${Math.min(100, t.prob_rebaixamento)}%;"></div>
+            </div>
+            <span class="prob-val-label red">${t.prob_rebaixamento}%</span>
+          </div>
+        </td>
+        <td class="text-center">
+          <span class="diag-badge ${t.badge_class}">${escapeHtml(t.status_badge)}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+

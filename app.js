@@ -206,6 +206,7 @@ function initTabsNavigation() {
       if (tabTarget === "midias-sociais" && window.loadSocialMediaTab) window.loadSocialMediaTab();
       if (tabTarget === "minifaces") loadMinifacesStudio();
       if (tabTarget === "prognosticos") loadPrognosticosDashboard();
+      if (tabTarget === "standings") loadStandings();
 
       initLucideIcons();
     });
@@ -7603,6 +7604,7 @@ function switchTab(tabTarget) {
   if (tabTarget === "scout") loadScoutHubData();
   if (tabTarget === "dashboard") loadDashboardData();
   if (tabTarget === "standings") loadStandings();
+  if (tabTarget === "prognosticos") loadPrognosticosDashboard();
   if (tabTarget === "minifaces") loadMinifacesStudio();
 
   initLucideIcons();

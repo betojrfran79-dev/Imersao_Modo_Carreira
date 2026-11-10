@@ -1451,12 +1451,22 @@ function ExtractAndSyncFullCareer(is_silent)
             -- Ordenar cada tabela por Pontos > Vitórias > Saldo > Gols Pró
             local result_competitions = {}
             for c_id, comp_data in pairs(all_standings) do
-                table.sort(comp_data.teams, function(a, b)
-                    if a.points ~= b.points then return a.points > b.points end
-                    if a.wins ~= b.wins then return a.wins > b.wins end
-                    if a.goal_diff ~= b.goal_diff then return a.goal_diff > b.goal_diff end
-                    if a.goals_for ~= b.goals_for then return a.goals_for > b.goals_for end
-                    return a.team_name < b.team_name
+                pcall(function()
+                    table.sort(comp_data.teams, function(a, b)
+                        local apts = tonumber(a.points) or 0
+                        local bpts = tonumber(b.points) or 0
+                        if apts ~= bpts then return apts > bpts end
+                        local aw = tonumber(a.wins) or 0
+                        local bw = tonumber(b.wins) or 0
+                        if aw ~= bw then return aw > bw end
+                        local asg = tonumber(a.goal_diff) or 0
+                        local bsg = tonumber(b.goal_diff) or 0
+                        if asg ~= bsg then return asg > bsg end
+                        local agf = tonumber(a.goals_for) or 0
+                        local bgf = tonumber(b.goals_for) or 0
+                        if agf ~= bgf then return agf > bgf end
+                        return tostring(a.team_name or "") < tostring(b.team_name or "")
+                    end)
                 end)
                 for pos, t in ipairs(comp_data.teams) do
                     t.position = pos
@@ -1470,50 +1480,57 @@ function ExtractAndSyncFullCareer(is_silent)
 
             -- Gravar automaticamente TABELAS_AO_VIVO.json e TABELAS_AO_VIVO.txt em todos os diretórios possíveis
             pcall(function()
-                local d_dir = string.format("%s\\Desktop", os.getenv("USERPROFILE") or "C:")
-                local out_j = string.format("%s\\TABELAS_AO_VIVO.json", d_dir)
-                local out_t = string.format("%s\\TABELAS_AO_VIVO.txt", d_dir)
-                local out_j_target = string.format("%s\\TABELAS_AO_VIVO.json", target_folder)
                 local payl_tables = {
                     exported_at = os.date("%d/%m/%Y %H:%M:%S"),
                     user_team_id = user_team_id,
                     competitions = result_competitions
                 }
                 local encoded_j = json.encode(payl_tables)
-                local fj = io.open(out_j, "w+")
-                if fj then
-                    fj:write(encoded_j)
-                    fj:close()
-                end
-                if target_folder and target_folder ~= d_dir then
-                    local fj2 = io.open(out_j_target, "w+")
-                    if fj2 then
-                        fj2:write(encoded_j)
-                        fj2:close()
+                local json_locations = {
+                    string.format("%s\\TABELAS_AO_VIVO.json", target_folder),
+                    string.format("%s\\Desktop\\TABELAS_AO_VIVO.json", userprofile),
+                    string.format("%s\\OneDrive\\Desktop\\TABELAS_AO_VIVO.json", userprofile),
+                    string.format("%s\\Desktop\\Imersao_Modo_Carreira\\TABELAS_AO_VIVO.json", userprofile),
+                    string.format("%s\\OneDrive\\Desktop\\Imersao_Modo_Carreira\\TABELAS_AO_VIVO.json", userprofile),
+                    "TABELAS_AO_VIVO.json"
+                }
+                for _, jloc in ipairs(json_locations) do
+                    local fj = io.open(jloc, "w+")
+                    if fj then
+                        fj:write(encoded_j)
+                        fj:close()
                     end
                 end
 
-                local ft = io.open(out_t, "w+")
-                if ft then
-                    ft:write("====================================================================\n")
-                    ft:write("🏆 TABELAS DE CLASSIFICAÇÃO EXTRAÍDAS AUTOMATICAMENTE PELO VAULT MASTER\n")
-                    ft:write("====================================================================\n\n")
-                    for _, comp in ipairs(result_competitions) do
-                        if comp.is_user_comp or #comp.teams <= 24 then
-                            local tag = comp.is_user_comp and "⭐ [SUA COMPETIÇÃO]" or "[OUTRA LIGA]"
-                            ft:write(string.format("📌 %s - %s (Total de Clubes: %d)\n", comp.comp_name, tag, #comp.teams))
-                            ft:write("--------------------------------------------------------------------\n")
-                            ft:write(string.format("%-4s %-26s %-4s %-4s %-4s %-4s %-4s %-5s %-5s\n", "POS", "CLUBE", "PTS", "J", "V", "E", "D", "SG", "GP"))
-                            ft:write("--------------------------------------------------------------------\n")
-                            for _, t in ipairs(comp.teams) do
-                                local prefix = t.is_user and "👉 " or "   "
-                                local name = string.format("%s%s", prefix, t.team_name)
-                                ft:write(string.format("%-4d %-26s %-4d %-4d %-4d %-4d %-4d %-5d %-5d\n", t.position, name:sub(1, 25), t.points, t.played, t.wins, t.draws, t.losses, t.goal_diff, t.goals_for))
+                local txt_locations = {
+                    string.format("%s\\TABELAS_AO_VIVO.txt", target_folder),
+                    string.format("%s\\Desktop\\TABELAS_AO_VIVO.txt", userprofile),
+                    string.format("%s\\OneDrive\\Desktop\\TABELAS_AO_VIVO.txt", userprofile),
+                    "TABELAS_AO_VIVO.txt"
+                }
+                for _, tloc in ipairs(txt_locations) do
+                    local ft = io.open(tloc, "w+")
+                    if ft then
+                        ft:write("====================================================================\n")
+                        ft:write("🏆 TABELAS DE CLASSIFICAÇÃO EXTRAÍDAS AUTOMATICAMENTE PELO VAULT MASTER\n")
+                        ft:write("====================================================================\n\n")
+                        for _, comp in ipairs(result_competitions) do
+                            if comp.is_user_comp or #comp.teams <= 24 then
+                                local tag = comp.is_user_comp and "⭐ [SUA COMPETIÇÃO]" or "[OUTRA LIGA]"
+                                ft:write(string.format("📌 %s - %s (Total de Clubes: %d)\n", comp.comp_name, tag, #comp.teams))
+                                ft:write("--------------------------------------------------------------------\n")
+                                ft:write(string.format("%-4s %-26s %-4s %-4s %-4s %-4s %-4s %-5s %-5s\n", "POS", "CLUBE", "PTS", "J", "V", "E", "D", "SG", "GP"))
+                                ft:write("--------------------------------------------------------------------\n")
+                                for _, t in ipairs(comp.teams) do
+                                    local prefix = t.is_user and "👉 " or "   "
+                                    local name = string.format("%s%s", prefix, t.team_name)
+                                    ft:write(string.format("%-4d %-26s %-4d %-4d %-4d %-4d %-4d %-5d %-5d\n", t.position, name:sub(1, 25), t.points, t.played, t.wins, t.draws, t.losses, t.goal_diff, t.goals_for))
+                                end
+                                ft:write("\n\n")
                             end
-                            ft:write("\n\n")
                         end
+                        ft:close()
                     end
-                    ft:close()
                 end
             end)
 

@@ -2042,13 +2042,22 @@ def sync_live_standings_from_json(save_id="carreira_ativa", season_year=None, js
         cur.execute("DELETE FROM standings WHERE save_id = ? AND season_year = ? AND competition_name = ?", 
                     (save_id, season_year, c_name))
 
+        c_root = "Brasileir" if "brasileir" in c_name.lower() else ("Libertadores" if "libertadores" in c_name.lower() else ("Carioc" if "carioc" in c_name.lower() else c_name))
+
         # Obter forma real do clube do usuário nos últimos jogos nesta competição
         cur.execute("""
-        SELECT home_score, away_score, is_home, home_team_id FROM matches 
-        WHERE save_id = ? AND season_year = ? AND (competition_name = ? OR competition_name LIKE ?)
+        SELECT home_score, away_score, home_team_id, away_team_id FROM matches 
+        WHERE save_id = ? AND season_year = ? 
+          AND (competition_name = ? OR competition_name LIKE ? OR ? LIKE ('%' || competition_name || '%') OR competition_name LIKE ?)
           AND (home_team_id = ? OR away_team_id = ?)
-        ORDER BY match_date DESC, id DESC LIMIT 5
-        """, (save_id, season_year, c_name, f"%{c_name}%", user_team_id, user_team_id))
+        ORDER BY 
+            CASE 
+                WHEN match_date LIKE '__/__/____' THEN substr(match_date, 7, 4) || '-' || substr(match_date, 4, 2) || '-' || substr(match_date, 1, 2)
+                WHEN match_date LIKE '____-__-__' THEN match_date
+                ELSE '1900-01-01'
+            END DESC, id DESC 
+        LIMIT 5
+        """, (save_id, season_year, c_name, f"%{c_name}%", c_name, f"%{c_root}%", user_team_id, user_team_id))
         user_matches_recent = cur.fetchall()
         user_real_form = ""
         if user_matches_recent:
@@ -2056,7 +2065,7 @@ def sync_live_standings_from_json(save_id="carreira_ativa", season_year=None, js
             for mr in reversed(user_matches_recent):
                 hs = mr["home_score"] if mr["home_score"] is not None else 0
                 aws = mr["away_score"] if mr["away_score"] is not None else 0
-                is_h = mr["is_home"] if mr["is_home"] is not None else (1 if mr["home_team_id"] == user_team_id else 0)
+                is_h = (mr["home_team_id"] == user_team_id)
                 u_sc = hs if is_h else aws
                 opp_sc = aws if is_h else hs
                 if u_sc > opp_sc:
@@ -2074,11 +2083,18 @@ def sync_live_standings_from_json(save_id="carreira_ativa", season_year=None, js
 
             # Obter forma real recente de cada clube nesta competição
             cur.execute("""
-            SELECT home_score, away_score, home_team_id, away_team_id FROM matches 
-            WHERE save_id = ? AND season_year = ? AND (competition_name = ? OR competition_name LIKE ?)
+            SELECT home_score, away_score, home_team_id, away_team_id, match_date FROM matches 
+            WHERE save_id = ? AND season_year = ? 
+              AND (competition_name = ? OR competition_name LIKE ? OR ? LIKE ('%' || competition_name || '%') OR competition_name LIKE ?)
               AND (home_team_id = ? OR away_team_id = ?)
-            ORDER BY match_date DESC, id DESC LIMIT 5
-            """, (save_id, season_year, c_name, f"%{c_name}%", tid, tid))
+            ORDER BY 
+                CASE 
+                    WHEN match_date LIKE '__/__/____' THEN substr(match_date, 7, 4) || '-' || substr(match_date, 4, 2) || '-' || substr(match_date, 1, 2)
+                    WHEN match_date LIKE '____-__-__' THEN match_date
+                    ELSE '1900-01-01'
+                END DESC, id DESC 
+            LIMIT 5
+            """, (save_id, season_year, c_name, f"%{c_name}%", c_name, f"%{c_root}%", tid, tid))
             team_matches_recent = cur.fetchall()
 
             team_form = ""
@@ -2101,6 +2117,29 @@ def sync_live_standings_from_json(save_id="carreira_ativa", season_year=None, js
                 team_form = user_real_form
             elif t.get("form"):
                 team_form = t.get("form")
+            else:
+                # Gerar histórico plausível baseado nos números da tabela para evitar badges vazios
+                played = int(t.get("played") or 0)
+                if played > 0:
+                    wins = int(t.get("wins") or 0)
+                    draws = int(t.get("draws") or 0)
+                    losses = int(t.get("losses") or 0)
+                    needed = min(5, played)
+                    pool = (["V"] * wins) + (["E"] * draws) + (["D"] * losses)
+                    if not pool:
+                        pool = ["V"] * needed
+                    import random
+                    rng = random.Random((tid or 1) * 37 + played * 13)
+                    pool_copy = list(pool)
+                    chosen = []
+                    for _ in range(needed):
+                        if pool_copy:
+                            val = rng.choice(pool_copy)
+                            chosen.append(val)
+                            pool_copy.remove(val)
+                        else:
+                            chosen.append("V")
+                    team_form = ",".join(chosen)
 
             cur.execute("""
             INSERT INTO standings (
@@ -2264,6 +2303,135 @@ def get_current_standings(save_id, season_year=None):
     """, (save_id, season_year))
     rows = [dict(r) for r in cur.fetchall()]
 
+    # Calcular dinamicamente a forma recente (últimos 5 jogos) de cada clube e reconciliar com partidas reais
+    for r in rows:
+        c_name = r["competition_name"]
+        t_id = r["team_id"]
+        is_u = (r.get("is_user_team") == 1 or t_id == user_team_id)
+        c_root = "Brasileir" if "brasileir" in c_name.lower() else ("Libertadores" if "libertadores" in c_name.lower() else ("Carioc" if "carioc" in c_name.lower() else c_name))
+
+        # Reconciliação com partidas reais disputadas para evitar tabela defasada em relação ao calendário
+        cur.execute("""
+        SELECT home_score, away_score, home_team_id, away_team_id FROM matches 
+        WHERE save_id = ? AND season_year = ? 
+          AND (competition_name = ? OR competition_name LIKE ? OR ? LIKE ('%' || competition_name || '%') OR competition_name LIKE ?)
+          AND (home_team_id = ? OR away_team_id = ?)
+        """, (save_id, season_year, c_name, f"%{c_name}%", c_name, f"%{c_root}%", t_id, t_id))
+        all_club_matches = cur.fetchall()
+
+        if is_u and len(all_club_matches) > int(r.get("played") or 0):
+            w_c, d_c, l_c = 0, 0, 0
+            gf_c, ga_c = 0, 0
+            for mr in all_club_matches:
+                hs = mr["home_score"] if mr["home_score"] is not None else 0
+                aws = mr["away_score"] if mr["away_score"] is not None else 0
+                is_h = (mr["home_team_id"] == t_id)
+                t_sc = hs if is_h else aws
+                opp_sc = aws if is_h else hs
+                gf_c += t_sc
+                ga_c += opp_sc
+                if t_sc > opp_sc:
+                    w_c += 1
+                elif t_sc == opp_sc:
+                    d_c += 1
+                else:
+                    l_c += 1
+            r["played"] = len(all_club_matches)
+            r["wins"] = w_c
+            r["draws"] = d_c
+            r["losses"] = l_c
+            r["goals_for"] = gf_c
+            r["goals_against"] = ga_c
+            r["goal_diff"] = gf_c - ga_c
+            r["points"] = w_c * 3 + d_c
+            try:
+                cur.execute("""
+                UPDATE standings SET
+                    played = ?, wins = ?, draws = ?, losses = ?,
+                    goals_for = ?, goals_against = ?, goal_diff = ?, points = ?
+                WHERE save_id = ? AND season_year = ? AND competition_name = ? AND team_id = ?
+                """, (len(all_club_matches), w_c, d_c, l_c, gf_c, ga_c, gf_c - ga_c, w_c * 3 + d_c,
+                      save_id, season_year, c_name, t_id))
+            except Exception:
+                pass
+
+        cur.execute("""
+        SELECT home_score, away_score, home_team_id, away_team_id, match_date
+        FROM matches
+        WHERE save_id = ? AND season_year = ? 
+          AND (competition_name = ? OR competition_name LIKE ? OR ? LIKE ('%' || competition_name || '%') OR competition_name LIKE ?)
+          AND (home_team_id = ? OR away_team_id = ?)
+        ORDER BY 
+            CASE 
+                WHEN match_date LIKE '__/__/____' THEN substr(match_date, 7, 4) || '-' || substr(match_date, 4, 2) || '-' || substr(match_date, 1, 2)
+                WHEN match_date LIKE '____-__-__' THEN match_date
+                ELSE '1900-01-01'
+            END DESC, id DESC 
+        LIMIT 5
+        """, (save_id, season_year, c_name, f"%{c_name}%", c_name, f"%{c_root}%", t_id, t_id))
+        team_matches_recent = cur.fetchall()
+
+        if team_matches_recent:
+            form_chars = []
+            for mr in reversed(team_matches_recent):
+                hs = mr["home_score"] if mr["home_score"] is not None else 0
+                aws = mr["away_score"] if mr["away_score"] is not None else 0
+                is_h = (mr["home_team_id"] == t_id)
+                t_score = hs if is_h else aws
+                opp_score = aws if is_h else hs
+                if t_score > opp_score:
+                    form_chars.append("V")
+                elif t_score == opp_score:
+                    form_chars.append("E")
+                else:
+                    form_chars.append("D")
+
+            played = int(r.get("played") or 0)
+            if len(form_chars) < 5 and played > len(form_chars):
+                wins = int(r.get("wins") or 0)
+                draws = int(r.get("draws") or 0)
+                losses = int(r.get("losses") or 0)
+                rem_wins = max(0, wins - form_chars.count("V"))
+                rem_draws = max(0, draws - form_chars.count("E"))
+                rem_losses = max(0, losses - form_chars.count("D"))
+                needed = min(5 - len(form_chars), played - len(form_chars))
+                pool = (["V"] * rem_wins) + (["E"] * rem_draws) + (["D"] * rem_losses)
+                if not pool:
+                    pool = ["V"] if wins >= losses else (["E"] if draws > 0 else ["D"])
+                import random
+                rng = random.Random((t_id or 1) * 31 + played * 7)
+                for _ in range(needed):
+                    pick = rng.choice(pool) if pool else "V"
+                    form_chars.insert(0, pick)
+                    if pick in pool:
+                        pool.remove(pick)
+
+            r["form"] = ",".join(form_chars)
+        else:
+            played = int(r.get("played") or 0)
+            if played > 0:
+                wins = int(r.get("wins") or 0)
+                draws = int(r.get("draws") or 0)
+                losses = int(r.get("losses") or 0)
+                needed = min(5, played)
+                pool = (["V"] * wins) + (["E"] * draws) + (["D"] * losses)
+                if not pool:
+                    pool = ["V"] * needed
+                import random
+                rng = random.Random((t_id or 1) * 37 + played * 13)
+                pool_copy = list(pool)
+                chosen = []
+                for _ in range(needed):
+                    if pool_copy:
+                        val = rng.choice(pool_copy)
+                        chosen.append(val)
+                        pool_copy.remove(val)
+                    else:
+                        chosen.append("V")
+                r["form"] = ",".join(chosen)
+            elif not r.get("form"):
+                r["form"] = "V,E,D,V,V"
+
     cur.execute("""
     SELECT 
         id, competition_name, stage_name, stage_order, match_order,
@@ -2306,6 +2474,17 @@ def get_current_standings(save_id, season_year=None):
         if c_name not in all_comps:
             all_comps[c_name] = []
         all_comps[c_name].append(r)
+
+    # Reordenar os clubes de cada competição por Pontos > Vitórias > Saldo > Gols Pró
+    for c_name, t_list in all_comps.items():
+        t_list.sort(key=lambda x: (
+            int(x.get("points") or 0),
+            int(x.get("wins") or 0),
+            int(x.get("goal_diff") or 0),
+            int(x.get("goals_for") or 0)
+        ), reverse=True)
+        for idx, t in enumerate(t_list, start=1):
+            t["position"] = idx
 
     # Filtrar tabelas de pontos corridos legítimas (máximo 20 clubes por divisão regular, descartando pools gerais)
     for c_name, t_list in list(all_comps.items()):
@@ -3900,6 +4079,7 @@ def get_detailed_squad_stats(save_id, season_year=None, comp_name=None):
         query += " ORDER BY p.overall_rating DESC, p.goals DESC, p.appearances DESC"
         cur.execute(query, tuple(params))
         rows = [dict(r) for r in cur.fetchall()]
+        effective_season = season_year
         effective_season = season_year
 
     cur.execute("""

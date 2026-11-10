@@ -34,6 +34,8 @@ window.I18N_LOCALES['en'] = {
     manager: 'Manager Career',
     seasons: 'Seasons History',
     calendar: 'Calendar & Fixtures',
+    standings: 'Standings & Tables',
+    prognosticos: 'Projections & Chances',
     squad: 'Squad & Players',
     youth: 'Youth Academy',
     transfers: 'Transfers & Market',

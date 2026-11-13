@@ -83,6 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadOpponentsList();
   loadScoutHubData();
   loadSetupStatus();
+  loadBoardMeetingData(false);
   // Mídias Sociais é carregada sob demanda quando o usuário clica na aba (evita requisições pesadas no boot)
 
   // Sincronização automática inicial com dados do Desktop se disponíveis
@@ -196,8 +197,8 @@ function initTabsNavigation() {
       // Atualiza dados conforme a aba acessada
       if (tabTarget === "transfers") loadTransfersData();
       if (tabTarget === "finances") loadFinancesData();
-      if (tabTarget === "squad") loadSquadData();
-      if (tabTarget === "manager") loadManagerData();
+      if (tabTarget === "squad") { loadSquadData(); if (!cachedBoardMeetingReport) loadBoardMeetingData(false); }
+      if (tabTarget === "manager") { loadManagerData(); if (!cachedBoardMeetingReport) loadBoardMeetingData(false); }
       if (tabTarget === "seasons") loadSeasonsList();
       if (tabTarget === "calendar") loadCalendarData();
       if (tabTarget === "hall-of-fame" || tabTarget === "halloffame") loadHallOfFameData();
@@ -2522,6 +2523,30 @@ async function openScoutPlayerModal(playerId) {
       skillsEl.innerHTML = `Fintas: <b>${'⭐'.repeat(sm)} (${sm}/5)</b> • Perna Ruim: <b>${'⭐'.repeat(wf)} (${wf}/5)</b>`;
     }
 
+    // 4.5. 6 Atributos Principais (Ritmo, Finalização, Passe, Drible, Defesa, Físico)
+    const statsObj = data.stats || {};
+    const mainStatsMap = [
+      { id: "spmStatPace", barId: "spmStatPaceBar", val: Number(statsObj.pace || 0) },
+      { id: "spmStatShooting", barId: "spmStatShootingBar", val: Number(statsObj.shooting || 0) },
+      { id: "spmStatPassing", barId: "spmStatPassingBar", val: Number(statsObj.passing || 0) },
+      { id: "spmStatDribbling", barId: "spmStatDribblingBar", val: Number(statsObj.dribbling || 0) },
+      { id: "spmStatDefending", barId: "spmStatDefendingBar", val: Number(statsObj.defending || 0) },
+      { id: "spmStatPhysical", barId: "spmStatPhysicalBar", val: Number(statsObj.physical || 0) }
+    ];
+    mainStatsMap.forEach(({ id, barId, val }) => {
+      const clamped = Math.max(0, Math.min(99, val));
+      const valEl = document.getElementById(id);
+      const barEl = document.getElementById(barId);
+      if (valEl) {
+        valEl.textContent = clamped;
+        valEl.className = `psc-val ${clamped >= 85 ? 'very-high' : (clamped >= 75 ? 'high' : '')}`;
+      }
+      if (barEl) {
+        barEl.style.width = `${clamped}%`;
+        barEl.className = `psc-fill ${clamped >= 85 ? 'gold' : ''}`;
+      }
+    });
+
     // 5. 7 Categorias Oficiais de Atributos FCM (Ofensivo, Habilidade, Movimentação, Força, Mentalidade, Defesa, Goleiro)
     const catGrid = document.getElementById("spmCategoryCardsGrid");
     const toggleAllBtnText = document.getElementById("spmToggleAllText");
@@ -2648,11 +2673,99 @@ window.openScoutPlayerModal = openScoutPlayerModal;
 // -------------------------------------------------------------
 // 10. RAIO-X DE DUELOS (HEAD-TO-HEAD)
 // -------------------------------------------------------------
+let cachedH2HOpponents = [];
+
+function normalizeSearchStr(str) {
+  return String(str || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+function initH2HAutocomplete() {
+  const input = document.getElementById("h2hSearchInput");
+  const dropdown = document.getElementById("h2hAutocompleteList");
+  const select = document.getElementById("h2hSelect");
+  if (!input || !dropdown || input.dataset.bound === "1") return;
+  input.dataset.bound = "1";
+
+  const renderSuggestions = (query) => {
+    const q = normalizeSearchStr(query);
+    const matches = q
+      ? cachedH2HOpponents.filter(o => normalizeSearchStr(o.team_name).includes(q))
+      : cachedH2HOpponents;
+
+    if (!matches.length) {
+      dropdown.innerHTML = `<div class="h2h-autocomplete-item" style="color: var(--text-dim); cursor: default;">Nenhum adversário encontrado</div>`;
+      dropdown.style.display = "block";
+      return;
+    }
+
+    dropdown.innerHTML = matches.slice(0, 20).map(o => `
+      <div class="h2h-autocomplete-item" data-team-id="${o.team_id}">
+        <img class="h2h-ac-crest" src="${escapeHtml(o.crest_url || '/assets/default_crest.png')}" onerror="this.src='/assets/default_crest.png'" alt="">
+        <span>${escapeHtml(o.team_name)}</span>
+      </div>
+    `).join("");
+    dropdown.style.display = "block";
+
+    dropdown.querySelectorAll(".h2h-autocomplete-item[data-team-id]").forEach(item => {
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        const tid = item.getAttribute("data-team-id");
+        const oppObj = cachedH2HOpponents.find(x => String(x.team_id) === String(tid));
+        if (oppObj && select) {
+          select.value = String(oppObj.team_id);
+          input.value = oppObj.team_name;
+          dropdown.style.display = "none";
+          loadH2H(oppObj.team_id);
+        }
+      });
+    });
+  };
+
+  input.addEventListener("focus", () => {
+    if (cachedH2HOpponents.length) renderSuggestions(input.value);
+  });
+
+  input.addEventListener("input", () => {
+    renderSuggestions(input.value);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      const q = normalizeSearchStr(input.value);
+      const firstMatch = cachedH2HOpponents.find(o => normalizeSearchStr(o.team_name).includes(q));
+      if (firstMatch && select) {
+        e.preventDefault();
+        select.value = String(firstMatch.team_id);
+        input.value = firstMatch.team_name;
+        dropdown.style.display = "none";
+        loadH2H(firstMatch.team_id);
+      }
+    } else if (e.key === "Escape") {
+      dropdown.style.display = "none";
+    }
+  });
+
+  input.addEventListener("blur", () => {
+    setTimeout(() => { dropdown.style.display = "none"; }, 160);
+  });
+}
+
 async function loadOpponentsList() {
+  initH2HAutocomplete();
   try {
     const res = await fetch(`${API_BASE}/opponents?save_id=${currentSaveId}`);
     if (!res.ok) return;
-    const opps = await res.json();
+    let opps = await res.json();
+    if (Array.isArray(opps)) {
+      opps.sort((a, b) => String(a.team_name || "").localeCompare(String(b.team_name || ""), "pt-BR", { sensitivity: "base" }));
+    } else {
+      opps = [];
+    }
+    cachedH2HOpponents = opps;
 
     const myTeamName = (cachedDashboardData && cachedDashboardData.save && cachedDashboardData.save.current_team_name) ? cachedDashboardData.save.current_team_name : "Meu Clube";
     const myTeamId = (cachedDashboardData && cachedDashboardData.save && cachedDashboardData.save.current_team_id) ? cachedDashboardData.save.current_team_id : 0;
@@ -2662,6 +2775,8 @@ async function loadOpponentsList() {
     document.getElementById("h2hMyCrest").src = myCrest;
 
     const select = document.getElementById("h2hSelect");
+    const prevSelected = select ? select.value : "";
+
     if (!opps || opps.length === 0) {
       select.innerHTML = `<option value="">Nenhum adversário enfrentado ainda</option>`;
       document.getElementById("h2hOppName").textContent = "Adversário";
@@ -2675,17 +2790,26 @@ async function loadOpponentsList() {
       return;
     }
 
-    select.innerHTML = `<option value="">Selecione um adversário...</option>` + 
-      opps.map(o => `<option value="${o.team_id}">${o.team_name}</option>`).join('');
+    select.innerHTML = `<option value="">Selecione um adversário (${opps.length})...</option>` + 
+      opps.map(o => `<option value="${o.team_id}">${escapeHtml(o.team_name)}</option>`).join('');
 
-    select.addEventListener("change", (e) => {
+    select.onchange = (e) => {
       const oppId = e.target.value;
-      if (oppId) loadH2H(oppId);
-    });
+      const searchInput = document.getElementById("h2hSearchInput");
+      if (oppId) {
+        const oppObj = cachedH2HOpponents.find(x => String(x.team_id) === String(oppId));
+        if (searchInput && oppObj) searchInput.value = oppObj.team_name;
+        loadH2H(oppId);
+      }
+    };
 
-    if (opps.length > 0) {
-      select.value = opps[0].team_id;
-      loadH2H(opps[0].team_id);
+    const targetId = (prevSelected && opps.some(o => String(o.team_id) === String(prevSelected)))
+      ? prevSelected
+      : String(opps[0].team_id);
+
+    if (targetId) {
+      select.value = targetId;
+      loadH2H(targetId);
     }
   } catch (err) {
     console.error("Erro ao carregar adversários:", err);
@@ -6268,6 +6392,8 @@ function navigateToTab(tabName) {
     if (tabName === "calendar") loadCalendarData();
     if (tabName === "standings") loadStandings();
     if (tabName === "h2h") loadOpponentsList();
+    if (tabName === "squad") { loadSquadData(); if (!cachedBoardMeetingReport) loadBoardMeetingData(false); }
+    if (tabName === "manager") { loadManagerData(); if (!cachedBoardMeetingReport) loadBoardMeetingData(false); }
     initLucideIcons();
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -7594,9 +7720,9 @@ function switchTab(tabTarget) {
   if (tabTarget === "setup") loadSetupStatus();
   if (tabTarget === "transfers") loadTransfersData();
   if (tabTarget === "finances") loadFinancesData();
-  if (tabTarget === "squad") loadSquadData();
+  if (tabTarget === "squad") { loadSquadData(); if (!cachedBoardMeetingReport) loadBoardMeetingData(false); }
   if (tabTarget === "youth" && typeof window.reloadYouthAcademyData === "function") window.reloadYouthAcademyData();
-  if (tabTarget === "manager") loadManagerData();
+  if (tabTarget === "manager") { loadManagerData(); if (!cachedBoardMeetingReport) loadBoardMeetingData(false); }
   if (tabTarget === "seasons") loadSeasonsList();
   if (tabTarget === "calendar") loadCalendarData();
   if (tabTarget === "hall-of-fame" || tabTarget === "halloffame") loadHallOfFameData();
@@ -8869,5 +8995,361 @@ function renderProjectionsTable(teams) {
       </tr>
     `;
   }).join('');
+}
+
+// ==============================================================================
+// COMITÊ DE GESTÃO DE ELENCO & CONSELHO DIRETOR + SQUAD MATRIX (4 QUADRANTES)
+// ==============================================================================
+let cachedBoardMeetingReport = null;
+let currentMatrixPosFilter = "ALL";
+let bmPlayersIndexMap = {};
+
+function switchManagerSubtab(subtab) {
+  const navBar = document.getElementById("mgrSubtabNavBar");
+  if (navBar) {
+    navBar.querySelectorAll(".subtab-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-mgr-subtab") === subtab);
+    });
+  }
+  const profPane = document.getElementById("mgrSubtabProfile");
+  const boardPane = document.getElementById("mgrSubtabBoard");
+  if (profPane) profPane.classList.toggle("active", subtab === "profile");
+  if (boardPane) boardPane.classList.toggle("active", subtab === "board");
+
+  if (subtab === "board" && !cachedBoardMeetingReport) {
+    loadBoardMeetingData(false);
+  }
+  initLucideIcons();
+}
+
+function switchSquadSubtab(subtab) {
+  const navBar = document.getElementById("squadSubtabNavBar");
+  if (navBar) {
+    navBar.querySelectorAll(".subtab-btn").forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-squad-subtab") === subtab);
+    });
+  }
+  const tblPane = document.getElementById("squadSubtabTable");
+  const auditPane = document.getElementById("squadSubtabAudit");
+  if (tblPane) tblPane.classList.toggle("active", subtab === "table");
+  if (auditPane) auditPane.classList.toggle("active", subtab === "audit");
+
+  if (subtab === "audit" && !cachedBoardMeetingReport) {
+    loadBoardMeetingData(false);
+  }
+  initLucideIcons();
+}
+
+function openManagerBoardReview() {
+  switchTab("manager");
+  switchManagerSubtab("board");
+  if (!cachedBoardMeetingReport) loadBoardMeetingData(false);
+}
+
+function openSquadAuditMatrix() {
+  switchTab("squad");
+  switchSquadSubtab("audit");
+  if (!cachedBoardMeetingReport) loadBoardMeetingData(false);
+}
+
+function getMatrixPosGroup(posStr) {
+  const p = String(posStr || "").trim().toUpperCase();
+  if (["GOL", "GK"].includes(p)) return "GOL";
+  if (["ZAG", "LE", "LD", "ADE", "ADD", "CB", "LB", "RB", "LWB", "RWB"].includes(p)) return "DEF";
+  if (["VOL", "MC", "MEI", "ME", "MD", "CDM", "CM", "CAM", "LM", "RM"].includes(p)) return "MEI";
+  return "ATA";
+}
+
+function initMatrixPositionFilters() {
+  const container = document.getElementById("bmMatrixPosFilters");
+  if (!container || container.dataset.bound === "1") return;
+  container.dataset.bound = "1";
+
+  container.querySelectorAll(".filter-pill").forEach(btn => {
+    btn.addEventListener("click", () => {
+      container.querySelectorAll(".filter-pill").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentMatrixPosFilter = btn.getAttribute("data-pos") || "ALL";
+      if (cachedBoardMeetingReport) {
+        renderSquadMatrixQuadrants(cachedBoardMeetingReport);
+      }
+    });
+  });
+}
+
+async function loadBoardMeetingData(showToastFeedback = false) {
+  initMatrixPositionFilters();
+  try {
+    const res = await fetch(`${API_BASE}/squad-audit?save_id=${encodeURIComponent(currentSaveId)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const report = await res.json();
+    cachedBoardMeetingReport = report;
+
+    // Indexar jogadores por ID para abertura rápida do modal de parecer
+    bmPlayersIndexMap = {};
+    const m = report.matrix || {};
+    ["pillars", "peak_value", "young_gems", "deadwood"].forEach(qKey => {
+      (m[qKey] || []).forEach(pl => {
+        bmPlayersIndexMap[String(pl.player_id)] = pl;
+      });
+    });
+
+    updateBoardMeetingNotification(report);
+    renderBoardMeetingView(report);
+
+    if (showToastFeedback && typeof showToast === "function") {
+      showToast("Auditoria do Comitê e Diretoria atualizada!");
+    }
+  } catch (err) {
+    console.error("Erro ao carregar Comitê & Diretoria:", err);
+  }
+}
+
+function updateBoardMeetingNotification(report) {
+  const banner = document.getElementById("dashBoardMeetingBanner");
+  const alertDot = document.getElementById("navBoardAlertDot");
+  const mgrAlertDot = document.getElementById("mgrBoardAlertDot");
+  const rev = report.board_review || {};
+  const isTriggered = Boolean(report.meeting_trigger_active);
+
+  if (alertDot) {
+    alertDot.style.display = isTriggered ? "inline-block" : "none";
+  }
+  if (mgrAlertDot) {
+    mgrAlertDot.style.display = isTriggered ? "inline-block" : "none";
+  }
+
+  if (banner) {
+    if (isTriggered) {
+      banner.style.display = "flex";
+      const periodEl = document.getElementById("dashBoardBannerPeriod");
+      const scoreEl = document.getElementById("dashBoardBannerScore");
+      const titleEl = document.getElementById("dashBoardBannerTitle");
+      const descEl = document.getElementById("dashBoardBannerDesc");
+
+      if (periodEl) periodEl.textContent = (report.meeting_period || "REUNIÃO DO CONSELHO").toUpperCase();
+      if (scoreEl) scoreEl.textContent = `Nota do Técnico: ${Number(rev.manager_score || 0).toFixed(1)} / 10`;
+      if (titleEl) titleEl.textContent = `${report.meeting_period || "Reunião Oficial"} • ${report.team_name || "Clube"} (${report.season_year || ""})`;
+      if (descEl) {
+        descEl.textContent = `${rev.status || "Avaliação Concluída"}: ${report.total_players_analyzed || 0} atletas analisados na Squad Matrix. Confira o parecer da Presidência, CFO e Diretor de Futebol.`;
+      }
+    } else {
+      banner.style.display = "none";
+    }
+  }
+}
+
+function renderBoardMeetingView(report) {
+  const rev = report.board_review || {};
+
+  const crestEl = document.getElementById("bmTeamCrest");
+  if (crestEl && report.team_crest) crestEl.src = report.team_crest;
+
+  const periodBadge = document.getElementById("bmPeriodBadge");
+  if (periodBadge) periodBadge.textContent = report.meeting_period || "Auditoria do Comitê";
+
+  const subEl = document.getElementById("bmSubtitle");
+  if (subEl) {
+    subEl.textContent = `${report.team_name || "Clube"} • Temporada ${report.season_year || ""} • Técnico: ${report.manager_name || "Manager"}`;
+  }
+
+  const genEl = document.getElementById("bmGeneratedAt");
+  if (genEl) genEl.textContent = `Atualizado em ${report.generated_at || "—"}`;
+
+  // Avaliação do Técnico
+  const scoreVal = Number(rev.manager_score || 0);
+  const scoreEl = document.getElementById("bmManagerScore");
+  const ringEl = document.getElementById("bmManagerScoreRing");
+  if (scoreEl) scoreEl.textContent = scoreVal.toFixed(1);
+  if (ringEl) {
+    ringEl.classList.remove("ring-warning", "ring-danger");
+    if (scoreVal < 6.5) ringEl.classList.add("ring-danger");
+    else if (scoreVal < 8.0) ringEl.classList.add("ring-warning");
+  }
+
+  const statusEl = document.getElementById("bmBoardStatus");
+  if (statusEl) statusEl.textContent = rev.status || "EM AVALIAÇÃO";
+
+  const verdictEl = document.getElementById("bmBoardVerdict");
+  if (verdictEl) verdictEl.textContent = rev.verdict || "—";
+
+  const budgetEl = document.getElementById("bmBudgetAdjustment");
+  if (budgetEl) budgetEl.textContent = rev.budget_adjustment || "—";
+
+  const benchEl = document.getElementById("bmWageBenchmarks");
+  if (benchEl) {
+    const topNameNote = rev.top_wage_player ? ` (${escapeHtml(rev.top_wage_player)})` : "";
+    benchEl.innerHTML = `
+      <span class="wage-bench-chip">Liga: <strong>${rev.league_position || 1}º Lugar (${rev.league_points || 0} pts em ${rev.league_played || 0}J)</strong></span>
+      <span class="wage-bench-chip">Maior Salário: <strong>${formatCurrency(rev.max_club_wage || 0)}/sem</strong>${topNameNote}</span>
+      <span class="wage-bench-chip">Média do Elenco: <strong>${formatCurrency(rev.avg_club_wage || 0)}/sem</strong></span>
+      <span class="wage-bench-chip">Folha Semanal Total: <strong>${formatCurrency(rev.total_weekly_wage || 0)}/sem</strong></span>
+      <span class="wage-bench-chip">Teto Guia p/ Janela: <strong style="color: #34d399;">${formatCurrency(rev.approved_wage_cap || rev.max_club_wage || 0)}/sem</strong></span>
+      <span class="wage-bench-chip">Elenco Auditado: <strong>${report.total_players_analyzed || 0} atletas</strong></span>
+    `;
+  }
+
+  // Discursos
+  const presEl = document.getElementById("bmPresidentSpeech");
+  const cfoEl = document.getElementById("bmCfoSpeech");
+  const dirEl = document.getElementById("bmDirectorSpeech");
+  if (presEl) presEl.textContent = rev.president_speech || "—";
+  if (cfoEl) cfoEl.textContent = rev.cfo_speech || "—";
+  if (dirEl) dirEl.textContent = rev.director_speech || "—";
+
+  // Contagem total
+  const countAllEl = document.getElementById("bmCountAll");
+  if (countAllEl) countAllEl.textContent = report.total_players_analyzed || 0;
+
+  // Matriz dos 4 Quadrantes
+  renderSquadMatrixQuadrants(report);
+
+  // Planos de Ação Imediatos
+  const actions = report.actions || {};
+  renderBoardActionList("bmActionRenew", actions.renew || [], "Nenhum vencimento urgente");
+  renderBoardActionList("bmActionLoan", actions.loan || [], "Nenhum empréstimo sugerido");
+  renderBoardActionList("bmActionSell", actions.sell_high || [], "Nenhuma venda no pico detectada");
+  renderBoardActionList("bmActionTransferList", actions.transfer_list || [], "Folha limpa de alertas graves");
+
+  initLucideIcons();
+}
+
+function renderSquadMatrixQuadrants(report) {
+  const m = report.matrix || {};
+  const filterFn = (p) => currentMatrixPosFilter === "ALL" || getMatrixPosGroup(p.position) === currentMatrixPosFilter;
+
+  const q1 = (m.pillars || []).filter(filterFn);
+  const q2 = (m.peak_value || []).filter(filterFn);
+  const q3 = (m.young_gems || []).filter(filterFn);
+  const q4 = (m.deadwood || []).filter(filterFn);
+
+  renderQuadrantCards("bmQ1List", "bmQ1Count", q1, "Nenhum pilar nesta posição.");
+  renderQuadrantCards("bmQ2List", "bmQ2Count", q2, "Nenhum ativo de pico de mercado nesta posição.");
+  renderQuadrantCards("bmQ3List", "bmQ3Count", q3, "Nenhuma jóia Sub-23 para lapidação nesta posição.");
+  renderQuadrantCards("bmQ4List", "bmQ4Count", q4, "Nenhum atleta em alerta/fim de ciclo nesta posição.");
+}
+
+function renderQuadrantCards(listId, countId, players, emptyMsg) {
+  const listEl = document.getElementById(listId);
+  const countEl = document.getElementById(countId);
+  if (countEl) countEl.textContent = players.length;
+  if (!listEl) return;
+
+  if (!players.length) {
+    listEl.innerHTML = `<div class="mq-empty">${escapeHtml(emptyMsg)}</div>`;
+    return;
+  }
+
+  listEl.innerHTML = players.map(p => {
+    const face = p.face_url || "/assets/default_face.png";
+    const ratingStr = Number(p.avg_rating || 0).toFixed(2);
+    const wageStr = formatCurrency(p.weekly_wage || 0);
+    return `
+      <div class="matrix-player-card" onclick="openBoardPlayerAdviceModal('${escapeJs(String(p.player_id))}')">
+        <div class="mpc-left">
+          <img class="mpc-face" src="${escapeHtml(face)}" onerror="this.src='/assets/default_face.png'" alt="${escapeHtml(p.player_name)}">
+          <div class="mpc-info">
+            <div class="mpc-name">${escapeHtml(p.player_name)}</div>
+            <div class="mpc-meta">
+              <span class="mpc-pos-pill">${escapeHtml(p.position)}</span>
+              <span>GER ${p.overall_rating} / POT ${p.potential}</span>
+              <span>• ${p.age}a</span>
+              <span>• ${wageStr}/sem</span>
+            </div>
+          </div>
+        </div>
+        <div class="mpc-right">
+          <span class="mpc-rating-pill ${escapeHtml(p.rating_class || 'rating-good')}">${ratingStr} • ${escapeHtml(p.rating_status || '')}</span>
+          <span class="mpc-stats-mini">${p.appearances}J • ${p.goals}G • ${p.assists}A</span>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderBoardActionList(containerId, items, emptyText) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!items || !items.length) {
+    el.innerHTML = `<div style="font-size: 0.78rem; color: var(--text-dim); padding: 0.4rem 0;">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+  el.innerHTML = items.map(p => `
+    <div class="ba-row-item" onclick="openBoardPlayerAdviceModal('${escapeJs(String(p.player_id))}')">
+      <span><strong>${escapeHtml(p.player_name)}</strong> (${escapeHtml(p.position)})</span>
+      <span style="color: var(--text-muted); font-size: 0.74rem;">${Number(p.avg_rating || 0).toFixed(2)} • ${formatCurrency(p.weekly_wage || 0)}</span>
+    </div>
+  `).join("");
+}
+
+function openBoardPlayerAdviceModal(playerIdStr) {
+  const p = bmPlayersIndexMap[String(playerIdStr)];
+  const modal = document.getElementById("modalBoardPlayerAdvice");
+  const body = document.getElementById("bmPlayerAdviceBody");
+  if (!p || !modal || !body) return;
+
+  const quadLabels = {
+    pillars: "👑 Pilares & Intocáveis",
+    peak_value: "📈 Ativos de Pico de Mercado",
+    young_gems: "🌱 Jóias & Lapidação",
+    deadwood: "⚠️ Fim de Ciclo & Carga Folha"
+  };
+
+  body.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+      <img src="${escapeHtml(p.face_url || '/assets/default_face.png')}" onerror="this.src='/assets/default_face.png'" style="width: 68px; height: 68px; border-radius: 12px; object-fit: cover; background: rgba(0,0,0,0.4);">
+      <div>
+        <span class="mpc-rating-pill ${escapeHtml(p.rating_class || 'rating-good')}" style="margin-bottom: 4px; display: inline-block;">
+          Nota ${Number(p.avg_rating || 0).toFixed(2)} • ${escapeHtml(p.rating_status || '')}
+        </span>
+        <h3 style="margin: 0; font-size: 1.2rem;">${escapeHtml(p.player_name)}</h3>
+        <p style="margin: 2px 0 0 0; font-size: 0.84rem; color: var(--text-dim);">
+          ${escapeHtml(p.position)} • ${p.age} anos • Contrato até ${escapeHtml(String(p.contract_until || '—'))}
+        </p>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+      <div class="stat-pill-box" style="background: rgba(255,255,255,0.04); padding: 0.55rem; border-radius: 8px; text-align: center;">
+        <div style="font-size: 0.68rem; color: var(--text-dim);">GER / POT</div>
+        <div style="font-weight: 800; font-size: 0.95rem;">${p.overall_rating} / ${p.potential}</div>
+      </div>
+      <div class="stat-pill-box" style="background: rgba(255,255,255,0.04); padding: 0.55rem; border-radius: 8px; text-align: center;">
+        <div style="font-size: 0.68rem; color: var(--text-dim);">JOGOS</div>
+        <div style="font-weight: 800; font-size: 0.95rem;">${p.appearances}</div>
+      </div>
+      <div class="stat-pill-box" style="background: rgba(255,255,255,0.04); padding: 0.55rem; border-radius: 8px; text-align: center;">
+        <div style="font-size: 0.68rem; color: var(--text-dim);">GOLS / ASS.</div>
+        <div style="font-weight: 800; font-size: 0.95rem;">${p.goals}G / ${p.assists}A</div>
+      </div>
+      <div class="stat-pill-box" style="background: rgba(255,255,255,0.04); padding: 0.55rem; border-radius: 8px; text-align: center;">
+        <div style="font-size: 0.68rem; color: var(--text-dim);">SALÁRIO/SEM</div>
+        <div style="font-weight: 800; font-size: 0.95rem;">${formatCurrency(p.weekly_wage || 0)}</div>
+      </div>
+    </div>
+
+    <div style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; padding: 0.9rem;">
+      <div style="font-size: 0.75rem; font-weight: 800; color: #fbbf24; margin-bottom: 4px;">
+        PARECER DO COMITÊ • ${escapeHtml(quadLabels[p.quadrant] || p.quadrant || '')}
+      </div>
+      <p style="margin: 0; font-size: 0.9rem; line-height: 1.45; color: #f1f5f9;">
+        ${escapeHtml(p.staff_advice || 'Sem recomendações adicionais.')}
+      </p>
+    </div>
+
+    <div style="display: flex; justify-content: flex-end; gap: 0.65rem; margin-top: 1.15rem;">
+      <button type="button" class="btn-secondary" onclick="closeBoardPlayerAdviceModal()">Fechar</button>
+      <button type="button" class="btn-primary" onclick="closeBoardPlayerAdviceModal(); if(typeof openPlayerModal === 'function') openPlayerModal('${escapeJs(String(p.player_id))}', '${escapeJs(p.player_name)}');">
+        Ver Ficha Completa
+      </button>
+    </div>
+  `;
+
+  modal.style.display = "flex";
+}
+
+function closeBoardPlayerAdviceModal() {
+  const modal = document.getElementById("modalBoardPlayerAdvice");
+  if (modal) modal.style.display = "none";
 }
 

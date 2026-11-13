@@ -18,7 +18,7 @@
   <link rel="shortcut icon" type="image/x-icon" href="/siga_logo.ico">
   
   <!-- Main CSS -->
-  <link rel="stylesheet" href="style.css?v=4.0">
+  <link rel="stylesheet" href="style.css?v=4.2">
 
   <!-- html2canvas CDN (Exportação de cards e capas de jornais em imagem PNG) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -115,6 +115,7 @@
         <button class="nav-item" data-tab="manager">
           <i data-lucide="user-check"></i>
           <span data-i18n="menu.manager">Carreira do Técnico</span>
+          <span class="board-alert-dot" id="navBoardAlertDot" style="display: none;" title="Reunião da Diretoria Disponível"></span>
         </button>
         <button class="nav-item" data-tab="seasons">
           <i data-lucide="calendar"></i>
@@ -482,6 +483,29 @@
           </div>
         </div>
 
+        <!-- Banner de Convocação da Diretoria / Reunião do Comitê -->
+        <div class="board-meeting-banner" id="dashBoardMeetingBanner" style="display: none;">
+          <div class="bmb-left">
+            <div class="bmb-icon"><i data-lucide="landmark"></i></div>
+            <div class="bmb-text">
+              <div class="bmb-badge-row">
+                <span class="bmb-pill" id="dashBoardBannerPeriod">CONSELHO DIRETOR</span>
+                <span class="bmb-score-chip" id="dashBoardBannerScore">Nota do Técnico: —</span>
+              </div>
+              <h3 id="dashBoardBannerTitle">Reunião Oficial do Comitê de Gestão & Diretoria</h3>
+              <p id="dashBoardBannerDesc">A diretoria avaliou o seu trabalho e o elenco nesta temporada. Confira os pareceres do Conselho e a Matriz dos 4 Quadrantes.</p>
+            </div>
+          </div>
+          <div class="bmb-actions" style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+            <button class="btn-board-enter" onclick="openManagerBoardReview()">
+              <i data-lucide="landmark"></i> Avaliação do Técnico
+            </button>
+            <button class="btn-secondary" onclick="openSquadAuditMatrix()" style="border-color: rgba(56, 189, 248, 0.45); color: #38bdf8;">
+              <i data-lucide="layout-grid"></i> Squad Matrix (Elenco)
+            </button>
+          </div>
+        </div>
+
         <!-- Layout Grid: Última Partida & Próximo Confronto -->
         <div class="dash-grid-2">
           
@@ -615,6 +639,18 @@
           </div>
         </div>
 
+        <!-- Sub-abas de Carreira do Técnico -->
+        <div class="subtab-nav-bar" id="mgrSubtabNavBar">
+          <button type="button" class="subtab-btn active" data-mgr-subtab="profile" onclick="switchManagerSubtab('profile')">
+            <i data-lucide="user-check"></i> Ficha &amp; Sala de Troféus
+          </button>
+          <button type="button" class="subtab-btn" data-mgr-subtab="board" onclick="switchManagerSubtab('board')">
+            <i data-lucide="landmark"></i> Avaliação da Diretoria &amp; Conselho
+            <span class="subtab-alert-dot" id="mgrBoardAlertDot" style="display: none;"></span>
+          </button>
+        </div>
+
+        <div class="subtab-pane active" id="mgrSubtabProfile">
         <div class="manager-overview-grid">
           
           <!-- Card de Perfil do Técnico & Salário -->
@@ -739,6 +775,91 @@
             <!-- Renderizado dinamicamente -->
           </div>
         </div>
+        </div> <!-- /mgrSubtabProfile -->
+
+        <!-- Sub-aba 2: Avaliação da Diretoria & Conselho -->
+        <div class="subtab-pane" id="mgrSubtabBoard">
+          <div class="glass-card" style="padding: 1rem 1.25rem; margin-bottom: 1.1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.9rem;">
+              <img id="bmTeamCrest" src="/assets/default_crest.png" onerror="this.src='/assets/default_crest.png'" alt="Escudo" style="width: 44px; height: 44px; object-fit: contain;">
+              <div>
+                <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+                  <h3 style="margin: 0; font-size: 1.08rem;">Julgamento do Conselho Diretor</h3>
+                  <span class="badge-tag live-badge" id="bmPeriodBadge">Auditoria do Comitê</span>
+                </div>
+                <p id="bmSubtitle" style="margin: 2px 0 0 0; font-size: 0.83rem; color: var(--text-dim);">Parecer oficial da Presidência, CFO e Diretor de Futebol sobre a gestão do treinador.</p>
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+              <span id="bmGeneratedAt" style="font-size: 0.78rem; color: var(--text-dim);">—</span>
+              <button type="button" class="btn-secondary" onclick="openSquadAuditMatrix()" style="border-color: rgba(56, 189, 248, 0.45); color: #38bdf8;">
+                <i data-lucide="layout-grid"></i> Ver Matriz do Elenco
+              </button>
+              <button type="button" class="btn-primary" id="btnRefreshBoardMeeting" onclick="loadBoardMeetingData(true)">
+                <i data-lucide="refresh-cw"></i> Atualizar Parecer
+              </button>
+            </div>
+          </div>
+
+          <div class="board-review-section">
+            <div class="glass-card board-manager-score-card">
+              <div class="bms-left">
+                <div class="manager-score-ring" id="bmManagerScoreRing">
+                  <span class="msr-value" id="bmManagerScore">—</span>
+                  <span class="msr-label">NOTA DO MANAGER</span>
+                </div>
+                <div class="bms-summary">
+                  <div class="bms-status-badge" id="bmBoardStatus">AVALIANDO GESTÃO...</div>
+                  <p class="bms-verdict" id="bmBoardVerdict">Carregando parecer consolidado da diretoria...</p>
+                  <div class="bms-budget-box">
+                    <i data-lucide="wallet"></i>
+                    <div>
+                      <strong>Diretriz Orçamentária:</strong>
+                      <span id="bmBudgetAdjustment">—</span>
+                    </div>
+                  </div>
+                  <div class="bms-wage-bench" id="bmWageBenchmarks"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Vozes da Diretoria (Presidente, CFO, Diretor de Futebol) -->
+            <div class="board-voices-grid">
+              <div class="glass-card speech-card speech-president">
+                <div class="speech-header">
+                  <div class="speech-avatar president"><i data-lucide="crown"></i></div>
+                  <div>
+                    <span class="speech-role">PRESIDÊNCIA DO CLUBE</span>
+                    <h4>Parecer do Presidente</h4>
+                  </div>
+                </div>
+                <blockquote id="bmPresidentSpeech">Carregando pronunciamento...</blockquote>
+              </div>
+
+              <div class="glass-card speech-card speech-cfo">
+                <div class="speech-header">
+                  <div class="speech-avatar cfo"><i data-lucide="bar-chart-3"></i></div>
+                  <div>
+                    <span class="speech-role">DIRETORIA FINANCEIRA (CFO)</span>
+                    <h4>Auditoria de Folha &amp; Custo-Benefício</h4>
+                  </div>
+                </div>
+                <blockquote id="bmCfoSpeech">Carregando análise financeira...</blockquote>
+              </div>
+
+              <div class="glass-card speech-card speech-director">
+                <div class="speech-header">
+                  <div class="speech-avatar director"><i data-lucide="clipboard-check"></i></div>
+                  <div>
+                    <span class="speech-role">DIRETORIA DE FUTEBOL</span>
+                    <h4>Relatório Técnico do Elenco</h4>
+                  </div>
+                </div>
+                <blockquote id="bmDirectorSpeech">Carregando relatório técnico...</blockquote>
+              </div>
+            </div>
+          </div>
+        </div> <!-- /mgrSubtabBoard -->
       </section>
 
       <!-- ======================================================== -->
@@ -1163,6 +1284,17 @@
           </div>
         </div>
 
+        <!-- Sub-abas de Elenco & Atletas -->
+        <div class="subtab-nav-bar" id="squadSubtabNavBar">
+          <button type="button" class="subtab-btn active" data-squad-subtab="table" onclick="switchSquadSubtab('table')">
+            <i data-lucide="users"></i> Estatísticas &amp; Atributos do Elenco
+          </button>
+          <button type="button" class="subtab-btn" data-squad-subtab="audit" onclick="switchSquadSubtab('audit')">
+            <i data-lucide="layout-grid"></i> Comitê &amp; Matriz 4 Quadrantes (Squad Matrix)
+          </button>
+        </div>
+
+        <div class="subtab-pane active" id="squadSubtabTable">
         <div class="glass-card">
           <div class="table-responsive">
             <table class="vault-table hoverable" id="allSquadTable">
@@ -1188,6 +1320,119 @@
             </table>
           </div>
         </div>
+        </div> <!-- /squadSubtabTable -->
+
+        <!-- Sub-aba 2: Auditoria de Desempenho & Matriz dos 4 Quadrantes -->
+        <div class="subtab-pane" id="squadSubtabAudit">
+          <div class="glass-card squad-matrix-wrapper">
+            <div class="matrix-toolbar">
+              <div>
+                <h3 style="margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+                  <i data-lucide="layout-grid" style="color: var(--accent-gold);"></i>
+                  Matriz Visual dos 4 Quadrantes do Elenco (Squad Matrix)
+                </h3>
+                <p style="margin: 4px 0 0 0; font-size: 0.84rem; color: var(--text-dim);">
+                  Critérios Calibrados EA FC: <span class="legend-dot elite">&ge; 6.8 Destaque</span> • <span class="legend-dot good">6.5–6.79 Regular</span> • <span class="legend-dot warning">6.1–6.49 Alerta</span> • <span class="legend-dot danger">&lt; 6.1 Crítico</span>
+                </p>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                <div class="matrix-pos-filters" id="bmMatrixPosFilters">
+                  <button type="button" class="filter-pill active" data-pos="ALL">Todos (<span id="bmCountAll">0</span>)</button>
+                  <button type="button" class="filter-pill" data-pos="GOL">GOL</button>
+                  <button type="button" class="filter-pill" data-pos="DEF">DEF</button>
+                  <button type="button" class="filter-pill" data-pos="MEI">MEI</button>
+                  <button type="button" class="filter-pill" data-pos="ATA">ATA</button>
+                </div>
+                <button type="button" class="btn-secondary" onclick="loadBoardMeetingData(true)" title="Atualizar Auditoria do Elenco">
+                  <i data-lucide="refresh-cw"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="squad-matrix-2x2">
+              <!-- Quadrante 1: Pilares & Intocáveis -->
+              <div class="matrix-quadrant q-pillars">
+                <div class="mq-header">
+                  <div class="mq-title-wrap">
+                    <span class="mq-icon">👑</span>
+                    <div>
+                      <h4>Pilares &amp; Intocáveis</h4>
+                      <span class="mq-sub">Nota &ge; 6.8 ou titulares consistentes • Manter / Renovar</span>
+                    </div>
+                  </div>
+                  <span class="mq-count-badge" id="bmQ1Count">0</span>
+                </div>
+                <div class="mq-players-list" id="bmQ1List"></div>
+              </div>
+
+              <!-- Quadrante 2: Ativos de Pico de Mercado -->
+              <div class="matrix-quadrant q-peak">
+                <div class="mq-header">
+                  <div class="mq-title-wrap">
+                    <span class="mq-icon">📈</span>
+                    <div>
+                      <h4>Ativos de Pico de Mercado</h4>
+                      <span class="mq-sub">Maturidade (26–31 anos) + boa entrega • Venda estratégica por lucro</span>
+                    </div>
+                  </div>
+                  <span class="mq-count-badge" id="bmQ2Count">0</span>
+                </div>
+                <div class="mq-players-list" id="bmQ2List"></div>
+              </div>
+
+              <!-- Quadrante 3: Jóias & Lapidação -->
+              <div class="matrix-quadrant q-gems">
+                <div class="mq-header">
+                  <div class="mq-title-wrap">
+                    <span class="mq-icon">🌱</span>
+                    <div>
+                      <h4>Jóias &amp; Lapidação</h4>
+                      <span class="mq-sub">Sub-23 com Potencial &ge; 72 e pouca minutagem • Empréstimo recomendado</span>
+                    </div>
+                  </div>
+                  <span class="mq-count-badge" id="bmQ3Count">0</span>
+                </div>
+                <div class="mq-players-list" id="bmQ3List"></div>
+              </div>
+
+              <!-- Quadrante 4: Fim de Ciclo & Carga Financeira -->
+              <div class="matrix-quadrant q-deadwood">
+                <div class="mq-header">
+                  <div class="mq-title-wrap">
+                    <span class="mq-icon">⚠️</span>
+                    <div>
+                      <h4>Fim de Ciclo &amp; Carga Folha</h4>
+                      <span class="mq-sub">Nota &lt; 6.4 ou custo-benefício negativo • Lista de transferência / Rescisão</span>
+                    </div>
+                  </div>
+                  <span class="mq-count-badge" id="bmQ4Count">0</span>
+                </div>
+                <div class="mq-players-list" id="bmQ4List"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- PLANO DE AÇÃO IMEDIATA NA JANELA -->
+          <div class="board-actions-grid">
+            <div class="glass-card ba-card ba-renew">
+              <div class="ba-header"><i data-lucide="file-signature"></i> Renovar Prioridade</div>
+              <div class="ba-list" id="bmActionRenew"></div>
+            </div>
+            <div class="glass-card ba-card ba-loan">
+              <div class="ba-header"><i data-lucide="sprout"></i> Enviar por Empréstimo</div>
+              <div class="ba-list" id="bmActionLoan"></div>
+            </div>
+            <div class="glass-card ba-card ba-sell">
+              <div class="ba-header"><i data-lucide="trending-up"></i> Vender no Pico (Lucro)</div>
+              <div class="ba-list" id="bmActionSell"></div>
+            </div>
+            <div class="glass-card ba-card ba-list">
+              <div class="ba-header"><i data-lucide="user-x"></i> Negociar / Aliviar Folha</div>
+              <div class="ba-list" id="bmActionTransferList"></div>
+            </div>
+          </div>
+        </div> <!-- /squadSubtabAudit -->
       </section>
 
       <!-- ======================================================== -->
@@ -1493,9 +1738,14 @@
             <p>Retrospecto acumulado contra qualquer adversário que você já enfrentou no save.</p>
           </div>
 
-          <!-- Seletor de Adversário -->
-          <div class="opponent-selector-wrap">
-            <label for="h2hSelect"><i data-lucide="shield"></i> Adversário:</label>
+          <!-- Seletor e Pesquisa de Adversário -->
+          <div class="opponent-selector-wrap" style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+            <div class="h2h-search-box" style="position: relative; min-width: 240px;">
+              <i data-lucide="search" style="position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-dim); pointer-events: none;"></i>
+              <input type="text" id="h2hSearchInput" class="vault-input" placeholder="Buscar adversário..." autocomplete="off" style="padding-left: 2.1rem; width: 100%;">
+              <div id="h2hAutocompleteList" class="h2h-autocomplete-dropdown" style="display: none;"></div>
+            </div>
+            <label for="h2hSelect"><i data-lucide="shield"></i> Lista (A–Z):</label>
             <select id="h2hSelect" class="vault-select">
               <option value="">Selecione um adversário...</option>
             </select>
@@ -2649,6 +2899,19 @@
             <span class="psc-val" id="spmStatPhysical">0</span>
             <div class="psc-bar"><div class="psc-fill" id="spmStatPhysicalBar" style="width: 0%;"></div></div>
           </div>
+        </div>
+      </div>
+
+      <!-- 7 Categorias Oficiais de Atributos Detalhados -->
+      <div class="psm-categories-section">
+        <div class="psm-categories-topbar">
+          <div class="psm-section-label" style="margin-bottom: 0;"><i data-lucide="layers"></i> Detalhamento Técnico Completo</div>
+          <button type="button" class="psm-toggle-all-btn" onclick="toggleAllCategoryCards()">
+            <i data-lucide="chevrons-up-down"></i> <span id="spmToggleAllText">Recolher Todos</span>
+          </button>
+        </div>
+        <div class="psm-category-cards-grid" id="spmCategoryCardsGrid">
+          <!-- Inserido dinamicamente via JS -->
         </div>
       </div>
 
@@ -3989,7 +4252,7 @@
   <!-- Social Media & Press Studio Module -->
   <script src="social_media.js?v=1.0"></script>
   <!-- Main JavaScript Application -->
-  <script src="app.js?v=4.3"></script>
+  <script src="app.js?v=4.6"></script>
 
   <!-- Modal: Registrar Prêmio Individual -->
   <div class="modal-overlay" id="modalAddPlayerAward" style="display: none;">
@@ -4129,6 +4392,14 @@
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: Parecer Detalhado do Atleta no Comitê -->
+  <div class="modal-overlay" id="modalBoardPlayerAdvice" style="display: none;">
+    <div class="modal-card" style="max-width: 560px; width: 94%;">
+      <button class="modal-close-btn" type="button" onclick="closeBoardPlayerAdviceModal()">&times;</button>
+      <div id="bmPlayerAdviceBody"></div>
     </div>
   </div>
 </body>

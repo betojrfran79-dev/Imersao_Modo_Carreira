@@ -23,6 +23,7 @@ import database
 import fcm_resolver
 import updater
 import media_engine
+import squad_committee_engine
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -1317,6 +1318,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
 
             # 14. API Opponents
             if path == "/api/opponents":
+                import unicodedata
                 conn = database.get_db()
                 cur = conn.cursor()
                 cur.execute("""
@@ -1324,12 +1326,28 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     CASE WHEN home_team_id != user_team_id THEN home_team_id ELSE away_team_id END as team_id,
                     CASE WHEN home_team_id != user_team_id THEN home_team_name ELSE away_team_name END as team_name
                 FROM matches
-                WHERE save_id = ?
+                WHERE save_id = ? AND is_user_match = 1
                 """, (save_id,))
-                opps = [dict(r) for r in cur.fetchall()]
+                raw_opps = [dict(r) for r in cur.fetchall()]
+                conn.close()
+
+                # Deduplicar por team_id e ordenar alfabeticamente (sem acento)
+                seen_ids = {}
+                for o in raw_opps:
+                    tid = int(o.get("team_id") or 0)
+                    tname = str(o.get("team_name") or "").strip()
+                    if tid <= 0 or not tname:
+                        continue
+                    if tid not in seen_ids:
+                        seen_ids[tid] = {"team_id": tid, "team_name": tname}
+
+                def _sort_key_pt(item):
+                    nfkd = unicodedata.normalize('NFKD', item["team_name"].lower())
+                    return "".join(c for c in nfkd if not unicodedata.combining(c))
+
+                opps = sorted(seen_ids.values(), key=_sort_key_pt)
                 for o in opps:
                     o["crest_url"] = fcm_resolver.get_crest_image_path_or_url(o["team_id"])
-                conn.close()
                 return self.send_json(opps)
 
             # 14.5 Busca de Clubes para Troca de Escudos
@@ -1588,6 +1606,12 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     pid = item.get("player_id", 0)
                     item["head_url"] = fcm_resolver.get_head_image_path_or_url(pid)
                 return self.send_json({"shortlist": shortlist})
+
+            if path == "/api/squad-audit":
+                save_id_req = query.get("save_id", ["carreira_ativa"])[0]
+                season_year_req = query.get("season_year", [None])[0]
+                report = squad_committee_engine.get_squad_audit_report(save_id_req, season_year_req)
+                return self.send_json(report)
 
             if path == "/api/scout/search":
                 save_id_req = query.get("save_id", ["carreira_ativa"])[0]

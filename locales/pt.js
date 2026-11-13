@@ -37,6 +37,7 @@ window.I18N_LOCALES['pt'] = {
     standings: 'Tabelas & Classificação',
     prognosticos: 'Prognósticos & Chances',
     squad: 'Elenco & Atletas',
+    boardMeeting: 'Comitê & Diretoria',
     youth: 'Divisões de Base',
     transfers: 'Transferências & Mercado',
     scout: 'Equipe de Scout',

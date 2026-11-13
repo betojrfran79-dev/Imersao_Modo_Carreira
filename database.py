@@ -744,7 +744,7 @@ def normalize_competition_name(raw_name):
     # 3. Séries do Brasileirão
     if "série b" in name_lower or "serie b" in name_lower:
         return "Brasileirão Série B"
-    if "série a" in name_lower or "serie a" in name_lower:
+    if "série a" in name_lower or "serie a" in name_lower or name_lower in ("brasileirão", "brasileirao", "campeonato brasileiro"):
         return "Brasileirão Série A"
     if "série c" in name_lower or "serie c" in name_lower:
         return "Brasileirão Série C"
@@ -762,7 +762,7 @@ def normalize_competition_name(raw_name):
     # 5. Torneios Continentais e Internacionais
     if "libertadores" in name_lower:
         return "Copa Libertadores"
-    if "sul-americana" in name_lower or "sulamericana" in name_lower:
+    if "sul-americana" in name_lower or "sulamericana" in name_lower or "sudamericana" in name_lower:
         return "Copa Sul-Americana"
     if "recopa" in name_lower:
         return "Recopa Sul-Americana"
@@ -815,7 +815,12 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
             user_team_name = mc_row["team_name"]
             
     if user_team_id <= 0 or not user_team_name or user_team_name.lower() == 'clube':
-        cur.execute("SELECT user_team_id, home_team_name, away_team_name, home_team_id, away_team_id FROM matches WHERE save_id = ? AND user_team_id > 0 LIMIT 1", (save_id,))
+        cur.execute("""
+        SELECT user_team_id, home_team_name, away_team_name, home_team_id, away_team_id 
+        FROM matches 
+        WHERE save_id = ? AND user_team_id > 0 AND is_user_match = 1 
+        LIMIT 1
+        """, (save_id,))
         m_row = cur.fetchone()
         if m_row:
             user_team_id = m_row["user_team_id"]
@@ -826,6 +831,19 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
         user_team_name = "Portuguesa-RJ" if user_team_id == 132332 else "Clube"
         
     user_team_lower = user_team_name.lower()
+
+    def _comp_match_clause(comp_canonical):
+        if comp_canonical == "Brasileirão Série A":
+            return "(competition_name IN ('Brasileirão Série A', 'Brasileirão', 'Campeonato Brasileiro') OR LOWER(competition_name) LIKE '%série a%' OR LOWER(competition_name) LIKE '%serie a%')", []
+        if comp_canonical == "Copa Libertadores":
+            return "(competition_name = 'Copa Libertadores' OR LOWER(competition_name) LIKE '%libertadores%')", []
+        if comp_canonical == "Copa Sul-Americana":
+            return "(LOWER(competition_name) LIKE '%sul-americana%' OR LOWER(competition_name) LIKE '%sulamericana%' OR LOWER(competition_name) LIKE '%sudamericana%')", []
+        if comp_canonical == "Cariocão":
+            return "(LOWER(competition_name) LIKE '%carioc%' OR LOWER(competition_name) LIKE '%taça guanabara%' OR LOWER(competition_name) LIKE '%taca guanabara%' OR LOWER(competition_name) LIKE '%taça rio%' OR LOWER(competition_name) LIKE '%taca rio%')", []
+        if comp_canonical == "Copa do Brasil":
+            return "(competition_name = 'Copa do Brasil' OR (LOWER(competition_name) LIKE '%copa do brasil%' AND LOWER(competition_name) NOT LIKE '%supercopa%'))", []
+        return "(competition_name = ? OR competition_name LIKE ?)", [comp_canonical, f"%{comp_canonical}%"]
     
     if season_year:
         seasons = [str(season_year).strip()]
@@ -834,23 +852,24 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
         SELECT DISTINCT season_year FROM (
             SELECT season_year FROM season_competitions WHERE save_id = ?
             UNION
-            SELECT season_year FROM matches WHERE save_id = ?
+            SELECT season_year FROM matches WHERE save_id = ? AND is_user_match = 1
             UNION
-            SELECT season_year FROM knockout_stages WHERE save_id = ?
+            SELECT season_year FROM knockout_stages WHERE save_id = ? AND (home_team_id = ? OR away_team_id = ?)
             UNION
-            SELECT season_year FROM standings WHERE save_id = ?
+            SELECT season_year FROM standings WHERE save_id = ? AND (is_user_team = 1 OR team_id = ?)
         ) WHERE season_year IS NOT NULL AND season_year != '' AND season_year NOT IN ('57053')
-        """, (save_id, save_id, save_id, save_id))
+        """, (save_id, save_id, save_id, user_team_id, user_team_id, save_id, user_team_id))
         seasons = [str(r[0]).strip() for r in cur.fetchall() if r[0]]
         
     for s_year in seasons:
-        # Resolver clube para a temporada específica
+        # Resolver clube apenas por partidas reais do usuário (evitando jogos de IA como Botafogo)
         s_team_id = user_team_id
         s_team_name = user_team_name
         cur.execute("""
         SELECT user_team_id, home_team_name, away_team_name, home_team_id, away_team_id 
         FROM matches 
-        WHERE save_id = ? AND season_year = ? AND user_team_id > 0 
+        WHERE save_id = ? AND season_year = ? AND is_user_match = 1 AND user_team_id > 0 
+          AND (home_team_id = user_team_id OR away_team_id = user_team_id)
         LIMIT 1
         """, (save_id, s_year))
         sm_row = cur.fetchone()
@@ -861,16 +880,21 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
 
         comp_query = """
         SELECT DISTINCT comp FROM (
-            SELECT competition_name as comp FROM matches WHERE save_id = ? AND season_year = ?
+            SELECT competition_name as comp FROM matches WHERE save_id = ? AND season_year = ? AND is_user_match = 1
             UNION
-            SELECT competition_name as comp FROM knockout_stages WHERE save_id = ? AND season_year = ?
+            SELECT competition_name as comp FROM knockout_stages WHERE save_id = ? AND season_year = ? AND (home_team_id = ? OR away_team_id = ?)
             UNION
-            SELECT competition_name as comp FROM standings WHERE save_id = ? AND season_year = ?
+            SELECT competition_name as comp FROM standings WHERE save_id = ? AND season_year = ? AND (is_user_team = 1 OR team_id = ?)
             UNION
-            SELECT competition_name as comp FROM season_competitions WHERE save_id = ? AND season_year = ?
+            SELECT competition_name as comp FROM season_competitions WHERE save_id = ? AND season_year = ? AND (COALESCE(is_manual, 0) = 1 OR games_played > 0)
         ) WHERE comp IS NOT NULL AND comp != ''
         """
-        cur.execute(comp_query, (save_id, s_year, save_id, s_year, save_id, s_year, save_id, s_year))
+        cur.execute(comp_query, (
+            save_id, s_year,
+            save_id, s_year, s_team_id, s_team_id,
+            save_id, s_year, s_team_id,
+            save_id, s_year
+        ))
         raw_comps = [r[0].strip() for r in cur.fetchall() if r[0] and r[0].strip()]
         
         canonical_comps = set()
@@ -886,24 +910,22 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
         active_comps_in_season = list(canonical_comps)
         
         for c in active_comps_in_season:
-            # Proteção especial para não misturar Copa do Brasil com Supercopa
-            supercopa_exclusion = " AND competition_name NOT LIKE '%Supercopa%'" if c == 'Copa do Brasil' else ""
+            c_clause, c_params = _comp_match_clause(c)
 
             # Verificar se foi deletado pelo usuário e não tem partidas jogadas
             cur.execute(f"""
             SELECT COUNT(*) as games FROM matches
             WHERE save_id = ? AND season_year = ? AND is_user_match = 1
-              AND (competition_name = ? OR competition_name LIKE ? OR (? = 'Cariocão' AND (competition_name LIKE '%Carioca%' OR competition_name LIKE '%Cariocão%')))
-              {supercopa_exclusion}
-            """, (save_id, s_year, c, f"%{c}%", c))
+              AND {c_clause}
+            """, [save_id, s_year] + c_params)
             m_chk = cur.fetchone()
             user_games_played = m_chk["games"] if m_chk else 0
             
             if user_games_played == 0 and ((s_year, c.lower()) in deleted_set or (s_year, c) in deleted_set):
-                cur.execute("""
+                cur.execute(f"""
                 DELETE FROM season_competitions 
-                WHERE save_id = ? AND season_year = ? AND (competition_name = ? OR LOWER(competition_name) = LOWER(?))
-                """, (save_id, s_year, c, c))
+                WHERE save_id = ? AND season_year = ? AND {c_clause}
+                """, [save_id, s_year] + c_params)
                 continue
 
             # 1. Estatísticas consolidadas de partidas disputadas pelo usuário nesta competição
@@ -917,9 +939,8 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                 SUM(CASE WHEN user_team_id = home_team_id THEN away_score ELSE home_score END) as ga
             FROM matches
             WHERE save_id = ? AND season_year = ? AND is_user_match = 1
-              AND (competition_name = ? OR competition_name LIKE ? OR (? = 'Cariocão' AND (competition_name LIKE '%Carioca%' OR competition_name LIKE '%Cariocão%')))
-              {supercopa_exclusion}
-            """, (save_id, s_year, c, f"%{c}%", c))
+              AND {c_clause}
+            """, [save_id, s_year] + c_params)
             m_stat = cur.fetchone()
             g_cnt = m_stat["games"] or 0
             w_cnt = m_stat["wins"] or 0
@@ -940,10 +961,9 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                 winner_team_id
             FROM knockout_stages
             WHERE save_id = ? AND season_year = ? 
-              AND (competition_name = ? OR competition_name LIKE ? OR (? = 'Cariocão' AND (competition_name LIKE '%Carioca%' OR competition_name LIKE '%Cariocão%')))
-              {supercopa_exclusion}
+              AND {c_clause}
             ORDER BY stage_order DESC, id DESC
-            """, (save_id, s_year, c, f"%{c}%", c))
+            """, [save_id, s_year] + c_params)
             ko_matches = [dict(r) for r in cur.fetchall()]
             
             user_kos = []
@@ -1064,14 +1084,14 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                         final_position = f"{stage_name} (Em Andamento)"
                         position_numeric = 4
             else:
-                cur.execute("""
+                cur.execute(f"""
                 SELECT competition_name, position, played, points 
                 FROM standings 
                 WHERE save_id = ? AND season_year = ? 
-                  AND (competition_name = ? OR competition_name LIKE ? OR (? = 'Cariocão' AND (competition_name LIKE '%Carioca%' OR competition_name LIKE '%Cariocão%')))
+                  AND {c_clause}
                   AND (is_user_team = 1 OR team_id = ? OR LOWER(team_name) LIKE ?)
                 ORDER BY played DESC, id DESC LIMIT 1
-                """, (save_id, s_year, c, f"{c}%", c, s_team_id, f"%{s_team_lower}%"))
+                """, [save_id, s_year] + c_params + [s_team_id, f"%{s_team_lower}%"])
                 st_row = cur.fetchone()
                 if st_row and st_row["position"] and st_row["position"] <= 24:
                     pos = st_row["position"]
@@ -1092,27 +1112,33 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                     position_numeric = 0
 
             # 3. Busca e deduplicação de registros existentes para esta competição canônica
-            cur.execute("""
+            cur.execute(f"""
             SELECT id, team_id, team_name, final_position, status, trophy_won, position_numeric,
-                   games_played, wins, draws, losses, goals_for, goals_against, points
+                   games_played, wins, draws, losses, goals_for, goals_against, points,
+                   COALESCE(is_manual, 0) as is_manual
             FROM season_competitions 
             WHERE save_id = ? AND season_year = ? 
-              AND (competition_name = ? OR LOWER(competition_name) = LOWER(?)
-                   OR (? = 'Cariocão' AND (LOWER(competition_name) LIKE '%carioc%' OR LOWER(competition_name) LIKE '%taça%')))
+              AND {c_clause}
             ORDER BY 
                 CASE WHEN status IN ('CONCLUÍDO', 'CAMPEÃO', 'ELIMINADO') THEN 0 ELSE 1 END,
                 CASE WHEN team_name != 'Clube' AND team_id > 0 THEN 0 ELSE 1 END,
                 games_played DESC, id ASC
-            """, (save_id, s_year, c, c, c))
+            """, [save_id, s_year] + c_params)
             comp_rows = [dict(r) for r in cur.fetchall()]
             
             existing_comp = None
             if comp_rows:
                 existing_comp = comp_rows[0]
-                # Se houver mais de um registro duplicado, remove os excedentes imediatamente
                 if len(comp_rows) > 1:
                     for dup in comp_rows[1:]:
                         cur.execute("DELETE FROM season_competitions WHERE id = ?", (dup["id"],))
+
+            # Não criar/manter competições fantasmas sem nenhuma participação do clube
+            is_manual_comp = existing_comp and existing_comp.get("is_manual") == 1
+            if g_cnt == 0 and not user_kos and not is_manual_comp:
+                if existing_comp:
+                    cur.execute("DELETE FROM season_competitions WHERE id = ?", (existing_comp["id"],))
+                continue
 
             # Preservar customização manual do usuário e colocações já finalizadas
             is_user_customized = existing_comp and (
@@ -1172,7 +1198,7 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                     g_cnt, w_cnt, d_cnt, l_cnt, gf_cnt, ga_cnt, pts_cnt
                 ))
 
-        # 4. Remover qualquer pseudo-torneio ou registro inválido remanescente nesta temporada
+        # 4. Remover qualquer pseudo-torneio, duplicata antiga ou competição fantasma (0 jogos, não-manual)
         cur.execute("""
         DELETE FROM season_competitions
         WHERE save_id = ? AND season_year = ?
@@ -1180,7 +1206,8 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                OR competition_name LIKE 'Confronto%'
                OR competition_name LIKE 'Campeonato Carioca - %'
                OR competition_name LIKE 'Brasileirão Série B - %'
-               OR competition_name LIKE 'Copa Sul-Sudeste - %')
+               OR competition_name LIKE 'Copa Sul-Sudeste - %'
+               OR (COALESCE(is_manual, 0) = 0 AND games_played = 0))
         """, (save_id, s_year))
 
     # Limpeza final de duplicatas residuais
@@ -1489,7 +1516,7 @@ def sync_full_career(save_id, full_data, purge_previous=False):
         motm_id = int(m.get("motm_player_id", 0))
         motm_name = m.get("motm_player_name", "")
 
-        is_u = 1 if (m.get("is_user_match") == 1 or (u_id and (h_id == u_id or a_id == u_id)) or (user_team and (h_name == user_team or a_name == user_team))) else 0
+        is_u = 1 if (m.get("is_user_match") == 1 or (u_id and (h_id == u_id or a_id == u_id)) or (team_name and (h_name == team_name or a_name == team_name))) else 0
 
         cur.execute("""
         SELECT id, match_date FROM matches 
@@ -4193,7 +4220,7 @@ def get_head_to_head(save_id, opponent_team_id):
         home_team_id, home_team_name, away_team_id, away_team_name,
         home_score, away_score, user_team_id, motm_player_name
     FROM matches
-    WHERE save_id = ? AND (home_team_id = ? OR away_team_id = ?)
+    WHERE save_id = ? AND is_user_match = 1 AND (home_team_id = ? OR away_team_id = ?)
     ORDER BY 
         CASE 
             WHEN match_date LIKE '__/__/____' THEN substr(match_date, 7, 4) || '-' || substr(match_date, 4, 2) || '-' || substr(match_date, 1, 2)
@@ -4212,7 +4239,7 @@ def get_head_to_head(save_id, opponent_team_id):
     opp_name = ""
 
     for m in matches:
-        is_home = (m["user_team_id"] == m["home_team_id"])
+        is_home = (m["away_team_id"] == opponent_team_id)
         u_score = m["home_score"] if is_home else m["away_score"]
         o_score = m["away_score"] if is_home else m["home_score"]
         opp_name = m["away_team_name"] if is_home else m["home_team_name"]

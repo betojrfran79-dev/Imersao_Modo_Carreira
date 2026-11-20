@@ -151,9 +151,9 @@ window.showYouthPlayerProfile = function(playerId) {
   if (placeholder) placeholder.style.display = "none";
   if (container) container.style.display = "block";
 
-  // Esconde a área de comparativo até o usuário solicitar
+  // Exibe a área de comparativo e parecer técnico por padrão
   const compSection = document.getElementById("youthComparisonSection");
-  if (compSection) compSection.style.display = "none";
+  if (compSection) compSection.style.display = "block";
 
   // Preenche dados do Cabeçalho com posição traduzida em Português
   const faceEl = document.getElementById("yProfileFace");
@@ -217,6 +217,9 @@ window.showYouthPlayerProfile = function(playerId) {
 
   // Carrega e renderiza o Gráfico de Evolução Temporal das 7 Categorias
   loadYouthEvolutionChart(p.playerid, p.categories || []);
+
+  // Executa automaticamente o Cruzamento e Parecer Técnico de Transição de Lucas Valença
+  window.runYouthComparison(false);
 };
 
 // Renderiza as 7 Categorias no mesmo padrão rico do Scout
@@ -370,7 +373,7 @@ async function loadYouthEvolutionChart(playerId, fallbackCategories) {
 }
 
 // Executa o Comparativo com Todos os Atletas do Time Principal e gera Parecer
-window.runYouthComparison = async function() {
+window.runYouthComparison = async function(scroll = true) {
   const p = window.YouthAcademyState.selectedPlayer;
   if (!p) return;
 
@@ -384,7 +387,9 @@ window.runYouthComparison = async function() {
 
   if (compSection) {
     compSection.style.display = "block";
-    compSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (scroll) {
+      compSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }
 
   if (verdictTextEl) {

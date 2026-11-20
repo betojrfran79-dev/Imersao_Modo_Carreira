@@ -24,6 +24,7 @@ import fcm_resolver
 import updater
 import media_engine
 import squad_committee_engine
+import press_conference_engine
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8')
@@ -621,7 +622,10 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Length", str(content_length))
                 self.send_header("Accept-Ranges", "bytes")
                 self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Cache-Control", "public, max-age=86400")
+                if lower_path.endswith(('.css', '.js', '.html')):
+                    self.send_header("Cache-Control", "no-cache, must-revalidate")
+                else:
+                    self.send_header("Cache-Control", "public, max-age=86400")
                 self.end_headers()
 
                 with open(filepath, 'rb') as f:
@@ -646,7 +650,10 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header("Content-Length", str(file_size))
                 self.send_header("Accept-Ranges", "bytes")
                 self.send_header("Access-Control-Allow-Origin", "*")
-                self.send_header("Cache-Control", "public, max-age=86400")
+                if lower_path.endswith(('.css', '.js', '.html')):
+                    self.send_header("Cache-Control", "no-cache, must-revalidate")
+                else:
+                    self.send_header("Cache-Control", "public, max-age=86400")
                 self.end_headers()
 
                 with open(filepath, 'rb') as f:
@@ -687,6 +694,20 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 ico_path = os.path.join(BASE_DIR, "siga_logo.ico")
                 if os.path.exists(ico_path):
                     return self.serve_image(ico_path)
+
+            # 0.1 Ícones e Logos Oficiais do Portal Siga La Pelota
+            if path in ("/assets/siga_logo.png", "/assets/siga_la_pelota_logo.png", "/siga_logo.png", "/siga_la_pelota_logo.png", "/assets/avatars/sigalapelotanews.png"):
+                fname = os.path.basename(path)
+                candidates = [
+                    os.path.join(BASE_DIR, "assets", fname),
+                    os.path.join(BASE_DIR, "assets", "avatars", fname),
+                    os.path.join(BASE_DIR, fname),
+                    os.path.join(BASE_DIR, "assets", "siga_logo.png"),
+                    os.path.join(BASE_DIR, "assets", "siga_la_pelota_logo.png")
+                ]
+                for c in candidates:
+                    if c and os.path.isfile(c):
+                        return self.serve_image(c)
 
             # 0. Rota Segura de Streaming de Vídeo Anti-Interceptação (IDM/Download Managers)
             # Serve vídeos sem extensão .mp4 na URL para evitar que o Internet Download Manager (IDM) sequestre a reprodução
@@ -946,10 +967,16 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 repo_fallback = os.path.join(REPO_HEADS_DIR, "notfound.png")
                 return self.serve_image(fallback, repo_fallback)
 
-            if path in ["/api/dashboard", "/api/match/scout-dossier", "/api/standings/current", "/api/matches/history"]:
+            if path in ["/api/dashboard", "/api/manager", "/api/finances", "/api/sponsorships/dashboard", "/api/match/scout-dossier", "/api/standings/current", "/api/matches/history"]:
                 check_and_auto_import_desktop()
 
             # 4. API Dashboard (Visão do Momento)
+            if path == "/api/press/context":
+                return self.send_json(press_conference_engine.get_full_press_context(save_id))
+
+            if path == "/api/press/questions":
+                return self.send_json({"questions": press_conference_engine.generate_press_questions_with_gemini(save_id)})
+
             if path == "/api/dashboard":
                 conn = database.get_db()
                 cur = conn.cursor()
@@ -1126,6 +1153,22 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                 data = database.get_club_finances(save_id, season_year)
                 return self.send_json(data)
 
+            # 8.5 API Sponsorships, TV Rights, Prizes & Board Budget Governance
+            if path == "/api/sponsorships/dashboard":
+                import sponsorship_engine
+                allow_neg = (params.get("allow_negotiation", ["false"])[0].lower() == "true")
+                spons_data = sponsorship_engine.get_full_sponsorship_dashboard(save_id, allow_negotiation=allow_neg)
+                return self.send_json(spons_data)
+
+            if path == "/api/sponsorships/latest_lua_script":
+                import sponsorship_engine
+                script_path = os.path.join(BASE_DIR, "APLICAR_VERBA_DIRETORIA.lua")
+                lua_content = ""
+                if os.path.exists(script_path):
+                    with open(script_path, "r", encoding="utf-8") as f:
+                        lua_content = f.read()
+                return self.send_json({"status": "ok", "lua_code": lua_content})
+
             # 9. API Squad Detailed (Elenco com OVR/POT/Valor e Filtro de Competição)
             if path == "/api/squad/detailed":
                 data = database.get_detailed_squad_stats(save_id, season_year, comp_name)
@@ -1264,9 +1307,29 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     """, (save_id, season_year_req))
                     players = [dict(r) for r in cur.fetchall()]
 
+                cur.execute("SELECT current_team_id, current_team_name FROM saves WHERE id = ?", (save_id,))
+                save_info = cur.fetchone()
+                user_tid = int(save_info["current_team_id"] or 112810) if save_info else 112810
+                user_tname = str(save_info["current_team_name"] or "Madureira").lower() if save_info else "madureira"
+
+                filtered_matches = []
+                active_comp_names = {database.normalize_competition_name(c.get("competition_name") or "") for c in competitions if c.get("competition_name")}
                 for m in matches:
-                    m["home_crest"] = fcm_resolver.get_crest_image_path_or_url(m["home_team_id"])
-                    m["away_crest"] = fcm_resolver.get_crest_image_path_or_url(m["away_team_id"])
+                    c_norm = database.normalize_competition_name(m.get("competition_name") or "")
+                    is_u = (
+                        m.get("is_user_match") == 1
+                        or m.get("home_team_id") == user_tid
+                        or m.get("away_team_id") == user_tid
+                        or user_tname in str(m.get("home_team_name") or "").lower()
+                        or user_tname in str(m.get("away_team_name") or "").lower()
+                    )
+                    if is_u or (c_norm in active_comp_names):
+                        m["competition_name"] = c_norm or m.get("competition_name")
+                        m["is_user_match"] = 1 if is_u else 0
+                        m["home_crest"] = fcm_resolver.get_crest_image_path_or_url(m["home_team_id"])
+                        m["away_crest"] = fcm_resolver.get_crest_image_path_or_url(m["away_team_id"])
+                        filtered_matches.append(m)
+                matches = filtered_matches
 
                 for p in players:
                     p["face_url"] = fcm_resolver.get_head_image_path_or_url(p["player_id"])
@@ -1311,6 +1374,11 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
 
             # 13.5 API Scout Dossier (ScoutPad Pro)
             if path == "/api/match/scout-dossier":
+                try:
+                    import importlib
+                    importlib.reload(database)
+                except Exception:
+                    pass
                 opp_id_str = query.get("opponent_id", [None])[0]
                 opp_id = int(opp_id_str) if opp_id_str and opp_id_str.isdigit() else None
                 dossier = database.get_match_scout_dossier(save_id, opp_id, season_year)
@@ -1647,7 +1715,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
                     "max_age": query.get("max_age", [None])[0],
                     "is_wonderkid": query.get("is_wonderkid", ["0"])[0] in ["1", "true", "True"],
                     "order_by": query.get("order_by", ["ovr_desc"])[0],
-                    "limit": query.get("limit", [20])[0]
+                    "limit": min(40, max(1, int(query.get("limit", [40])[0])))
                 }
                 
                 cur_year, _ = database.get_active_career_context(save_id_req)
@@ -2021,6 +2089,13 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
 
                 env_k = load_env().get("GEMINI_API_KEY", "")
                 res = media_engine.analyze_media_with_ai(payload, BASE_DIR, env_k)
+                return self.send_json(res)
+
+            if path == "/api/press/react":
+                coach_ans = payload.get("answer", "")
+                q_text = payload.get("question", "")
+                save_id_req = payload.get("save_id", "carreira_ativa")
+                res = press_conference_engine.react_and_generate_news_with_gemini(coach_ans, q_text, save_id_req)
                 return self.send_json(res)
 
             if path == "/api/upload-local":
@@ -3052,6 +3127,58 @@ Retorne exclusivamente o objeto JSON válido, sem texto explicativo nem markdown
                 except Exception as e:
                     traceback.print_exc()
                     return self.send_json({"status": "error", "message": f"Erro ao salvar finanças: {str(e)}"}, 500)
+
+            if path == "/api/sponsorships/sign":
+                try:
+                    import sponsorship_engine
+                    res = sponsorship_engine.sign_sponsorship_contract(save_id, payload)
+                    return self.send_json(res)
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro ao assinar patrocínio: {str(e)}"}, 500)
+
+            if path == "/api/sponsorships/trigger_installment":
+                try:
+                    import sponsorship_engine
+                    s_id = int(payload.get("sponsorship_id") or 0)
+                    act_type = str(payload.get("action_type") or "MIDSEASON").upper()
+                    res = sponsorship_engine.trigger_midseason_or_recall(save_id, s_id, act_type)
+                    return self.send_json(res)
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro ao liberar parcela/recall: {str(e)}"}, 500)
+
+            if path == "/api/sponsorships/sign_tv":
+                try:
+                    import sponsorship_engine
+                    b_id = str(payload.get("broadcaster_id") or "globo_premiere")
+                    res = sponsorship_engine.sign_tv_rights_contract(save_id, b_id)
+                    return self.send_json(res)
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro ao assinar direitos de TV: {str(e)}"}, 500)
+
+            if path == "/api/sponsorships/claim_prize":
+                try:
+                    import sponsorship_engine
+                    ref_k = str(payload.get("reference_key") or "")
+                    res = sponsorship_engine.claim_tournament_prize(save_id, ref_k)
+                    return self.send_json(res)
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro ao resgatar premiação: {str(e)}"}, 500)
+
+            if path == "/api/sponsorships/request_extra_funds":
+                try:
+                    import sponsorship_engine
+                    amt = float(payload.get("amount") or 0.0)
+                    rsn = str(payload.get("reason") or "Reforço Estratégico de Elenco")
+                    goal_acc = str(payload.get("new_goal") or "")
+                    res = sponsorship_engine.request_extraordinary_board_funds(save_id, amt, rsn, goal_acc)
+                    return self.send_json(res)
+                except Exception as e:
+                    traceback.print_exc()
+                    return self.send_json({"status": "error", "message": f"Erro na solicitação ao Conselho: {str(e)}"}, 500)
 
             if path == "/api/teams/upload_crest":
                 team_id = int(payload.get("team_id", 0))

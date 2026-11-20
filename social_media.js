@@ -14,6 +14,9 @@ const SOCIAL_PERSONAS = [
   { id: "Jorge_iggor", name: "Jorge Iggor", handle: "@jorgeiggor", avatar: "/assets/avatars/Jorge_iggor.jpg", desc: "TNT Sports - Narração épica, maiúsculas, 'EMOCIONANTE', tom grandioso" },
   { id: "Lance", name: "Lance!", handle: "@lancenet", avatar: "/assets/avatars/Lance.jpg", desc: "Manchetes dinâmicas, trocadilhos ('DEU LANCE!') e energia rápida" },
   { id: "Mauro_Cezar", name: "Mauro Cezar", handle: "@maurocezar", avatar: "/assets/avatars/Mauro_Cezar.jpg", desc: "Crítica cirúrgica, avesso a oba-oba, aponta falhas e desconexão tática" },
+  { id: "Pedrinho", name: "Pedrinho", handle: "@pedrinho7oficial", avatar: "/assets/avatars/pedrinho.png", desc: "Comentarista técnico, visão profunda de campo, inteligência posicional e entrosamento" },
+  { id: "Craque_Neto", name: "Craque Neto", handle: "@10neto", avatar: "/assets/avatars/neto.png", desc: "Os Donos da Bola, explosivo, direto e apaixonado ('garotinho', 'brincadeira')" },
+  { id: "Galvao_Bueno", name: "Galvão Bueno", handle: "@galvaobueno", avatar: "/assets/avatars/galvao.png", desc: "Narrador histórico, emoção pura ('Haja coração!', 'Olha o que ele fez!')" },
   { id: "NeymarJr", name: "Neymar Jr", handle: "@neymarjr", avatar: "/assets/avatars/NeymarJr.jpg", desc: "Super casual, 'parceiro', gírias de boleiro e muitos emojis (🚀🔥👊🏼)" },
   { id: "PVC", name: "PVC", handle: "@pvc_comenta", avatar: "/assets/avatars/PVC.jpg", desc: "Enciclopédico, dados históricos minuciosos e cruzamento de eras" },
   { id: "Romário", name: "Romário", handle: "@romario11", avatar: "/assets/avatars/Romário.jpg", desc: "O Baixinho, fala na terceira pessoa, autoconfiança de matador, 'peixe'" },
@@ -712,6 +715,10 @@ window.autoFillLastMatchData = async function() {
     return;
   }
 
+  // Registra a competição da última partida para consistência editorial na manchete
+  window.SocialStudioState = window.SocialStudioState || {};
+  window.SocialStudioState.lastMatchCompetition = lastMatch.competition_name || "";
+
   const isHome = (lastMatch.home_team_name || "").toLowerCase() === teamName.toLowerCase();
   const myGoals = isHome ? lastMatch.home_score : lastMatch.away_score;
   const oppGoals = isHome ? lastMatch.away_score : lastMatch.home_score;
@@ -737,17 +744,16 @@ window.autoFillLastMatchData = async function() {
 // ==============================================================================
 // 5. GERAÇÃO DE CONTEÚDO (IA & MOCK)
 // ==============================================================================
-window.handleGenerateMediaContent = async function(event) {
-  event.preventDefault();
-
+async function executeMediaGeneration(useFullCareerData = false) {
   const authorSelect = document.getElementById("socialAuthorSelect");
   const journalistSelect = document.getElementById("journalistSelect");
   const contextInput = document.getElementById("socialContextInput");
   const btnSubmit = document.getElementById("btnSubmitGenerateMedia");
+  const btnContext = document.getElementById("btnGenerateWithFullContext");
   const hintEl = document.getElementById("socialGenStatusHint");
 
   const promptText = (contextInput && contextInput.value.trim()) || "";
-  if (!promptText) {
+  if (!promptText && !useFullCareerData) {
     alert("Por favor, digite ou fale por áudio o que aconteceu na partida!");
     return;
   }
@@ -778,19 +784,31 @@ window.handleGenerateMediaContent = async function(event) {
 
   // Loading state
   const origBtnContent = btnSubmit ? btnSubmit.innerHTML : "";
-  if (btnSubmit) {
-    btnSubmit.disabled = true;
+  const origContextContent = btnContext ? btnContext.innerHTML : "";
+  if (btnSubmit) btnSubmit.disabled = true;
+  if (btnContext) btnContext.disabled = true;
+
+  if (useFullCareerData && btnContext) {
+    btnContext.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width: 16px; height: 16px;"></i><span>Cruzando com Dados Reais do Save...</span>`;
+  } else if (btnSubmit) {
     btnSubmit.innerHTML = `<i data-lucide="loader" class="animate-spin" style="width: 16px; height: 16px;"></i><span>Processando Análise & Gerando Redes...</span>`;
-    if (window.lucide) lucide.createIcons();
   }
-  if (hintEl) hintEl.textContent = "Conectando ao modelo de IA multimodal...";
+  if (window.lucide) lucide.createIcons();
+
+  if (hintEl) {
+    hintEl.textContent = useFullCareerData 
+      ? "Extraindo súmula, classificação e elenco do save para cruzamento contextual..."
+      : "Conectando ao modelo de IA multimodal...";
+  }
 
   try {
     const userApiKey = localStorage.getItem("gemini_api_key") || localStorage.getItem("user_gemini_api_key") || "";
 
     const payload = {
-      notes: promptText,
-      prompt: promptText,
+      notes: promptText || "Análise oficial da temporada e momento esportivo do clube",
+      prompt: promptText || "Análise oficial da temporada e momento esportivo do clube",
+      competition: window.SocialStudioState?.lastMatchCompetition || "",
+      use_full_career_data: useFullCareerData,
       postAuthor: personaKey,
       persona: personaKey,
       journalist: journalistName,
@@ -824,11 +842,11 @@ window.handleGenerateMediaContent = async function(event) {
     const aiBadge = document.getElementById("socialAiSourceBadge");
     if (aiBadge) {
       if (data.source && data.source.startsWith("gemini")) {
-        aiBadge.textContent = `IA: ${data.source.toUpperCase()}`;
+        aiBadge.textContent = useFullCareerData ? `IA + SAVE: ${data.source.toUpperCase()}` : `IA: ${data.source.toUpperCase()}`;
         aiBadge.style.background = "rgba(0, 255, 102, 0.15)";
         aiBadge.style.color = "var(--neon-green)";
       } else {
-        aiBadge.textContent = "Simulação / Mock Oficial";
+        aiBadge.textContent = useFullCareerData ? "Simulação + Dados Reais do Save" : "Simulação / Mock Oficial";
         aiBadge.style.background = "rgba(0, 210, 255, 0.15)";
         aiBadge.style.color = "var(--neon-blue)";
       }
@@ -874,8 +892,8 @@ window.handleGenerateMediaContent = async function(event) {
     await savePostToCareerVault(window.SocialStudioState.activeGeneratedPost);
 
     // Feedback
-    if (hintEl) hintEl.textContent = "Publicação e Capa geradas com sucesso!";
-    if (window.showToast) window.showToast("Post no X e Capa do Siga La Pelota criados!", "success");
+    if (hintEl) hintEl.textContent = useFullCareerData ? "Matéria gerada cruzando o relato com dados reais do save!" : "Publicação e Capa geradas com sucesso!";
+    if (window.showToast) window.showToast(useFullCareerData ? "Matéria aprofundada com dados do save criada!" : "Post no X e Capa do Siga La Pelota criados!", "success");
 
   } catch (err) {
     console.error("Erro na geração de mídia:", err);
@@ -885,9 +903,23 @@ window.handleGenerateMediaContent = async function(event) {
     if (btnSubmit) {
       btnSubmit.disabled = false;
       btnSubmit.innerHTML = origBtnContent;
-      if (window.lucide) lucide.createIcons();
     }
+    if (btnContext) {
+      btnContext.disabled = false;
+      btnContext.innerHTML = origContextContent;
+    }
+    if (window.lucide) lucide.createIcons();
   }
+}
+
+window.handleGenerateMediaContent = async function(event) {
+  if (event) event.preventDefault();
+  return executeMediaGeneration(false);
+};
+
+window.handleGenerateWithCareerContext = async function(event) {
+  if (event) event.preventDefault();
+  return executeMediaGeneration(true);
 };
 
 // Salva o post gerado na tabela SQLite da carreira
@@ -959,28 +991,28 @@ function generateFallbackCommentsForPost(postData) {
   
   const pool = [
     {
-      name: "Vitor Sergio Rodrigues (VSR)",
-      handle: "@vitorsergio",
-      avatar: "/assets/avatars/VSR.jpg",
-      text: `Análise tática irretocável sobre o ${clubName} de ${managerName}. Leitura de jogo precisa em cada detalhe do confronto!`
+      name: "Galvão Bueno",
+      handle: "@galvaobueno",
+      avatar: "/assets/avatars/galvao.png",
+      text: `Haja coração, amigos! Que trabalho espetacular o ${managerName} está construindo com esse ${clubName}! É futebol com alma e autoridade!`
+    },
+    {
+      name: "Pedrinho",
+      handle: "@pedrinho7oficial",
+      avatar: "/assets/avatars/pedrinho.png",
+      text: `A leitura de espaços do ${clubName} sob o comando de ${managerName} é impressionante. Transições rápidas e encaixes defensivos perfeitos.`
+    },
+    {
+      name: "Craque Neto",
+      handle: "@10neto",
+      avatar: "/assets/avatars/neto.png",
+      text: `Garotinho, não tem como não aplaudir o ${managerName}! O ${clubName} joga bola de verdade, sem frescura e com raça de sobra!`
     },
     {
       name: "Mauro Cezar",
       handle: "@maurocezar",
       avatar: "/assets/avatars/Mauro_Cezar.jpg",
-      text: `Postura madura e competitiva apresentada pelo ${clubName}. O trabalho de ${managerName} tem método e convicção clara.`
-    },
-    {
-      name: "Craque Neto",
-      handle: "@10neto",
-      avatar: "/assets/avatars/CraqueNeto.jpg",
-      text: `Garotinho, não tem o que falar! O ${clubName} do ${managerName} foi pra cima e jogou com coração de verdade!`
-    },
-    {
-      name: "Casimiro",
-      handle: "@casimiro",
-      avatar: "/assets/avatars/casimiro.png",
-      text: `Que jogo absurdo, rapaziada! O ${clubName} de ${managerName} entregou entretenimento puro hoje!`
+      text: `Postura madura e competitiva apresentada pelo ${clubName}. O trabalho de ${managerName} tem método tático evidente e pés no chão.`
     }
   ];
 
@@ -1144,6 +1176,146 @@ function renderTweetCard(data, mediaUrl, mediaType, videoStart, videoEnd) {
   }
 }
 
+// Alternância interativa do widget lateral entre Tabela G-4 e Próximo Confronto
+window.toggleNewsSideWidget = function(mode) {
+  const standingsEl = document.getElementById("newsSideStandingsView");
+  const fixtureEl = document.getElementById("newsSideFixtureView");
+  const btnStandings = document.getElementById("btnSideTabStandings");
+  const btnFixture = document.getElementById("btnSideTabFixture");
+  if (!standingsEl || !fixtureEl) return;
+
+  if (mode === "fixture") {
+    standingsEl.style.display = "none";
+    fixtureEl.style.display = "block";
+    if (btnFixture) {
+      btnFixture.style.background = "rgba(245, 158, 11, 0.25)";
+      btnFixture.style.borderColor = "#facc15";
+      btnFixture.style.color = "#facc15";
+    }
+    if (btnStandings) {
+      btnStandings.style.background = "rgba(255, 255, 255, 0.06)";
+      btnStandings.style.borderColor = "rgba(255,255,255,0.15)";
+      btnStandings.style.color = "#cbd5e1";
+    }
+  } else {
+    standingsEl.style.display = "flex";
+    fixtureEl.style.display = "none";
+    if (btnStandings) {
+      btnStandings.style.background = "rgba(245, 158, 11, 0.25)";
+      btnStandings.style.borderColor = "#facc15";
+      btnStandings.style.color = "#facc15";
+    }
+    if (btnFixture) {
+      btnFixture.style.background = "rgba(255, 255, 255, 0.06)";
+      btnFixture.style.borderColor = "rgba(255,255,255,0.15)";
+      btnFixture.style.color = "#cbd5e1";
+    }
+  }
+};
+
+function buildNewsSideWidgetHtml(news, clubName) {
+  const standings = (news && news.standings_snippet) || (window.cachedDashboardData && window.cachedDashboardData.standings) || [];
+  const nextFix = (news && news.next_fixture) || (window.cachedDashboardData && window.cachedDashboardData.calendar_fixtures && window.cachedDashboardData.calendar_fixtures.find(f => !f.is_completed)) || null;
+
+  // Renderiza até 4 linhas da tabela G-4
+  const top4 = standings.slice(0, 4);
+  const standingsRowsHtml = top4.length > 0 ? top4.map(s => {
+    const isMe = (s.team_name || "").toLowerCase() === (clubName || "").toLowerCase() || (s.team_name || "").toLowerCase().includes("madureira");
+    return `
+      <div style="display: grid; grid-template-columns: 24px 22px 1fr 34px 28px; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; font-size: 0.78rem; ${isMe ? 'background: rgba(245, 158, 11, 0.2); font-weight: 800; color: #facc15;' : 'color: #e2e8f0;'}">
+        <span style="font-weight: 800; text-align: center; color: ${s.position === 1 ? '#facc15' : '#94a3b8'};">${s.position}º</span>
+        <img src="${s.crest_url || '/assets/default_crest.png'}" style="width: 18px; height: 18px; object-fit: contain;" onerror="this.src='/assets/default_crest.png'" />
+        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${s.team_name}</span>
+        <span style="text-align: right; font-weight: 800; color: #fff;">${s.points}p</span>
+        <span style="text-align: right; color: #94a3b8; font-size: 0.72rem;">${s.played || s.matches_played || 0}J</span>
+      </div>
+    `;
+  }).join('') : `
+    <div style="padding: 10px; font-size: 0.78rem; color: #94a3b8; text-align: center;">Classificação em atualização...</div>
+  `;
+
+  // Renderiza Próximo Duelo
+  let fixtureHtml = "";
+  if (nextFix) {
+    const isHome = (nextFix.home_team || nextFix.home_team_name || "").toLowerCase().includes((clubName || "").toLowerCase());
+    const dateFormatted = nextFix.fixture_date || nextFix.match_date || "Em breve";
+    const compName = nextFix.competition_name || news.competition || "Calendário Oficial";
+    const homeTeam = nextFix.home_team || nextFix.home_team_name || clubName;
+    const awayTeam = nextFix.away_team || nextFix.away_team_name || "Adversário";
+    const homeCrest = nextFix.home_crest || "/assets/default_crest.png";
+    const awayCrest = nextFix.away_crest || "/assets/default_crest.png";
+
+    fixtureHtml = `
+      <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 4px;">
+        <div style="font-size: 0.7rem; color: #facc15; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; display: flex; justify-content: space-between;">
+          <span>${compName}</span>
+          <span style="color: #cbd5e1;">${dateFormatted}</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-around; background: rgba(0,0,0,0.3); padding: 10px 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08);">
+          <div style="text-align: center; flex: 1;">
+            <img src="${homeCrest}" style="width: 32px; height: 32px; object-fit: contain; margin: 0 auto 4px auto; display: block;" onerror="this.src='/assets/default_crest.png'" />
+            <div style="font-size: 0.75rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px;">${homeTeam}</div>
+          </div>
+          <div style="font-size: 0.82rem; font-weight: 900; color: #facc15; padding: 0 8px;">VS</div>
+          <div style="text-align: center; flex: 1;">
+            <img src="${awayCrest}" style="width: 32px; height: 32px; object-fit: contain; margin: 0 auto 4px auto; display: block;" onerror="this.src='/assets/default_crest.png'" />
+            <div style="font-size: 0.75rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px;">${awayTeam}</div>
+          </div>
+        </div>
+        <div style="font-size: 0.7rem; color: #94a3b8; text-align: center;">
+          ${isHome ? '🏟️ Mandante: Estádio Aniceto Moscoso' : '✈️ Visitante: Duelo fora de casa'}
+        </div>
+      </div>
+    `;
+  } else {
+    fixtureHtml = `
+      <div style="padding: 12px; font-size: 0.78rem; color: #94a3b8; text-align: center;">Próximo confronto a definir pela CBF/Conmebol.</div>
+    `;
+  }
+
+  return `
+    <!-- Card Editorial: Classificação G-4 & Próximo Confronto do Calendário -->
+    <div class="news-side-editorial-card" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); color: #fff; border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); min-height: 200px;">
+      
+      <!-- Topo: Tabs Interativas para alternar entre Tabela e Duelo -->
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; margin-bottom: 10px;">
+        <span style="font-size: 0.72rem; font-weight: 900; text-transform: uppercase; letter-spacing: 0.06em; color: #facc15;">MOMENTO REAL</span>
+        <div style="display: flex; gap: 4px;">
+          <button type="button" id="btnSideTabStandings" onclick="window.toggleNewsSideWidget('standings')" style="background: rgba(245, 158, 11, 0.25); border: 1px solid #facc15; color: #facc15; font-size: 0.68rem; font-weight: 800; padding: 2px 7px; border-radius: 4px; cursor: pointer;">
+            Tabela G-4
+          </button>
+          <button type="button" id="btnSideTabFixture" onclick="window.toggleNewsSideWidget('fixture')" style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255,255,255,0.15); color: #cbd5e1; font-size: 0.68rem; font-weight: 700; padding: 2px 7px; border-radius: 4px; cursor: pointer;">
+            Próximo Duelo
+          </button>
+        </div>
+      </div>
+
+      <!-- Conteúdo 1: Classificação Atual -->
+      <div id="newsSideStandingsView" style="display: flex; flex-direction: column; gap: 4px;">
+        <div style="display: grid; grid-template-columns: 24px 22px 1fr 34px 28px; font-size: 0.65rem; color: #94a3b8; font-weight: 800; text-transform: uppercase; padding: 0 6px 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+          <span>POS</span>
+          <span></span>
+          <span>CLUBE</span>
+          <span style="text-align: right;">PTS</span>
+          <span style="text-align: right;">J</span>
+        </div>
+        ${standingsRowsHtml}
+      </div>
+
+      <!-- Conteúdo 2: Próximo Confronto (Inicialmente Oculto) -->
+      <div id="newsSideFixtureView" style="display: none;">
+        ${fixtureHtml}
+      </div>
+
+      <!-- Rodapé / Assinatura da Sala de Imprensa -->
+      <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-size: 0.65rem; font-weight: 700; color: rgba(255,255,255,0.6); text-transform: uppercase; letter-spacing: 0.05em;">SIGA LA PELOTA NEWS</span>
+        <span style="font-size: 0.65rem; font-family: monospace; color: #facc15;">EA FC 26</span>
+      </div>
+    </div>
+  `;
+}
+
 // ==============================================================================
 // 7. RENDERIZAÇÃO: CAPA DE JORNAL (SIGA LA PELOTA)
 // ==============================================================================
@@ -1162,21 +1334,66 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
     cleanMediaUrl = window.toSafeStreamUrl(cleanMediaUrl);
   }
 
-  let mediaColumnHtml = '';
+  let mediaWideHtml = '';
+  const captionText = news.caption || `${clubName} em campo • Melhores momentos • Temporada 2030`;
+
   if (cleanMediaUrl) {
     if (mediaType === 'video') {
-      mediaColumnHtml = `
-        <div style="border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 12px; position: relative; cursor: pointer;" title="Clique para pausar / reproduzir">
-          <video id="renderedNewsVideo" src="${cleanMediaUrl}" muted playsinline autoplay preload="auto" style="width: 100%; max-height: 240px; object-fit: contain; display: block;"></video>
-          <span style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.75); font-size: 11px; padding: 2px 8px; border-radius: 6px; color: #fff; pointer-events: none; display: flex; align-items: center; gap: 5px;">
-            <span style="width: 6px; height: 6px; background: #00e5ff; border-radius: 50%; display: inline-block;"></span> LOOP
-          </span>
+      mediaWideHtml = `
+        <div style="position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 8px;">
+          <!-- Botão Mudo Topo Esquerdo -->
+          <div style="position: absolute; top: 12px; left: 12px; z-index: 10; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); border-radius: 6px; padding: 6px; color: #fff; cursor: pointer; display: flex; align-items: center;" onclick="const v = document.getElementById('renderedNewsVideo'); if(v){ v.muted = !v.muted; }" title="Alternar Mudo">
+            <i data-lucide="volume-2" style="width: 18px; height: 18px;"></i>
+          </div>
+
+          <!-- Botão Compartilhar Topo Direito -->
+          <div style="position: absolute; top: 12px; right: 12px; z-index: 10; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); border-radius: 6px; padding: 6px; color: #fff; cursor: pointer; display: flex; align-items: center;" title="Compartilhar">
+            <i data-lucide="share-2" style="width: 18px; height: 18px;"></i>
+          </div>
+
+          <!-- Container do Vídeo 16:9 -->
+          <div style="width: 100%; aspect-ratio: 16/9; max-height: 480px; background: #000; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="const v = document.getElementById('renderedNewsVideo'); if(v){ v.paused ? v.play() : v.pause(); }" title="Clique para pausar / reproduzir">
+            <video id="renderedNewsVideo" src="${cleanMediaUrl}" muted playsinline autoplay loop preload="auto" style="width: 100%; height: 100%; object-fit: contain; display: block;"></video>
+          </div>
+
+          <!-- Barra de Controles Estilo Player Broadcast / GE -->
+          <div style="background: rgba(10, 10, 10, 0.92); color: #fff; padding: 8px 16px; font-size: 0.8rem; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid rgba(255,255,255,0.08);">
+            <!-- Barra de Progresso Vermelha / Branca -->
+            <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.25); border-radius: 2px; position: relative; cursor: pointer;">
+              <div style="width: 35%; height: 100%; background: #c4170c; border-radius: 2px;"></div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-weight: 800; font-size: 0.75rem; letter-spacing: 0.05em; color: #facc15;">SIGA LA PELOTA <span style="color: #fff;">PLAY</span></span>
+                <span style="font-family: monospace; font-size: 0.78rem; color: #cbd5e1;">00:05 / 04:40</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 12px; color: #cbd5e1;">
+                <i data-lucide="volume-x" style="width: 16px; height: 16px; cursor: pointer;"></i>
+                <i data-lucide="maximize" style="width: 16px; height: 16px; cursor: pointer;" onclick="const v = document.getElementById('renderedNewsVideo'); if(v && v.requestFullscreen) v.requestFullscreen();"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Legenda Fiel ao Modelo GE Logo Abaixo do Player -->
+        <div style="margin-bottom: 24px; font-size: 0.82rem; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <span class="editable-field" contenteditable="true" id="editableNewsCaption" style="padding: 1px 4px;" title="Clique para editar a legenda">${captionText}</span>
         </div>
       `;
     } else {
-      mediaColumnHtml = `
-        <div style="border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); margin-bottom: 12px;">
-          <img src="${cleanMediaUrl}" style="width: 100%; max-height: 240px; object-fit: cover; display: block;" alt="Lance Principal" />
+      mediaWideHtml = `
+        <div style="position: relative; width: 100%; border-radius: 8px; overflow: hidden; background: #0a0a0a; box-shadow: 0 10px 30px rgba(0,0,0,0.3); margin-bottom: 8px;">
+          <div style="width: 100%; aspect-ratio: 16/9; max-height: 480px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+            <img src="${cleanMediaUrl}" style="width: 100%; height: 100%; object-fit: cover; display: block;" alt="Lance Principal" />
+          </div>
+          <div style="position: absolute; bottom: 12px; right: 12px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); padding: 4px 10px; border-radius: 4px; font-size: 0.72rem; color: #cbd5e1;">
+            Foto: Agência Siga La Pelota
+          </div>
+        </div>
+
+        <!-- Legenda Fiel ao Modelo GE Logo Abaixo da Imagem -->
+        <div style="margin-bottom: 24px; font-size: 0.82rem; color: #64748b; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+          <span class="editable-field" contenteditable="true" id="editableNewsCaption" style="padding: 1px 4px;" title="Clique para editar a legenda">${captionText}</span>
         </div>
       `;
     }
@@ -1184,82 +1401,134 @@ function renderNewspaperCard(news, mediaUrl, mediaType, videoStart, videoEnd, cl
 
   container.innerHTML = `
     <!-- Barra de Auxílio à Edição -->
-    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.85rem; padding: 0.55rem 0.9rem; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 10px; max-width: 820px; margin-left: auto; margin-right: auto;">
-      <div style="font-size: 0.78rem; color: var(--accent-gold); display: flex; align-items: center; gap: 6px;">
-        <i data-lucide="edit-3" style="width: 14px; height: 14px;"></i>
-        <span><strong>Modo Edição Livre:</strong> Clique diretamente na manchete, subtítulo ou parágrafos para editar a matéria antes de exportar a capa!</span>
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem; padding: 0.65rem 1.1rem; background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 10px; max-width: 920px; margin-left: auto; margin-right: auto;">
+      <div style="font-size: 0.82rem; color: var(--accent-gold); display: flex; align-items: center; gap: 8px;">
+        <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
+        <span><strong>Modo Edição Livre (Portal Siga La Pelota News):</strong> Clique em qualquer manchete, legenda, aspas ou parágrafo para ajustar o texto antes de exportar!</span>
       </div>
-      <button type="button" class="btn-xs btn-primary" onclick="saveEditedCardContent()" title="Salvar alterações no banco de dados" style="display: flex; align-items: center; gap: 4px; padding: 0.25rem 0.65rem; background: var(--accent-gold); color: #000; white-space: nowrap;">
-        <i data-lucide="check" style="width: 12px; height: 12px;"></i>
-        <span>Salvar Alterações</span>
+      <button type="button" class="btn-xs btn-primary" onclick="saveEditedCardContent()" title="Salvar alterações no banco de dados" style="display: flex; align-items: center; gap: 6px; padding: 0.35rem 0.85rem; background: var(--accent-gold); color: #000; font-weight: 700; border-radius: 6px; white-space: nowrap;">
+        <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+        <span>Salvar Matéria</span>
       </button>
     </div>
 
-    <div class="classic-newspaper-sheet" id="exportableNewspaperElement" style="background: #fbf9f4; color: #1a1a1a; padding: 32px 36px; border-radius: 4px; box-shadow: 0 12px 35px rgba(0,0,0,0.35); font-family: 'Georgia', serif; border: 1px solid #dcd7ce;">
+    <!-- DOCUMENTO DA MATÉRIA ESTILO PORTAL SIGA LA PELOTA NEWS (RETANGULAR, MODERNO E AMPLO) -->
+    <div class="ge-portal-sheet" id="exportableNewspaperElement" style="background: #ffffff; color: #0f172a; max-width: 920px; margin: 0 auto; border-radius: 12px; box-shadow: 0 16px 45px rgba(0,0,0,0.3); overflow: hidden; font-family: 'Inter', -apple-system, sans-serif; border: 1px solid #e2e8f0;">
       
-      <!-- Masthead Superior do Jornal -->
-      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1a1a1a; padding-bottom: 12px; margin-bottom: 16px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <img src="/assets/avatars/sigalapelotanews.png" style="width: 38px; height: 38px; object-fit: contain;" onerror="this.style.display='none'" />
-          <div>
-            <span style="font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 2rem; letter-spacing: -0.03em; line-height: 1; text-transform: uppercase; color: #0a0a0a;">Siga La Pelota</span>
-            <div style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: #666; font-family: 'Inter', sans-serif; margin-top: 2px;">Diário da Cobertura de Futebol • Edição Especial de Rodada</div>
+      <!-- Topo / Barra de Marca Siga La Pelota News -->
+      <div style="background: #c4170c; color: #ffffff; padding: 14px 28px; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+          <!-- Badge de Alto Contraste para Evidenciar o Logo Siga La Pelota sobre o Vermelho -->
+          <div style="background: #ffffff; padding: 4px 8px; border-radius: 8px; border: 2px solid #facc15; box-shadow: 0 4px 12px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center;">
+            <img src="/assets/siga_logo.png" style="width: 44px; height: 44px; object-fit: contain;" alt="Siga La Pelota" onerror="this.onerror=null; this.src='/assets/siga_la_pelota_logo.png';" />
+          </div>
+          <span style="background: rgba(255,255,255,0.25); width: 1px; height: 26px;"></span>
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 1.02rem; font-family: 'Outfit', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: #ffffff;">SIGA LA PELOTA <span style="color: #facc15;">NEWS</span></span>
+            <span style="font-size: 0.72rem; color: rgba(255,255,255,0.9); font-weight: 700; letter-spacing: 0.05em;">PORTAL OFICIAL DO MODO CARREIRA</span>
           </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 14px;">
-          ${clubCrest ? `<img src="${clubCrest}" style="width: 34px; height: 34px; object-fit: contain;" />` : ''}
-          <div style="text-align: right; font-family: 'Inter', sans-serif;">
-            <div class="editable-field" contenteditable="true" id="editableNewsClubName" style="font-weight: 800; font-size: 0.88rem; text-transform: uppercase; color: #111; padding: 1px 4px;" title="Clique para editar clube">${clubName}</div>
-            <div style="font-size: 0.75rem; color: #666;">${dateStr}</div>
+        <div style="display: flex; align-items: center; gap: 12px; font-size: 0.82rem;">
+          ${clubCrest ? `<img src="${clubCrest}" style="width: 28px; height: 28px; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));" />` : ''}
+          <div style="text-align: right;">
+            <div class="editable-field" contenteditable="true" id="editableNewsClubName" style="font-weight: 800; text-transform: uppercase; color: #ffffff; padding: 1px 4px;" title="Clique para editar clube">${clubName}</div>
+            <div style="font-size: 0.72rem; color: rgba(255,255,255,0.8);">${dateStr}</div>
           </div>
         </div>
       </div>
 
-      <!-- Manchete e Linha Fina (Editáveis) -->
-      <div style="margin-bottom: 20px; border-bottom: 1px solid #1a1a1a; padding-bottom: 16px;">
-        <h1 class="editable-field" contenteditable="true" id="editableNewsHeadline" style="font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 2.1rem; line-height: 1.15; color: #0a0a0a; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: -0.02em; padding: 2px 4px;" title="Clique para editar a manchete">
-          ${news.headline || news.title || 'DESTAQUE DA RODADA'}
+      <div style="padding: 32px 36px;">
+        
+        <!-- Chapéu / Categoria -->
+        <div style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #c4170c; margin-bottom: 8px;">
+          ${(news.competition || window.SocialStudioState?.lastMatchCompetition || 'COPA DO BRASIL 2030').toUpperCase()}
+        </div>
+
+        <!-- Manchete Principal (Editável) -->
+        <h1 class="editable-field" contenteditable="true" id="editableNewsHeadline" style="font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 2.35rem; line-height: 1.15; color: #090d16; margin: 0 0 14px 0; letter-spacing: -0.025em; padding: 2px 4px;" title="Clique para editar a manchete">
+          ${news.headline || news.title || 'DESTAQUE DA COBERTURA ESPORTIVA'}
         </h1>
-        <h2 class="editable-field" contenteditable="true" id="editableNewsSubtitle" style="font-family: 'Inter', sans-serif; font-weight: 500; font-size: 1.05rem; line-height: 1.4; color: #444; margin: 0; font-style: italic; padding: 2px 4px;" title="Clique para editar o subtítulo">
+
+        <!-- Linha Fina / Subtítulo (Editável) -->
+        <h2 class="editable-field" contenteditable="true" id="editableNewsSubtitle" style="font-family: 'Inter', sans-serif; font-weight: 400; font-size: 1.15rem; line-height: 1.45; color: #475569; margin: 0 0 20px 0; padding: 2px 4px;" title="Clique para editar o subtítulo">
           ${news.subtitle || ''}
         </h2>
-      </div>
 
-      <!-- Assinatura do Jornalista -->
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 18px; font-family: 'Inter', sans-serif; font-size: 0.82rem; color: #444; text-transform: uppercase; letter-spacing: 0.05em; border-left: 3px solid var(--accent-gold); padding-left: 10px;">
-        <span>Por <strong class="editable-field" contenteditable="true" id="editableNewsJournalist" style="padding: 1px 4px;" title="Clique para editar o jornalista">${journalist}</strong></span>
-        <span>•</span>
-        <span>Direto da Redação</span>
-      </div>
-
-      <!-- Layout em Duas Colunas Estilo Folha de Notícias -->
-      <div style="display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; font-size: 0.95rem; line-height: 1.6; text-align: justify;">
-        
-        <!-- Coluna da Esquerda: Texto Principal (Editável) -->
-        <div>
-          <p class="editable-field" contenteditable="true" id="editableNewsLead" style="text-indent: 1.5rem; margin: 0 0 12px 0; padding: 2px 4px;" title="Clique para editar parágrafo">
-            ${news.lead || (news.body ? news.body.split('\n')[0] : '')}
-          </p>
-          <p class="editable-field" contenteditable="true" id="editableNewsP1" style="text-indent: 1.5rem; margin: 0 0 12px 0; padding: 2px 4px;" title="Clique para editar parágrafo">
-            ${news.analysis_paragraph_1 || ''}
-          </p>
+        <!-- Assinatura / Metadata da Matéria -->
+        <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; padding: 12px 4px; margin-bottom: 24px; font-size: 0.82rem; color: #64748b;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <img src="/assets/avatars/sigalapelotanews.png" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 1px solid #cbd5e1;" onerror="this.src='/assets/avatars/AndreRizek.jpg'" />
+            <div>
+              <div>Por <strong class="editable-field" contenteditable="true" id="editableNewsJournalist" style="color: #0f172a; padding: 1px 4px;" title="Clique para editar o jornalista">${journalist}</strong> — Rio de Janeiro</div>
+              <div style="font-size: 0.74rem; color: #94a3b8;">${dateStr} • Atualizado há 15 minutos</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="background: #f1f5f9; padding: 4px 10px; border-radius: 20px; font-weight: 600; color: #334155; font-size: 0.75rem;">3 min de leitura</span>
+          </div>
         </div>
 
-        <!-- Coluna da Direita: Imagem/Clipe + Análise Final (Editável) -->
-        <div>
-          ${mediaColumnHtml}
-          <p class="editable-field" contenteditable="true" id="editableNewsP2" style="text-indent: 1.5rem; margin: 0; padding: 2px 4px;" title="Clique para editar parágrafo">
-            ${news.analysis_paragraph_2 || ''}
-          </p>
+        <!-- PLAYER RETANGULAR 16:9 AMPLO CENTRALIZADO (ESTILO GE) -->
+        ${mediaWideHtml}
+
+        <!-- CORPO DA MATÉRIA: LINHA SUPERIOR (LEAD + BANNER PATROCINADOR ESTILO GE) -->
+        <div style="display: grid; grid-template-columns: 1fr 340px; gap: 28px; align-items: stretch; margin-bottom: 24px;">
+          
+          <!-- Coluna Esquerda: Lead da Matéria -->
+          <div style="font-size: 1.05rem; line-height: 1.75; color: #1e293b; display: flex; flex-direction: column; justify-content: center;">
+            <p class="editable-field" contenteditable="true" id="editableNewsLead" style="font-size: 1.14rem; font-weight: 500; color: #0f172a; margin: 0; line-height: 1.7; padding: 2px 4px;" title="Clique para editar parágrafo">
+              ${news.lead || (news.body ? news.body.split('\n')[0] : `O <strong>${clubName}</strong> de Beto Junior mantém ritmo forte na temporada e consolida sua estratégia rumo aos grandes objetivos da competição.`)}
+            </p>
+          </div>
+
+          <!-- Coluna Direita: Box Editorial Dinâmico (Tabela G-4 & Próximo Confronto do Calendário) -->
+          ${buildNewsSideWidgetHtml(news, clubName)}
+
         </div>
 
-      </div>
+        <!-- BLOCOS DE TEXTO SEGUINTES: LARGURA TOTAL ESTILO PORTAL DE NOTÍCIAS -->
+        <div style="font-size: 1.05rem; line-height: 1.75; color: #1e293b; text-align: left;">
+          
+          <!-- Parágrafo de Apuração / Bastidores Siga La Pelota -->
+          <p class="editable-field" contenteditable="true" id="editableNewsP1" style="margin: 0 0 20px 0; padding: 2px 4px;" title="Clique para editar parágrafo">
+            ${news.analysis_paragraph_1 || `O <strong>Siga La Pelota</strong> apurou que a comissão técnica de Beto Junior já traçou o planejamento estratégico para a sequência da temporada, priorizando a consistência física e o entrosamento do elenco titular.`}
+          </p>
 
-      <!-- Rodapé do Jornal com Patrocínio / Assinatura -->
-      <div style="margin-top: 24px; padding-top: 12px; border-top: 1px solid #ccc; display: flex; align-items: center; justify-content: space-between; font-family: 'Inter', sans-serif; font-size: 0.72rem; color: #777;">
-        <span>© 2026-2027 Portal Siga La Pelota • Todos os direitos reservados</span>
-        <span>Carreira Vault • Arquivo Oficial</span>
+          <!-- Box de Aspas / Declaração de Beto Junior -->
+          <div style="border-left: 4px solid #c4170c; padding: 14px 22px; background: #f8fafc; margin: 26px 0; border-radius: 0 8px 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+            <div class="editable-field" contenteditable="true" id="editableNewsQuote" style="font-style: italic; color: #0f172a; font-weight: 500; font-size: 1.08rem; line-height: 1.55; padding: 2px 4px;" title="Clique para editar as aspas">
+              "${news.quote || 'Estamos trabalhando forte com pés no chão para manter o Madureira competindo no mais alto nível a cada rodada.'}"
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 8px; font-weight: 700; text-transform: uppercase;">
+              — Beto Junior, técnico do ${clubName}
+            </div>
+          </div>
+
+          <!-- Parágrafo 3 (Desdobramentos e Futuro da Temporada) -->
+          <p class="editable-field" contenteditable="true" id="editableNewsP2" style="margin: 0 0 24px 0; padding: 2px 4px;" title="Clique para editar parágrafo">
+            ${news.analysis_paragraph_2 || `A diretoria comemora a solidez tática e os números alcançados, projetando os próximos confrontos decisivos com força máxima diante da torcida.`}
+          </p>
+
+          <!-- Box de Cenário da Temporada / Tabela & Dados Reais -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin-top: 16px;">
+            <div style="font-weight: 800; text-transform: uppercase; font-size: 0.78rem; letter-spacing: 0.06em; color: #c4170c; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="info" style="width: 15px; height: 15px;"></i>
+              <span>Cenário da Temporada & Dados do Save</span>
+            </div>
+            <div class="editable-field" contenteditable="true" id="editableNewsSidebar" style="font-size: 0.92rem; color: #334155; line-height: 1.6; padding: 2px 4px;" title="Clique para editar o resumo da temporada">
+              ${news.sidebar_info || `O ${clubName} de Beto Junior mantém alta regularidade na temporada 2030, figurando entre os principais competidores do futebol nacional.`}
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Rodapé Editorial -->
+        <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; font-size: 0.75rem; color: #94a3b8;">
+          <span>© 2026-2030 Portal Siga La Pelota • Central de Cobertura Esportiva</span>
+          <span>Carreira Ativa: Beto Junior • Madureira</span>
+        </div>
+
       </div>
 
     </div>
@@ -1320,6 +1589,15 @@ window.saveEditedCardContent = async function() {
 
   const editP2 = document.getElementById("editableNewsP2");
   if (editP2) post.newspaper.analysis_paragraph_2 = editP2.innerText.trim();
+
+  const editCaption = document.getElementById("editableNewsCaption");
+  if (editCaption) post.newspaper.caption = editCaption.innerText.trim();
+
+  const editQuote = document.getElementById("editableNewsQuote");
+  if (editQuote) post.newspaper.quote = editQuote.innerText.trim().replace(/^["']|["']$/g, '');
+
+  const editSidebar = document.getElementById("editableNewsSidebar");
+  if (editSidebar) post.newspaper.sidebar_info = editSidebar.innerText.trim();
 
   // 3. Salva no banco de dados SQLite
   try {

@@ -83,6 +83,11 @@ def get_search_roots():
 def find_career_files():
     """Retorna lista de caminhos candidatos para DADOS_CARREIRA.json em ordem de prioridade."""
     candidates = []
+    # Prioridade máxima: diretório local da aplicação
+    local_main = os.path.join(BASE_DIR, "DADOS_CARREIRA.json")
+    if os.path.exists(local_main):
+        candidates.append(local_main)
+
     folders = ["Imersao_Modo_Carreira", "Imersão_Modo_Carreira", "App_Modo_carreira", "Dados_Carreira_FC", ""]
     filenames = ["DADOS_CARREIRA.json", "FC_CAREER_VAULT_BACKUP.json", "dados_carreira_sync.json"]
     for root in get_search_roots():
@@ -100,6 +105,11 @@ def find_career_files():
 def find_youth_json_files():
     """Retorna lista de caminhos candidatos para BASE_JOVENS_EXTRAIDA.json."""
     candidates = []
+    # Prioridade máxima: diretório local da aplicação e scratch
+    for loc in [os.path.join(BASE_DIR, "BASE_JOVENS_EXTRAIDA.json"), os.path.join(BASE_DIR, "scratch", "BASE_JOVENS_EXTRAIDA.json")]:
+        if os.path.exists(loc) and loc not in candidates:
+            candidates.append(loc)
+
     folders = ["Imersao_Modo_Carreira", "Imersão_Modo_Carreira", "App_Modo_carreira", "Dados_Carreira_FC", "scratch", ""]
     filenames = ["BASE_JOVENS_EXTRAIDA.json", "base_jovens_extraida.json", "YOUTH_ACADEMY_PLAYERS.json"]
     for root in get_search_roots():

@@ -1,0 +1,1289 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sala de Coletiva SigaLaPelota TV • IA Conectada ao Save Ativo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cabinet+Grotesk:wght@700;800;900&family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+  :root {
+    --bg-main: #05080e;
+    --bg-panel: rgba(13, 19, 32, 0.95);
+    --bg-card: rgba(18, 26, 42, 0.92);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-gold: rgba(245, 158, 11, 0.35);
+    --gold: #f59e0b;
+    --gold-glow: rgba(245, 158, 11, 0.25);
+    --red-siga: #c4170c;
+    --red-siga-hover: #e01d10;
+    --green: #10b981;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg-main);
+    color: var(--text-primary);
+    font-family: 'Inter', sans-serif;
+    padding: 24px;
+    min-height: 100vh;
+    background-image: 
+      radial-gradient(circle at 10% 15%, rgba(196, 23, 12, 0.12) 0%, transparent 45%),
+      radial-gradient(circle at 90% 85%, rgba(245, 158, 11, 0.08) 0%, transparent 45%);
+  }
+
+  .container { max-width: 1260px; margin: 0 auto; }
+
+  /* Top Control Banner */
+  .control-banner {
+    background: linear-gradient(90deg, rgba(196, 23, 12, 0.25), rgba(245, 158, 11, 0.18));
+    border: 1px solid var(--border-gold);
+    border-radius: 14px;
+    padding: 14px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    backdrop-filter: blur(14px);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .cb-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .cb-logo-img {
+    width: 44px;
+    height: 44px;
+    object-fit: contain;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+  }
+  .cb-title {
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+    color: #fff;
+  }
+  .cb-subtitle {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+  .cb-status-badges {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .badge-live {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid #10b981;
+    color: #34d399;
+    font-size: 0.72rem;
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge-live-dot {
+    width: 7px;
+    height: 7px;
+    background: #34d399;
+    border-radius: 50%;
+    animation: pulse 1.2s infinite alternate;
+  }
+  @keyframes pulse { from { opacity: 0.4; } to { opacity: 1; } }
+
+  /* Match Context Bar */
+  .match-summary-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+  }
+  .msc-match {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .msc-team {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .msc-crest {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+  }
+  .msc-score {
+    font-family: 'Cabinet Grotesk', sans-serif;
+    font-size: 1.9rem;
+    font-weight: 900;
+    color: #facc15;
+    background: rgba(0,0,0,0.5);
+    padding: 2px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .msc-info-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .msc-sponsors-strip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+  .sponsor-pill {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  /* PRINCIPAL: CUTSCENE 3D E ESTÚDIO DA COLETIVA */
+  .press-studio-grid {
+    display: grid;
+    grid-template-columns: 2.2fr 1fr;
+    gap: 24px;
+    margin-bottom: 30px;
+  }
+
+  /* Cutscene 3D Card */
+  .cutscene-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border-gold);
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .cutscene-viewport {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    position: relative;
+    background: #000;
+    overflow: hidden;
+  }
+  .cutscene-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease;
+  }
+  .cutscene-overlay-live {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    background: rgba(196, 23, 12, 0.9);
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 900;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 0 16px rgba(196, 23, 12, 0.6);
+  }
+  .cutscene-caption {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.92) 100%);
+    padding: 28px 24px 14px;
+    font-size: 0.86rem;
+    color: #f1f5f9;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .cc-name {
+    font-family: 'Cabinet Grotesk', sans-serif;
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: #facc15;
+  }
+  .cc-role {
+    font-size: 0.75rem;
+    color: #cbd5e1;
+  }
+
+  /* Reporter Card (Ao lado) */
+  .reporter-stage-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+  }
+  .reporter-photo-wrap {
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: #0b111d;
+    position: relative;
+    overflow: hidden;
+    border-bottom: 2px solid var(--red-siga);
+  }
+  .reporter-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .reporter-badge-tag {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    background: rgba(196, 23, 12, 0.95);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 6px;
+    text-transform: uppercase;
+  }
+  .reporter-bio {
+    padding: 16px 20px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .rb-name {
+    font-weight: 800;
+    font-size: 1rem;
+    color: #fff;
+  }
+  .rb-handle {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+  }
+  .rb-status {
+    font-size: 0.78rem;
+    color: #34d399;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+  }
+
+  /* ÁREA DE DIÁLOGO E INTERAÇÃO COM GEMINI */
+  .interview-console {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 26px;
+    margin-bottom: 35px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+  }
+
+  /* Balão da Pergunta da IA */
+  .question-bubble-wrap {
+    background: var(--bg-card);
+    border-left: 5px solid var(--red-siga);
+    border-radius: 0 14px 14px 0;
+    padding: 20px 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  }
+  .qb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  .qb-source {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #f87171;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .qb-text {
+    font-size: 1.12rem;
+    line-height: 1.6;
+    color: #f8fafc;
+    font-weight: 500;
+  }
+  .btn-audio-speak {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border);
+    color: #fff;
+    padding: 5px 12px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .btn-audio-speak:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+
+  /* Área de Resposta do Treinador */
+  .answer-input-box {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .aib-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .aib-label {
+    font-weight: 800;
+    font-size: 0.95rem;
+    color: #facc15;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .speech-textarea {
+    width: 100%;
+    min-height: 110px;
+    background: rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: #fff;
+    font-size: 1.02rem;
+    line-height: 1.55;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .speech-textarea:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 16px var(--gold-glow);
+  }
+
+  /* Controles de Gravação de Voz e Envio */
+  .actions-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  .record-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .btn-voice {
+    background: var(--red-siga);
+    border: none;
+    color: #fff;
+    padding: 11px 22px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 0.92rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 15px rgba(196, 23, 12, 0.4);
+  }
+  .btn-voice:hover {
+    background: var(--red-siga-hover);
+    transform: translateY(-1px);
+  }
+  .btn-voice.recording {
+    background: #ef4444;
+    animation: voice-pulse 1s infinite alternate;
+  }
+  @keyframes voice-pulse {
+    from { box-shadow: 0 0 10px #ef4444; }
+    to { box-shadow: 0 0 25px #ef4444, 0 0 40px rgba(239, 68, 68, 0.6); }
+  }
+
+  .wave-bars {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    height: 22px;
+  }
+  .wave-bar {
+    width: 3px;
+    height: 100%;
+    background: #ef4444;
+    border-radius: 3px;
+    animation: wave-anim 0.8s infinite ease-in-out alternate;
+  }
+  .wave-bar:nth-child(2) { animation-delay: 0.15s; height: 70%; }
+  .wave-bar:nth-child(3) { animation-delay: 0.3s; height: 90%; }
+  .wave-bar:nth-child(4) { animation-delay: 0.45s; height: 50%; }
+  @keyframes wave-anim { from { transform: scaleY(0.3); } to { transform: scaleY(1); } }
+
+  .btn-send-answer {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border: none;
+    color: #fff;
+    padding: 11px 26px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 0.92rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.35);
+    transition: all 0.2s;
+  }
+  .btn-send-answer:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-1px);
+  }
+
+  /* Reação Dinâmica da IA */
+  .ai-reaction-card {
+    display: none;
+    margin-top: 20px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    border-radius: 12px;
+    padding: 16px 20px;
+    color: #a7f3d0;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  /* SEÇÃO DOS RESULTADOS GERADOS: JORNAL + REDES SOCIAIS */
+  .results-section {
+    display: none;
+    margin-top: 40px;
+  }
+  .rs-heading {
+    text-align: center;
+    margin-bottom: 26px;
+  }
+  .rs-title {
+    font-family: 'Cabinet Grotesk', sans-serif;
+    font-size: 1.9rem;
+    font-weight: 900;
+    letter-spacing: -0.5px;
+    color: #fff;
+  }
+
+  /* MATÉRIA OFICIAL PORTAL SIGA LA PELOTA NEWS (LAYOUT RETANGULAR 16:9) */
+  .news-sheet-card {
+    background: #ffffff;
+    color: #0f172a;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 35px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.65);
+    border: 1px solid #e2e8f0;
+  }
+  .ns-top-bar {
+    background: #c4170c;
+    color: #ffffff;
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ns-brand-group {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .ns-body {
+    padding: 34px 38px;
+  }
+  .ns-headline {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 900;
+    font-size: 2.35rem;
+    line-height: 1.15;
+    letter-spacing: -0.8px;
+    color: #090d16;
+    margin-bottom: 12px;
+  }
+  .ns-subtitle {
+    font-size: 1.15rem;
+    line-height: 1.45;
+    color: #475569;
+    font-weight: 500;
+    margin-bottom: 22px;
+  }
+  .ns-byline {
+    font-size: 0.8rem;
+    color: #64748b;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 10px 0;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .ns-player-frame {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 28px;
+    background: #000;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+  }
+  .ns-player-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .ns-caption-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.85) 100%);
+    color: #f1f5f9;
+    padding: 24px 20px 12px;
+    font-size: 0.85rem;
+  }
+  .ns-content-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 32px;
+  }
+  .ns-paragraphs p {
+    font-size: 1.05rem;
+    line-height: 1.75;
+    color: #1e293b;
+    margin-bottom: 18px;
+  }
+  .ns-quote-box {
+    background: #f8fafc;
+    border-left: 5px solid #c4170c;
+    padding: 20px 24px;
+    border-radius: 0 12px 12px 0;
+    margin: 24px 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  }
+  .ns-quote-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #c4170c;
+    margin-bottom: 6px;
+    letter-spacing: 0.5px;
+  }
+  .ns-quote-text {
+    font-size: 1.18rem;
+    font-weight: 600;
+    font-style: italic;
+    color: #0f172a;
+    line-height: 1.5;
+  }
+  .ns-sidebar-box {
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 22px;
+    height: fit-content;
+  }
+  .ns-sidebar-title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1rem;
+    font-weight: 800;
+    color: #0f172a;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 2px solid #c4170c;
+    padding-bottom: 8px;
+  }
+
+  /* POST REDES SOCIAIS COM REAÇÕES DE GALVÃO, PEDRINHO, NETO, MAURO CEZAR */
+  .social-reactions-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 26px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+  }
+  .src-author {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .src-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  .src-text {
+    font-size: 1.08rem;
+    line-height: 1.6;
+    margin-bottom: 22px;
+    color: #f1f5f9;
+  }
+  .src-comments {
+    border-top: 1px solid var(--border);
+    padding-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .src-comment-item {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex;
+    gap: 14px;
+  }
+  .src-comm-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  .src-comm-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .src-comm-name {
+    font-weight: 800;
+    font-size: 0.88rem;
+    color: #fff;
+  }
+  .src-comm-role {
+    font-size: 0.68rem;
+    background: rgba(245, 158, 11, 0.2);
+    color: #facc15;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 700;
+  }
+  .src-comm-body {
+    font-size: 0.93rem;
+    line-height: 1.5;
+    color: #cbd5e1;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <!-- BANNER DE CONTROLE -->
+  <div class="control-banner">
+    <div class="cb-brand">
+      <img src="/assets/siga_logo.png" class="cb-logo-img" alt="Siga La Pelota Logo">
+      <div>
+        <div class="cb-title">Sala de Coletiva SigaLaPelota TV • Transmissão & IA Oficial</div>
+        <div class="cb-subtitle">Conectado em tempo real ao banco de dados do save ativo (Temporada 2030)</div>
+      </div>
+    </div>
+    <div class="cb-status-badges">
+      <div class="badge-live"><span class="badge-live-dot"></span> IA GEMINI CONECTADA</div>
+      <div class="badge-live" style="border-color: var(--gold); color: #facc15;">🏆 BRASILEIRÃO 2030: MADUREIRA LÍDER (82 PTS)</div>
+    </div>
+  </div>
+
+  <!-- RESUMO DA PARTIDA REAL DO SAVE -->
+  <div class="match-summary-card">
+    <div class="msc-match">
+      <div class="msc-team">
+        <img src="/assets/crest/l112810.png" class="msc-crest" id="homeCrest" onerror="this.src='/assets/default_crest.png'">
+        <span style="font-weight: 800; font-size: 1.1rem;" id="homeTeamName">Madureira</span>
+      </div>
+      <div class="msc-score" id="matchScore">2 - 0</div>
+      <div class="msc-team">
+        <img src="/assets/crest/l1041.png" class="msc-crest" id="awayCrest" onerror="this.src='/assets/default_crest.png'">
+        <span style="font-weight: 800; font-size: 1.1rem;" id="awayTeamName">Athletico Paranaense</span>
+      </div>
+    </div>
+
+    <div class="msc-info-meta">
+      <span style="font-size: 0.8rem; font-weight: 700; color: #34d399;">Brasileirão Série A • Reta Final 2030</span>
+      <div class="msc-sponsors-strip">
+        <span>Patrocinadores Reais:</span>
+        <span class="sponsor-pill">Samsung (Máster)</span>
+        <span class="sponsor-pill">Unimed (Mangas)</span>
+        <span class="sponsor-pill">Uber (Calção)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENÁRIO 3D: CUTSCENE CINEMATOGRÁFICA + REPÓRTER -->
+  <div class="press-studio-grid">
+    
+    <!-- Cutscene 3D da Bancada com Backdrop Oficial -->
+    <div class="cutscene-card">
+      <div class="cutscene-viewport">
+        <span class="cutscene-overlay-live"><span class="badge-live-dot" style="background: #fff;"></span> AO VIVO NA SIGALAPELOTA TV</span>
+        <img src="/assets/coletiva/coletiva_press_scene.jpg" class="cutscene-img" alt="Coletiva Beto Junior EA FC 26">
+        <div class="cutscene-caption">
+          <div>
+            <div class="cc-name" id="managerName">BETO JUNIOR</div>
+            <div class="cc-role" id="managerRole">Técnico • Atual Campeão Brasileiro & Carioca</div>
+          </div>
+          <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600;">
+            Backdrop Oficial: Samsung • Unimed • Uber • SigaLaPelota TV
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Repórter 3D da SigaLaPelota TV -->
+    <div class="reporter-stage-card">
+      <div class="reporter-photo-wrap">
+        <img src="/assets/coletiva/reporter_sigalapelota.jpg" class="reporter-img" alt="Repórter SigaLaPelota TV">
+        <span class="reporter-badge-tag">SigaLaPelota TV</span>
+      </div>
+      <div class="reporter-bio">
+        <div>
+          <div class="rb-name" id="reporterNameLabel">Lucas Silveira</div>
+          <div class="rb-handle">Repórter Setorista do Madureira</div>
+        </div>
+        <div class="rb-status">
+          <i data-lucide="mic" style="width: 14px; height: 14px;"></i> Credencial Oficial de Imprensa #042
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CONSOLE INTERATIVO DE ENTREVISTA (VOZ & TEXTO LIVRE) -->
+  <div class="interview-console">
+    
+    <!-- Pergunta Formulada pela IA com Base nos Dados Reais -->
+    <div class="question-bubble-wrap">
+      <div class="qb-header">
+        <span class="qb-source">
+          <i data-lucide="radio"></i> Pergunta da Imprensa • Pergunta <span id="qIndexLabel">1</span> de 2
+        </span>
+        <button class="btn-audio-speak" onclick="narrateQuestion()">
+          <i data-lucide="volume-2"></i> Ouvir Pergunta
+        </button>
+      </div>
+      <div class="qb-text" id="questionText">
+        "Professor Beto Junior, boa noite! O Madureira confirmou mais uma atuação contundente na vitória por 2 a 0 sobre o Athletico Paranaense, mantendo a liderança isolada e caminhando a passos largos rumo à conquista histórica do Brasileirão. O time dominou o meio-campo com César Araújo e neutralizou qualquer investida adversária. Qual foi a principal leitura tática trabalhada por você nos treinos para manter essa imposição defensiva e ofensiva nessa reta decisiva?"
+      </div>
+    </div>
+
+    <!-- Área de Resposta do Treinador -->
+    <div class="answer-input-box">
+      <div class="aib-header">
+        <span class="aib-label">
+          <i data-lucide="message-square"></i> Sua Resposta Oficial como Técnico Beto Junior:
+        </span>
+        <span style="font-size: 0.8rem; color: var(--text-secondary);">
+          Fale livremente pelo microfone ou digite sua análise. A IA interpretará seu raciocínio.
+        </span>
+      </div>
+
+      <textarea id="coachAnswerInput" class="speech-textarea" placeholder="Clique em 'Gravar por Voz' e fale no microfone (ou digite aqui sua análise como técnico do Madureira)..."></textarea>
+
+      <div class="actions-bar">
+        <div class="record-group">
+          <button class="btn-voice" id="btnMicRecord" onclick="toggleVoiceRecording()">
+            <i data-lucide="mic"></i> <span id="micLabel">Gravar por Voz</span>
+          </button>
+          <div class="wave-bars" id="audioWaveBars">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+          </div>
+          <span id="speechStatus" style="font-size: 0.82rem; color: #ef4444; font-weight: 700; display: none;">
+            Gravando... Fale agora!
+          </span>
+        </div>
+
+        <button class="btn-send-answer" id="btnSubmitAnswer" onclick="sendAnswerToAI()">
+          <i data-lucide="send"></i> Responder Coletiva com IA
+        </button>
+      </div>
+
+      <!-- Card de Reação da IA -->
+      <div class="ai-reaction-card" id="aiReactionBox">
+        <div style="font-weight: 800; color: #34d399; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+          <i data-lucide="check-circle-2"></i> Reação da SigaLaPelota TV:
+        </div>
+        <div id="aiReactionMsg"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SEÇÃO DE RESULTADOS GERADOS PELA IA (MATÉRIA RETANGULAR + REAÇÕES) -->
+  <div class="results-section" id="resultsSection">
+    
+    <div class="rs-heading">
+      <h2 class="rs-title">Cobertura Oficial Siga La Pelota News</h2>
+      <p style="font-size: 0.9rem; color: var(--text-secondary);">Matéria do portal e repercussão das personalidades esportivas</p>
+    </div>
+
+    <!-- PRODUTO 1: MATÉRIA RETANGULAR NO PADRÃO SIGA LA PELOTA NEWS -->
+    <div class="news-sheet-card">
+      <div class="ns-top-bar">
+        <div class="ns-brand-group">
+          <img src="/assets/siga_logo.png" style="width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));" alt="Siga La Pelota">
+          <span style="background: rgba(255,255,255,0.25); width: 1px; height: 22px;"></span>
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 0.95rem; font-family: 'Outfit', sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: 0.04em; color: #ffffff;">SIGA LA PELOTA <span style="color: #facc15;">NEWS</span></span>
+            <span style="font-size: 0.7rem; color: rgba(255,255,255,0.85); font-weight: 600; letter-spacing: 0.05em;">PORTAL OFICIAL DO MODO CARREIRA</span>
+          </div>
+        </div>
+        <div style="font-size: 0.8rem; font-weight: 800; color: #fff;">
+          BRASILEIRÃO 2030 • COLETIVA EXCLUSIVA
+        </div>
+      </div>
+
+      <div class="ns-body">
+        <h1 class="ns-headline" id="resHeadline">
+          Beto Junior exalta consistência do Madureira na vitória por 2 a 0: "Nossa entrega tática foi perfeita"
+        </h1>
+
+        <div class="ns-subtitle" id="resSubtitle">
+          Com gols decisivos e controle absoluto, líder do campeonato chega a 82 pontos; treinador parabeniza o grupo pelo foco.
+        </div>
+
+        <div class="ns-byline">
+          <span>Por <b>Lucas Silveira e Redação SigaLaPelota TV</b> — Rio de Janeiro</span>
+          <span id="resDate">Atualizado há poucos instantes</span>
+        </div>
+
+        <!-- Player 16:9 Centralizado com a Cutscene Oficial -->
+        <div class="ns-player-frame">
+          <img src="/assets/coletiva/coletiva_press_scene.jpg" class="ns-player-img" alt="Beto Junior na Coletiva">
+          <div class="ns-caption-overlay" id="resCaption">
+            Beto Junior durante entrevista coletiva concedida à SigaLaPelota TV no Estádio Aniceto Moscoso. (Foto: Reprodução / SigaLaPelota TV)
+          </div>
+        </div>
+
+        <div class="ns-content-grid">
+          <div class="ns-paragraphs">
+            <p id="resLeadParagraph">
+              Em mais uma demonstração de maturidade competitiva, o <b>Madureira Esporte Clube</b> superou o Athletico Paranaense por 2 a 0. O treinador <b>Beto Junior</b> destacou a obediência tática da equipe, ressaltando que o clube manteve o equilíbrio do início ao fim.
+            </p>
+
+            <!-- Box de Aspas -->
+            <div class="ns-quote-box">
+              <div class="ns-quote-title">Aspas do Professor Beto Junior</div>
+              <div class="ns-quote-text" id="resQuoteBox">
+                "Nossa entrega tática foi perfeita. Sabíamos da importância de somar os três pontos e o elenco cumpriu rigorosamente tudo o que planejamos nos treinamentos."
+              </div>
+            </div>
+
+            <p id="resTacticalParagraph">
+              O meio-campo comandado por César Araújo e a mobilidade ofensiva de peças como Richarlison e Gabriel Mec foram determinantes para desmontar o bloqueio rival. A vitória consolida a impressionante marca de 82 pontos na liderança do Brasileirão.
+            </p>
+          </div>
+
+          <!-- Sidebar -->
+          <div class="ns-sidebar-box">
+            <div class="ns-sidebar-title">
+              <i data-lucide="trophy"></i> Brasileirão 2030 (Topo)
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-bottom: 16px;">
+              <thead>
+                <tr style="color: #64748b; border-bottom: 1px solid #cbd5e1; text-align: left;">
+                  <th style="padding: 6px 4px;">Clube</th>
+                  <th style="padding: 6px 4px;">J</th>
+                  <th style="padding: 6px 4px;">PTS</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="color: #10b981; font-weight: 800; border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 6px 4px;">1. Madureira</td>
+                  <td style="padding: 6px 4px;">38</td>
+                  <td style="padding: 6px 4px;">82</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 6px 4px;">2. Flamengo</td>
+                  <td style="padding: 6px 4px;">38</td>
+                  <td style="padding: 6px 4px;">73</td>
+                </tr>
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 6px 4px;">3. Vasco da Gama</td>
+                  <td style="padding: 6px 4px;">38</td>
+                  <td style="padding: 6px 4px;">69</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <div class="ns-sidebar-title" style="margin-top: 14px;">
+              <i data-lucide="award"></i> Patrocinadores do Clube
+            </div>
+            <div style="font-size: 0.8rem; color: #334155; line-height: 1.5;">
+              • Máster: <b>Samsung</b><br>
+              • Mangas: <b>Unimed</b><br>
+              • Calção: <b>Uber</b><br>
+              • Transmissão: <b>SigaLaPelota TV</b>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRODUTO 2: POST DAS REDES SOCIAIS COM COMENTÁRIOS DE GALVÃO, PEDRINHO, NETO, MAURO CEZAR -->
+    <div class="social-reactions-card">
+      <div class="src-author">
+        <img src="/assets/siga_logo.png" class="src-avatar" alt="SigaLaPelota TV">
+        <div>
+          <div style="font-weight: 800; font-size: 0.95rem;">SigaLaPelota TV <i data-lucide="check-circle" style="width: 14px; height: 14px; color: #3b82f6; vertical-align: middle;"></i></div>
+          <div style="font-size: 0.78rem; color: var(--text-muted);">@SigaLaPelotaTV • Canal Oficial</div>
+        </div>
+      </div>
+
+      <div class="src-text" id="resTweetText">
+        COLETIVA! 🎙️ Beto Junior analisa a grande fase do Madureira: "Nossa entrega tática foi perfeita e o grupo merece essa liderança comemorada." Veja as reações! 🔴🟡 #Madureira #Brasileirao #SigaLaPelota
+      </div>
+
+      <!-- Comentários das Personalidades -->
+      <div class="src-comments" id="resCommentsList">
+        <!-- Renderizado dinamicamente -->
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  lucide.createIcons();
+
+  const API_BASE = (window.location.protocol === 'file:' || !window.location.port) ? 'http://localhost:8000' : '';
+
+  let liveCareerData = null;
+  let pressQuestions = [
+    {
+      reporter_name: "Lucas Silveira (SigaLaPelota TV)",
+      question: "Professor Beto Junior, boa noite! O Madureira confirmou mais uma atuação contundente na vitória por 2 a 0 sobre o Athletico Paranaense, mantendo a liderança isolada e caminhando a passos largos rumo à conquista histórica do Brasileirão. O time dominou o meio-campo com César Araújo e neutralizou qualquer investida adversária. Qual foi a principal leitura tática trabalhada por você nos treinos para manter essa imposição defensiva e ofensiva nessa reta decisiva?"
+    },
+    {
+      reporter_name: "Camila Duarte (SigaLaPelota TV)",
+      question: "Professor, com 82 pontos conquistados e peças decisivas como Richarlison, Gabriel Mec e Angulo, o Madureira se consolida como a grande potência do futebol brasileiro. Como tem sido a gestão do vestiário e o controle físico para manter esse nível altíssimo jogo após jogo?"
+    }
+  ];
+  let currentQIndex = 0;
+
+  // Gerenciamento Estrito de Voz (Evita repetição de palavras)
+  let isRecording = false;
+  let recognition = null;
+  let finalTranscript = '';
+
+  // 1. Carregar Contexto Real do Banco de Dados
+  async function loadRealCareerContext() {
+    try {
+      const resp = await fetch(`${API_BASE}/api/press/context?save_id=carreira_ativa`);
+      if (resp.ok) {
+        liveCareerData = await resp.json();
+        renderContextInUI(liveCareerData);
+      }
+    } catch (e) {
+      console.warn("Usando fallback de contexto local conectado:", e);
+    }
+
+    // Carregar Perguntas Geradas via Gemini
+    try {
+      const qResp = await fetch(`${API_BASE}/api/press/questions?save_id=carreira_ativa`);
+      if (qResp.ok) {
+        const qData = await qResp.json();
+        if (qData.questions && qData.questions.length > 0) {
+          pressQuestions = qData.questions;
+          displayQuestion(0);
+        }
+      }
+    } catch (e) {
+      console.warn("Usando perguntas padrão baseadas na súmula real:", e);
+      displayQuestion(0);
+    }
+  }
+
+  function renderContextInUI(ctx) {
+    if (!ctx) return;
+    document.getElementById('managerName').textContent = ctx.manager_name || 'BETO JUNIOR';
+    document.getElementById('managerRole').textContent = `Técnico • ${ctx.manager_titles || 'Atual Campeão Brasileiro'}`;
+    
+    if (ctx.last_match) {
+      document.getElementById('homeTeamName').textContent = ctx.last_match.home_team_name || 'Madureira';
+      document.getElementById('awayTeamName').textContent = ctx.last_match.away_team_name || 'Adversário';
+      document.getElementById('matchScore').textContent = `${ctx.last_match.home_score} - ${ctx.last_match.away_score}`;
+    }
+  }
+
+  function displayQuestion(idx) {
+    if (!pressQuestions || pressQuestions.length === 0) return;
+    const q = pressQuestions[idx];
+    document.getElementById('qIndexLabel').textContent = `${idx + 1}`;
+    document.getElementById('reporterNameLabel').textContent = q.reporter_name.split('(')[0].trim();
+    document.getElementById('questionText').textContent = `"${q.question}"`;
+    document.getElementById('coachAnswerInput').value = "";
+    finalTranscript = '';
+  }
+
+  // 2. Narração da Pergunta por Voz (Speech Synthesis)
+  function narrateQuestion() {
+    const q = document.getElementById('questionText').textContent;
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(q);
+      u.lang = 'pt-BR';
+      u.rate = 1.05;
+      window.speechSynthesis.speak(u);
+    } else {
+      alert("Síntese de voz não suportada neste navegador.");
+    }
+  }
+
+  // 3. Gravação de Voz Corrigida (Sem Duplicações)
+  function toggleVoiceRecording() {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      alert("Seu navegador não suporta reconhecimento de voz nativo. Por favor, digite no campo de texto.");
+      return;
+    }
+
+    const btn = document.getElementById('btnMicRecord');
+    const label = document.getElementById('micLabel');
+    const waves = document.getElementById('audioWaveBars');
+    const status = document.getElementById('speechStatus');
+    const textarea = document.getElementById('coachAnswerInput');
+
+    if (isRecording) {
+      if (recognition) recognition.stop();
+      isRecording = false;
+      btn.classList.remove('recording');
+      label.textContent = "Gravar por Voz";
+      waves.style.display = 'none';
+      status.style.display = 'none';
+      return;
+    }
+
+    try {
+      recognition = new SpeechRec();
+      recognition.lang = 'pt-BR';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      // Inicializa com o que já estiver digitado
+      const baseText = textarea.value.trim() ? textarea.value.trim() + ' ' : '';
+
+      recognition.onstart = function() {
+        isRecording = true;
+        btn.classList.add('recording');
+        label.textContent = "Parar Gravação";
+        waves.style.display = 'flex';
+        status.style.display = 'inline-block';
+      };
+
+      recognition.onresult = function(event) {
+        let finalChunk = '';
+        let interimChunk = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalChunk += event.results[i][0].transcript + ' ';
+          } else {
+            interimChunk += event.results[i][0].transcript;
+          }
+        }
+        textarea.value = (baseText + finalChunk + interimChunk).trim();
+      };
+
+      recognition.onerror = function(event) {
+        console.warn("Speech error:", event.error);
+        isRecording = false;
+        btn.classList.remove('recording');
+        label.textContent = "Gravar por Voz";
+        waves.style.display = 'none';
+        status.style.display = 'none';
+      };
+
+      recognition.onend = function() {
+        isRecording = false;
+        btn.classList.remove('recording');
+        label.textContent = "Gravar por Voz";
+        waves.style.display = 'none';
+        status.style.display = 'none';
+      };
+
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao acionar microfone: " + e.message);
+    }
+  }
+
+  // 4. Enviar Resposta para a IA Processar
+  async function sendAnswerToAI() {
+    const textarea = document.getElementById('coachAnswerInput');
+    const answer = textarea.value.trim();
+    if (!answer) {
+      alert("Por favor, fale pelo microfone ou digite sua resposta para a imprensa.");
+      return;
+    }
+
+    if (isRecording && recognition) {
+      recognition.stop();
+    }
+
+    const currentQ = document.getElementById('questionText').textContent;
+    const btn = document.getElementById('btnSubmitAnswer');
+    btn.innerHTML = `<i data-lucide="loader" class="spin"></i> Processando com Gemini...`;
+    btn.disabled = true;
+
+    try {
+      let data = null;
+      try {
+        const resp = await fetch(`${API_BASE}/api/press/react`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            answer: answer,
+            question: currentQ,
+            save_id: 'carreira_ativa'
+          })
+        });
+        if (resp.ok) {
+          data = await resp.json();
+        }
+      } catch (e) {
+        console.warn("Servidor offline ou sem conexão, gerando via motor local:", e);
+      }
+
+      if (!data) {
+        // Fallback inteligente com dados do save
+        const cleanAns = answer.trim();
+        const shortQ = cleanAns.length > 85 ? cleanAns.substring(0, 82) + "..." : cleanAns;
+        data = {
+          reporter_reaction: `Excelente colocação, Professor Beto Junior. O foco na entrega coletiva e essa clareza tática explicam o porquê da campanha de 82 pontos no Brasileirão.`,
+          headline: `Beto Junior analisa fase mágica do Madureira no Brasileirão: "${shortQ}"`,
+          subtitle: `Após triunfo por 2 a 0 sobre o Athletico Paranaense, comandante valoriza dedicação do elenco e detalha plano de jogo em entrevista à SigaLaPelota TV.`,
+          lead_paragraph: `O Madureira segue fazendo história na temporada 2030. Com o técnico Beto Junior à beira do gramado, o Tricolor suburbano controlou as ações na vitória por 2 a 0 e manteve a liderança isolada. Na coletiva, o treinador fez questão de enaltecer o comprometimento de cada atleta.`,
+          quote_box: `"${cleanAns}"`,
+          tactical_paragraph: `A sustentação defensiva com César Araújo e Ayrton Costa, somada à criatividade de Gabriel Mec e presença de área de Richarlison e Angulo, reafirma o favoritismo absoluto do time nas competições nacionais.`,
+          social_post_text: `COLETIVA HISTÓRICA! 🎙️ Beto Junior: "${shortQ}". Acompanhe a repercussão completa e os comentários das personalidades no Siga La Pelota News! 🔴🟡 #Madureira #Brasileirao #SigaLaPelota`,
+          celebrity_reactions: [
+            { name: "Galvão Bueno", role: "Narrador Histórico", comment: `"Haja coração, amigos! Beto Junior falando com a firmeza de um verdadeiro campeão! Que trabalho espetacular no comando do Madureira!"` },
+            { name: "Pedrinho", role: "Comentarista Tático", comment: `"Muito lúcido o Beto Junior ao ressaltar: '${shortQ}'. O time não joga de forma reativa; propõe o jogo e fecha os espaços com extrema disciplina."` },
+            { name: "Craque Neto", role: "Os Donos da Bola", comment: `"Garotinho, o que esse Madureira do Beto Junior tá jogando de bola é uma sacanagem! Bateu 2 a 0 e o cara fala na coletiva com pé no chão! Tem que respeitar!"` },
+            { name: "Mauro Cezar", role: "Jornalista Crítico", comment: `"Declaração precisa e equilibrada. Sem ufanismo barato. O Madureira tem organização tática e elenco comprometido, méritos indiscutíveis do Beto Junior."` }
+          ]
+        };
+      }
+
+      // Exibe a Reação Imediata do Repórter
+      const reactionBox = document.getElementById('aiReactionBox');
+      const reactionMsg = document.getElementById('aiReactionMsg');
+      reactionBox.style.display = 'block';
+      reactionMsg.textContent = data.reporter_reaction || "Declaração de Beto Junior recebida com grande repercussão pela bancada da SigaLaPelota TV.";
+
+      // Renderiza os Resultados Finais
+      renderFinalResults(data, answer);
+
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao processar: " + err.message);
+    } finally {
+      btn.innerHTML = `<i data-lucide="send"></i> Responder Coletiva com IA`;
+      btn.disabled = false;
+      lucide.createIcons();
+    }
+  }
+
+  // 5. Renderizar a Matéria do Siga La Pelota News + Redes Sociais
+  function renderFinalResults(data, rawAnswer) {
+    document.getElementById('resHeadline').textContent = data.headline;
+    document.getElementById('resSubtitle').textContent = data.subtitle;
+    document.getElementById('resLeadParagraph').textContent = data.lead_paragraph;
+    document.getElementById('resQuoteBox').textContent = data.quote_box || `"${rawAnswer}"`;
+    document.getElementById('resTacticalParagraph').textContent = data.tactical_paragraph;
+    document.getElementById('resTweetText').textContent = data.social_post_text;
+
+    // Renderizar Comentários de Galvão Bueno, Pedrinho, Craque Neto e Mauro Cezar com Avatares Oficiais do App
+    const commList = document.getElementById('resCommentsList');
+    commList.innerHTML = '';
+
+    const officialAvatars = {
+      "Galvão Bueno": "/assets/avatars/galvao.png",
+      "Pedrinho": "/assets/avatars/pedrinho.png",
+      "Craque Neto": "/assets/avatars/neto.png",
+      "Mauro Cezar": "/assets/avatars/Mauro_Cezar.jpg"
+    };
+
+    if (data.celebrity_reactions) {
+      data.celebrity_reactions.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'src-comment-item';
+        const avatarUrl = c.avatar || officialAvatars[c.name] || "/assets/avatars/sigalapelotanews.png";
+        item.innerHTML = `
+          <img src="${avatarUrl}" class="src-comm-avatar" alt="${c.name}" onerror="this.src='/assets/avatars/sigalapelotanews.png'">
+          <div style="flex: 1;">
+            <div class="src-comm-header">
+              <span class="src-comm-name">${c.name}</span>
+              <span class="src-comm-role">${c.role}</span>
+            </div>
+            <div class="src-comm-body">${c.comment}</div>
+          </div>
+        `;
+        commList.appendChild(item);
+      });
+    }
+
+    const resSec = document.getElementById('resultsSection');
+    resSec.style.display = 'block';
+    resSec.scrollIntoView({ behavior: 'smooth' });
+    lucide.createIcons();
+  }
+
+  // Inicialização
+  loadRealCareerContext();
+</script>
+
+</body>
+</html>

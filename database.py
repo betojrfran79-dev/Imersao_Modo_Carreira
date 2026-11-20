@@ -744,12 +744,17 @@ def normalize_competition_name(raw_name):
     # 3. Séries do Brasileirão
     if "série b" in name_lower or "serie b" in name_lower:
         return "Brasileirão Série B"
-    if "série a" in name_lower or "serie a" in name_lower or name_lower in ("brasileirão", "brasileirao", "campeonato brasileiro"):
-        return "Brasileirão Série A"
     if "série c" in name_lower or "serie c" in name_lower:
         return "Brasileirão Série C"
     if "série d" in name_lower or "serie d" in name_lower:
         return "Brasileirão Série D"
+    if (
+        ("série a" in name_lower or "serie a" in name_lower)
+        and "enilive" not in name_lower
+        and "italia" not in name_lower
+        and "tim" not in name_lower
+    ) or name_lower in ("brasileirão", "brasileirao", "campeonato brasileiro"):
+        return "Brasileirão Série A"
         
     # 4. Copas Nacionais e Regionais
     if "supercopa" in name_lower:
@@ -834,7 +839,7 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
 
     def _comp_match_clause(comp_canonical):
         if comp_canonical == "Brasileirão Série A":
-            return "(competition_name IN ('Brasileirão Série A', 'Brasileirão', 'Campeonato Brasileiro') OR LOWER(competition_name) LIKE '%série a%' OR LOWER(competition_name) LIKE '%serie a%')", []
+            return "(competition_name IN ('Brasileirão Série A', 'Brasileirão', 'Campeonato Brasileiro') OR ((LOWER(competition_name) LIKE '%série a%' OR LOWER(competition_name) LIKE '%serie a%') AND LOWER(competition_name) NOT LIKE '%enilive%' AND LOWER(competition_name) NOT LIKE '%italia%'))", []
         if comp_canonical == "Copa Libertadores":
             return "(competition_name = 'Copa Libertadores' OR LOWER(competition_name) LIKE '%libertadores%')", []
         if comp_canonical == "Copa Sul-Americana":
@@ -932,15 +937,15 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
             cur.execute(f"""
             SELECT 
                 COUNT(*) as games,
-                SUM(CASE WHEN (user_team_id = home_team_id AND home_score > away_score) OR (user_team_id = away_team_id AND away_score > home_score) THEN 1 ELSE 0 END) as wins,
+                SUM(CASE WHEN ((user_team_id = home_team_id OR home_team_id = ?) AND home_score > away_score) OR ((user_team_id = away_team_id OR away_team_id = ?) AND away_score > home_score) THEN 1 ELSE 0 END) as wins,
                 SUM(CASE WHEN home_score = away_score THEN 1 ELSE 0 END) as draws,
-                SUM(CASE WHEN (user_team_id = home_team_id AND home_score < away_score) OR (user_team_id = away_team_id AND away_score < home_score) THEN 1 ELSE 0 END) as losses,
-                SUM(CASE WHEN user_team_id = home_team_id THEN home_score ELSE away_score END) as gf,
-                SUM(CASE WHEN user_team_id = home_team_id THEN away_score ELSE home_score END) as ga
+                SUM(CASE WHEN ((user_team_id = home_team_id OR home_team_id = ?) AND home_score < away_score) OR ((user_team_id = away_team_id OR away_team_id = ?) AND away_score < home_score) THEN 1 ELSE 0 END) as losses,
+                SUM(CASE WHEN (user_team_id = home_team_id OR home_team_id = ?) THEN home_score ELSE away_score END) as gf,
+                SUM(CASE WHEN (user_team_id = home_team_id OR home_team_id = ?) THEN away_score ELSE home_score END) as ga
             FROM matches
-            WHERE save_id = ? AND season_year = ? AND is_user_match = 1
+            WHERE save_id = ? AND season_year = ? AND (is_user_match = 1 OR home_team_id = ? OR away_team_id = ?)
               AND {c_clause}
-            """, [save_id, s_year] + c_params)
+            """, [s_team_id, s_team_id, s_team_id, s_team_id, s_team_id, s_team_id, save_id, s_year, s_team_id, s_team_id] + c_params)
             m_stat = cur.fetchone()
             g_cnt = m_stat["games"] or 0
             w_cnt = m_stat["wins"] or 0
@@ -1004,29 +1009,33 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                 u_score = h_score if is_home else a_score
                 opp_score = a_score if is_home else h_score
                 
+                is_two_legged = bool(latest_ko.get("is_two_legged"))
+                tie_incomplete = is_two_legged and (latest_ko.get("leg2_home_score") is None and latest_ko.get("agg_home_score") is None)
+
                 user_won_tie = False
                 user_lost_tie = False
                 
-                if w_id > 0:
-                    if (is_home and w_id == latest_ko["home_team_id"]) or (not is_home and w_id == latest_ko["away_team_id"]) or (s_team_id > 0 and w_id == s_team_id):
-                        user_won_tie = True
+                if not tie_incomplete:
+                    if w_id > 0:
+                        if (is_home and w_id == latest_ko["home_team_id"]) or (not is_home and w_id == latest_ko["away_team_id"]) or (s_team_id > 0 and w_id == s_team_id):
+                            user_won_tie = True
+                        else:
+                            user_lost_tie = True
                     else:
-                        user_lost_tie = True
-                else:
-                    if u_score > opp_score:
-                        user_won_tie = True
-                    elif opp_score > u_score:
-                        user_lost_tie = True
-                    else:
-                        pen_h = latest_ko.get("penalties_home_score")
-                        pen_a = latest_ko.get("penalties_away_score")
-                        if pen_h is not None and pen_a is not None:
-                            u_pen = pen_h if is_home else pen_a
-                            opp_pen = pen_a if is_home else pen_h
-                            if u_pen > opp_pen:
-                                user_won_tie = True
-                            elif opp_pen > u_pen:
-                                user_lost_tie = True
+                        if u_score > opp_score:
+                            user_won_tie = True
+                        elif opp_score > u_score:
+                            user_lost_tie = True
+                        else:
+                            pen_h = latest_ko.get("penalties_home_score")
+                            pen_a = latest_ko.get("penalties_away_score")
+                            if pen_h is not None and pen_a is not None:
+                                u_pen = pen_h if is_home else pen_a
+                                opp_pen = pen_a if is_home else pen_h
+                                if u_pen > opp_pen:
+                                    user_won_tie = True
+                                elif opp_pen > u_pen:
+                                    user_lost_tie = True
                                 
                 if is_final_round:
                     if user_won_tie:
@@ -1034,18 +1043,6 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                         trophy_won = 1
                         final_position = "Campeão (1º)"
                         position_numeric = 1
-                        
-                        trophy_title = f"Campeão do {c}"
-                        cur.execute("""
-                        SELECT id FROM manager_awards 
-                        WHERE save_id = ? AND season_year = ? AND award_type = 'TROPHY' AND (title = ? OR title LIKE ?)
-                        """, (save_id, s_year, trophy_title, f"%{c}%"))
-                        if not cur.fetchone():
-                            trophy_date = "17/10/2026" if str(s_year) == "2026" else (f"15/11/{s_year}" if s_year else datetime.date.today().strftime("%d/%m/%Y"))
-                            cur.execute("""
-                            INSERT INTO manager_awards (save_id, season_year, award_type, title, team_name, date_earned)
-                            VALUES (?, ?, 'TROPHY', ?, ?, ?)
-                            """, (save_id, s_year, trophy_title, s_team_name, trophy_date))
                     elif user_lost_tie:
                         status = "CONCLUÍDO"
                         trophy_won = 0
@@ -1085,7 +1082,7 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                         position_numeric = 4
             else:
                 cur.execute(f"""
-                SELECT competition_name, position, played, points 
+                SELECT competition_name, position, played, wins, draws, losses, goals_for, goals_against, points 
                 FROM standings 
                 WHERE save_id = ? AND season_year = ? 
                   AND {c_clause}
@@ -1093,6 +1090,16 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                 ORDER BY played DESC, id DESC LIMIT 1
                 """, [save_id, s_year] + c_params + [s_team_id, f"%{s_team_lower}%"])
                 st_row = cur.fetchone()
+                if st_row:
+                    st_played = int(st_row["played"] or 0)
+                    if st_played > g_cnt:
+                        g_cnt = st_played
+                        w_cnt = int(st_row["wins"] or 0)
+                        d_cnt = int(st_row["draws"] or 0)
+                        l_cnt = int(st_row["losses"] or 0)
+                        gf_cnt = int(st_row["goals_for"] or 0)
+                        ga_cnt = int(st_row["goals_against"] or 0)
+                        pts_cnt = int(st_row["points"] or ((w_cnt * 3) + d_cnt))
                 if st_row and st_row["position"] and st_row["position"] <= 24:
                     pos = st_row["position"]
                     c_full = st_row["competition_name"]
@@ -1140,18 +1147,31 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
                     cur.execute("DELETE FROM season_competitions WHERE id = ?", (existing_comp["id"],))
                 continue
 
-            # Preservar customização manual do usuário e colocações já finalizadas
+            # Preservar customização manual do usuário e colocações já finalizadas,
+            # MAS SEMPRE atualizar J, V, E, D, GP, GC e PTS quando novas partidas reais forem disputadas (g_cnt >= existing_comp["games_played"])!
             is_user_customized = existing_comp and (
                 ("is_manual" in existing_comp.keys() and existing_comp["is_manual"] == 1) or
                 existing_comp["status"] in ("CONCLUÍDO", "CAMPEÃO", "ELIMINADO")
             )
             if is_user_customized and existing_comp["final_position"]:
-                final_position = existing_comp["final_position"]
-                status = existing_comp["status"]
-                trophy_won = existing_comp["trophy_won"]
-                position_numeric = existing_comp["position_numeric"]
-                if existing_comp["games_played"] and existing_comp["games_played"] > 0:
-                    g_cnt = existing_comp["games_played"]
+                # Se a competição já estava finalizada (CAMPEÃO, CONCLUÍDO, ELIMINADO) ou foi travada manualmente,
+                # preserva o status/colocação manual (a menos que esteja EM_DISPUTA e o texto seja genérico)
+                if existing_comp["status"] in ("CONCLUÍDO", "CAMPEÃO", "ELIMINADO"):
+                    final_position = existing_comp["final_position"]
+                    status = existing_comp["status"]
+                    trophy_won = existing_comp["trophy_won"]
+                    position_numeric = existing_comp["position_numeric"]
+                elif existing_comp.get("is_manual") == 1 and existing_comp["status"] == "EM_DISPUTA":
+                    status = "EM_DISPUTA"
+                    trophy_won = 0
+                    if existing_comp["final_position"] not in ("Em Disputa", "Aguardando Início", ""):
+                        final_position = existing_comp["final_position"]
+
+                # Estatísticas de jogos (J, V, E, D, GP, GC):
+                # NUNCA congelar se o banco de partidas (g_cnt) já tem mais jogos reais registrados!
+                prev_gp = int(existing_comp.get("games_played") or 0)
+                if prev_gp > g_cnt:
+                    g_cnt = prev_gp
                     w_cnt = existing_comp["wins"]
                     d_cnt = existing_comp["draws"]
                     l_cnt = existing_comp["losses"]
@@ -1221,8 +1241,8 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
     ) AND save_id = ?
     """, (save_id, save_id))
 
-    # SINCRONIZAÇÃO PRESERVATIVA DA SALA DE TROFÉUS (manager_awards):
-    # Assegurar que títulos oficiais confirmados constem na Sala de Troféus sem sobrescrever edições do usuário
+    # SINCRONIZAÇÃO BIDIRECIONAL PRESERVATIVA DA SALA DE TROFÉUS (manager_awards):
+    # 1. Assegurar que títulos oficiais confirmados constem na Sala de Troféus (sem datas reais artificiais)
     cur.execute("""
     SELECT season_year, competition_name, team_name 
     FROM season_competitions 
@@ -1230,22 +1250,47 @@ def recalculate_competition_status_and_trophies(save_id="carreira_ativa", season
     """, (save_id,))
     won_comps = [dict(r) for r in cur.fetchall()]
     for wc in won_comps:
-        c_name = wc["competition_name"]
-        c_norm = c_name.lower().replace("campeonato ", "").replace("copa ", "").replace("brasileirão ", "").strip()
+        c_name = wc["competition_name"].strip()
         cur.execute("""
-        SELECT id, date_earned FROM manager_awards 
+        SELECT id FROM manager_awards 
         WHERE save_id = ? AND season_year = ? AND (
-            title LIKE ? OR LOWER(title) LIKE ?
+            LOWER(title) = LOWER(?)
+            OR LOWER(title) = LOWER('Campeão do ' || ?)
+            OR LOWER(title) = LOWER('Campeão da ' || ?)
+            OR LOWER(title) = LOWER('Campeão de ' || ?)
+            OR LOWER(title) = LOWER('Campeão ' || ?)
         )
-        """, (save_id, wc["season_year"], f"%{c_name}%", f"%{c_norm}%"))
+        """, (save_id, wc["season_year"], c_name, c_name, c_name, c_name, c_name))
         if not cur.fetchone():
-            wc_year = str(wc["season_year"])
-            trophy_date = "17/10/2026" if wc_year == "2026" else (f"15/11/{wc_year}" if wc_year else datetime.date.today().strftime("%d/%m/%Y"))
             trophy_title = f"Campeão da {c_name}" if "copa" in c_name.lower() or "liga" in c_name.lower() else f"Campeão do {c_name}"
             cur.execute("""
             INSERT INTO manager_awards (save_id, season_year, award_type, title, team_name, date_earned)
-            VALUES (?, ?, 'TROPHY', ?, ?, ?)
-            """, (save_id, wc["season_year"], trophy_title, wc["team_name"], trophy_date))
+            VALUES (?, ?, 'TROPHY', ?, ?, '')
+            """, (save_id, wc["season_year"], trophy_title, wc["team_name"]))
+
+    # 2. Reflexo Imediato: competições que NÃO foram vencidas (trophy_won = 0 ou status != 'CAMPEÃO') NÃO podem ter troféu na Sala de Troféus
+    cur.execute("""
+    SELECT season_year, competition_name 
+    FROM season_competitions 
+    WHERE save_id = ? AND (trophy_won = 0 OR status != 'CAMPEÃO')
+    """, (save_id,))
+    not_won = [dict(r) for r in cur.fetchall()]
+    for nw in not_won:
+        c_name = nw["competition_name"].strip()
+        if not c_name:
+            continue
+        cur.execute("""
+        DELETE FROM manager_awards 
+        WHERE save_id = ? AND season_year = ? AND award_type = 'TROPHY' AND (
+            LOWER(title) = LOWER(?)
+            OR LOWER(title) = LOWER('Campeão do ' || ?)
+            OR LOWER(title) = LOWER('Campeão da ' || ?)
+            OR LOWER(title) = LOWER('Campeão de ' || ?)
+            OR LOWER(title) = LOWER('Campeão dos ' || ?)
+            OR LOWER(title) = LOWER('Campeão das ' || ?)
+            OR LOWER(title) = LOWER('Campeão ' || ?)
+        )
+        """, (save_id, nw["season_year"], c_name, c_name, c_name, c_name, c_name, c_name, c_name))
             
     conn.commit()
     conn.close()
@@ -1498,8 +1543,29 @@ def sync_full_career(save_id, full_data, purge_previous=False):
             VALUES (?, ?, ?, ?, ?, ?, 1)
             """, (save_id, team_id, team_name, start_date, weekly_wage, total_salary))
 
-    # Partidas (Com verificação inteligente anti-duplicação)
+    # Partidas (Com verificação inteligente anti-duplicação e filtro estrito de competições disputadas pelo clube do usuário)
     matches = full_data.get("matches", [])
+    user_active_comps_norm = set()
+    cur.execute("SELECT competition_name FROM season_competitions WHERE save_id = ? AND season_year = ?", (save_id, str(season_year)))
+    for r_sc in cur.fetchall():
+        cn_norm = normalize_competition_name(r_sc["competition_name"])
+        if cn_norm:
+            user_active_comps_norm.add(cn_norm.lower())
+    for um in full_data.get("upcoming_matches", []):
+        cn_norm = normalize_competition_name(um.get("competicao") or um.get("competition_name"))
+        if cn_norm:
+            user_active_comps_norm.add(cn_norm.lower())
+    for m_pre in matches:
+        h_id_p = int(m_pre.get("home_team_id", 0))
+        a_id_p = int(m_pre.get("away_team_id", 0))
+        h_nm_p = m_pre.get("home_team_name", "")
+        a_nm_p = m_pre.get("away_team_name", "")
+        u_id_p = int(m_pre.get("user_team_id", team_id))
+        if m_pre.get("is_user_match") == 1 or (u_id_p and (h_id_p == u_id_p or a_id_p == u_id_p)) or (team_name and (h_nm_p == team_name or a_nm_p == team_name)):
+            cn_norm = normalize_competition_name(m_pre.get("competition_name"))
+            if cn_norm:
+                user_active_comps_norm.add(cn_norm.lower())
+
     for m in matches:
         m_date = sanitize_date_str(m.get("match_date", start_date), season_year)
         m_season = format_brazilian_season(m.get("season_year"), m_date)
@@ -1517,6 +1583,12 @@ def sync_full_career(save_id, full_data, purge_previous=False):
         motm_name = m.get("motm_player_name", "")
 
         is_u = 1 if (m.get("is_user_match") == 1 or (u_id and (h_id == u_id or a_id == u_id)) or (team_name and (h_name == team_name or a_name == team_name))) else 0
+
+        # Bloquear jogos de campeonatos que o clube do usuário NÃO disputa!
+        comp_norm = normalize_competition_name(comp) or comp
+        if not is_u and user_active_comps_norm and comp_norm.lower() not in user_active_comps_norm:
+            continue
+        comp = comp_norm
 
         cur.execute("""
         SELECT id, match_date FROM matches 
@@ -1654,49 +1726,237 @@ def sync_full_career(save_id, full_data, purge_previous=False):
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (save_id, t_season, p_id, p_name, from_id, from_name, to_id, to_name, fee, t_type, t_date))
 
-    # Classificações Estruturadas e Completas de Todas as Competições
+    # 🌟 Detecção Automática de Pré-Contratos / Agentes Livres / Chegadas ao Elenco
+    # Jogadores que ingressaram no clube do usuário com contrato assinado recente mas sem registro no buffer de compras da RAM
+    player_contracts = full_data.get("player_contracts", {})
+    if isinstance(player_contracts, dict) and player_contracts:
+        for p in full_data.get("players", []):
+            p_tid = int(p.get("team_id") or 0)
+            if p_tid != team_id:
+                continue
+            pid = int(p.get("player_id") or 0)
+            if not pid:
+                continue
+            c_info = player_contracts.get(str(pid)) or player_contracts.get(pid)
+            if not c_info or not isinstance(c_info, dict):
+                continue
+            c_date_raw = c_info.get("contract_date") or 0
+            if not c_date_raw:
+                continue
+            
+            c_date_str = str(c_date_raw)
+            c_month = "01"
+            if len(c_date_str) == 8:
+                c_year = c_date_str[:4]
+                c_month = c_date_str[4:6]
+                c_day = c_date_str[6:8]
+                formatted_c_date = f"{c_day}/{c_month}/{c_year}"
+            else:
+                formatted_c_date = f"01/01/{season_year}"
+                c_year = season_year
+
+            # Se o contrato iniciou no ano da temporada atual
+            if c_year == season_year or (int(c_year) == int(season_year) - 1 and int(c_month or 1) >= 12):
+                # Verificar se o jogador já pertencia ao clube em temporadas anteriores (Renovação de Contrato)
+                cur.execute("""
+                SELECT id FROM player_season_stats
+                WHERE save_id = ? AND player_id = ? AND (team_id = ? OR team_name LIKE ?) AND CAST(season_year AS INTEGER) < CAST(? AS INTEGER)
+                LIMIT 1
+                """, (save_id, pid, team_id, f"%{team_name}%", season_year))
+                was_already_at_club = cur.fetchone() is not None
+
+                if not was_already_at_club:
+                    cur.execute("""
+                    SELECT id FROM transfers
+                    WHERE save_id = ? AND player_id = ? AND to_team_id = ? AND CAST(season_year AS INTEGER) < CAST(? AS INTEGER)
+                    LIMIT 1
+                    """, (save_id, pid, team_id, season_year))
+                    if cur.fetchone():
+                        was_already_at_club = True
+
+                # Se o atleta já era do clube, trata-se de renovação salarial/contratual e NÃO de contratação nova!
+                if not was_already_at_club:
+                    cur.execute("""
+                    SELECT id FROM transfers
+                    WHERE save_id = ? AND player_id = ? AND to_team_id = ? AND season_year = ?
+                    """, (save_id, pid, team_id, season_year))
+                    if not cur.fetchone():
+                        # Buscar clube de origem no scout_live_players
+                        cur.execute("""
+                        SELECT team_id, team_name FROM scout_live_players
+                        WHERE save_id = ? AND player_id = ? AND team_id != ?
+                        ORDER BY id DESC LIMIT 1
+                        """, (save_id, pid, team_id))
+                        scout_orig = cur.fetchone()
+                        if scout_orig:
+                            orig_id = int(scout_orig["team_id"] or 0)
+                            orig_name = str(scout_orig["team_name"] or "Clube Anterior").strip()
+                        else:
+                            orig_id = 0
+                            orig_name = "Passes Livres"
+                        
+                        p_name = str(p.get("player_name") or f"Jogador #{pid}").strip()
+                        cur.execute("""
+                        INSERT INTO transfers (
+                            save_id, season_year, player_id, player_name, from_team_id, from_team_name,
+                            to_team_id, to_team_name, fee, transfer_type, transfer_date
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (save_id, season_year, pid, p_name, orig_id, orig_name, team_id, team_name, 0.0, 'BUY', formatted_c_date))
+
+    # Classificações Estruturadas e Completas de Todas as Competições (Suporta formato de tabelas_classificacao e de StandingsDataList)
     tabelas_classificacao = full_data.get("tabelas_classificacao", []) or full_data.get("competicoes_em_disputa", [])
     if tabelas_classificacao:
-        for c in tabelas_classificacao:
-            cname = c.get("nome_completo") or c.get("competicao", "Campeonato Principal")
-            tabela = c.get("tabela", [])
-            stage_order = int(c.get("comp_obj_id", 0))
-            if tabela:
-                cur.execute("DELETE FROM standings WHERE save_id = ? AND season_year = ? AND competition_name = ?", (save_id, season_year, cname))
-                for pos_idx, r in enumerate(tabela):
-                    pos = int(r.get("position") or r.get("posicao") or (pos_idx + 1))
-                    t_id = int(r.get("team_id", 0))
-                    t_name = str(r.get("team_name") or r.get("time") or "Clube").strip()
-                    played = int(r.get("played") or r.get("jogos") or 0)
-                    wins = int(r.get("wins") or r.get("vitorias") or 0)
-                    draws = int(r.get("draws") or r.get("empates") or 0)
-                    losses = int(r.get("losses") or r.get("derrotas") or 0)
-                    gf = int(r.get("goals_for") or r.get("gols_pro") or 0)
-                    ga = int(r.get("goals_against") or r.get("gols_contra") or 0)
-                    gd = int(r.get("goal_diff") or r.get("saldo_gols") or (gf - ga))
-                    pts = int(r.get("points") or r.get("pontos") or (wins * 3 + draws))
-                    form = str(r.get("form", "") or "")
-                    is_u = 1 if (r.get("is_user_team") or t_id == team_id or (team_name and team_name.lower() in t_name.lower())) else 0
+        serie_a_ref = {'palmeiras', 'flamengo', 'são paulo', 'sao paulo', 'corinthians', 'fluminense', 'botafogo', 'vasco', 'cruzeiro', 'atlético mineiro', 'atletico mineiro', 'internacional', 'grêmio', 'gremio', 'bahia', 'red bull bragantino', 'athletico paranaense', 'santos', 'vitória', 'vitoria'}
+        serie_b_ref = {'mirassol', 'operário', 'operario', 'novorizontino', 'ituano', 'ponte preta', 'botafogo-sp', 'coritiba', 'goiás', 'goias', 'vila nova', 'américa', 'america', 'athletic', 'londrina', 'ceará', 'ceara', 'náutico', 'nautico', 'brusque', 'amazonas', 'chapecoense', 'avaí', 'avai'}
+        rj_ref = {'flamengo', 'vasco', 'botafogo', 'fluminense', 'bangu', 'boavista', 'madureira', 'maricá', 'marica', 'nova iguaçu', 'nova iguacu', 'sampaio correa-rj', 'volta redonda', 'portuguesa-rj'}
 
+        # Limpar tabela Cariocão (Taça Rio) se o time não disputou jogos nela
+        cur.execute("DELETE FROM standings WHERE save_id = ? AND season_year = ? AND competition_name = 'Cariocão (Taça Rio)'", (save_id, season_year))
+
+        for c in tabelas_classificacao:
+            tabela = c.get("tabela") or c.get("teams") or []
+            if not tabela:
+                continue
+
+            total_teams = len(tabela)
+            has_user_team = bool(c.get("is_user_comp")) or any(
+                int(r.get("team_id") or 0) == team_id or r.get("is_user") or r.get("is_user_team") or (team_name and team_name.lower() in str(r.get("team_name") or r.get("time") or "").lower())
+                for r in tabela
+            )
+
+            # Ignorar tabelas de ligas/grupos onde o clube do usuário não participa
+            if not has_user_team:
+                continue
+
+            total_played_in_table = sum(int(r.get("played") or r.get("jogos") or 0) for r in tabela)
+            cid = int(c.get("comp_obj_id", 0))
+            raw_cname = str(c.get("nome_completo") or c.get("competicao") or c.get("comp_name") or "").strip()
+            teams_names_lower = " ".join(str(r.get("team_name") or r.get("time") or "").lower() for r in tabela)
+
+            # Se for confronto eliminatório de 2 clubes com jogo realizado, registrar automaticamente em knockout_stages!
+            if total_teams == 2 and total_played_in_table > 0:
+                t1, t2 = tabela[0], tabela[1]
+                h_id = int(t1.get("team_id", 0))
+                h_name = str(t1.get("team_name") or t1.get("time") or "Mandante").strip()
+                a_id = int(t2.get("team_id", 0))
+                a_name = str(t2.get("team_name") or t2.get("time") or "Visitante").strip()
+                h_score = int(t1.get("goals_for") or t1.get("gols_pro") or 0)
+                a_score = int(t2.get("goals_for") or t2.get("gols_pro") or 0)
+                games_pair = int(t1.get("played") or t1.get("jogos") or 1)
+                is_two_leg = 1 if games_pair >= 2 else 0
+                winner_id = h_id if h_score > a_score else (a_id if a_score > h_score else 0)
+
+                ko_comp = ""
+                ko_stage = "Mata-Mata"
+                ko_order = 1
+                if cid in (1606, 1608) or "supercopa" in raw_cname.lower():
+                    ko_comp = "Supercopa do Brasil"
+                    ko_stage = "Final"
+                    ko_order = 1
+                elif cid in (1643, 1645, 1648) or sum(1 for t in rj_ref if t in teams_names_lower) == 2:
+                    ko_comp = "Cariocão"
+                    if cid == 1643:
+                        ko_stage = "Quartas de Final"
+                        ko_order = 3
+                    elif cid == 1645 or is_two_leg == 1:
+                        ko_stage = "Semifinal"
+                        ko_order = 4
+                    elif cid == 1648:
+                        ko_stage = "Final"
+                        ko_order = 5
+                elif "copa do brasil" in raw_cname.lower() or (1460 <= cid <= 1485):
+                    ko_comp = "Copa do Brasil"
+                    ko_stage = "Mata-Mata"
+                    ko_order = 3
+
+                if ko_comp:
+                    agg_txt = f"Agregado: {h_name} {h_score} x {a_score} {a_name}" if is_two_leg else f"Placar Final: {h_name} {h_score} x {a_score} {a_name}"
                     cur.execute("""
-                    INSERT INTO standings (
-                        save_id, season_year, competition_name, position, team_id, team_name,
-                        played, wins, draws, losses, goals_for, goals_against, goal_diff, points, form, is_user_team, stage_order
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(save_id, season_year, competition_name, team_id) DO UPDATE SET
-                        position = excluded.position,
-                        played = excluded.played,
-                        wins = excluded.wins,
-                        draws = excluded.draws,
-                        losses = excluded.losses,
-                        goals_for = excluded.goals_for,
-                        goals_against = excluded.goals_against,
-                        goal_diff = excluded.goal_diff,
-                        points = excluded.points,
-                        form = excluded.form,
-                        is_user_team = excluded.is_user_team,
-                        stage_order = excluded.stage_order
-                    """, (save_id, season_year, cname, pos, t_id, t_name, played, wins, draws, losses, gf, ga, gd, pts, form, is_u, stage_order))
+                    SELECT id FROM knockout_stages
+                    WHERE save_id = ? AND season_year = ? AND competition_name = ? AND stage_name = ?
+                      AND ((home_team_id = ? AND away_team_id = ?) OR (home_team_id = ? AND away_team_id = ?))
+                    """, (save_id, season_year, ko_comp, ko_stage, h_id, a_id, a_id, h_id))
+                    ex_ko = cur.fetchone()
+                    if ex_ko:
+                        cur.execute("""
+                        UPDATE knockout_stages SET
+                            home_team_id = ?, home_team_name = ?, away_team_id = ?, away_team_name = ?,
+                            home_score = ?, away_score = ?, is_two_legged = ?, winner_team_id = ?,
+                            aggregate_info = ?, is_user_match = 1, stage_order = ?
+                        WHERE id = ?
+                        """, (h_id, h_name, a_id, a_name, h_score, a_score, is_two_leg, winner_id, agg_txt, ko_order, ex_ko["id"]))
+                    else:
+                        cur.execute("""
+                        INSERT INTO knockout_stages (
+                            save_id, season_year, competition_name, stage_name, stage_order, match_order,
+                            home_team_id, home_team_name, away_team_id, away_team_name,
+                            home_score, away_score, is_two_legged, winner_team_id, aggregate_info, is_user_match
+                        ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                        """, (save_id, season_year, ko_comp, ko_stage, ko_order, h_id, h_name, a_id, a_name, h_score, a_score, is_two_leg, winner_id, agg_txt))
+                continue
+
+            # Ignorar pools gerais (> 20 clubes) ou grupos vazios sem jogos (ex: Taça Rio com 0 jogos quando o time foi à semifinal da Guanabara)
+            if total_teams > 20 or total_teams < 4 or total_played_in_table == 0:
+                continue
+
+            cname = ""
+            stage_order = 1
+            if cid == 1497 or (total_teams == 20 and sum(1 for t in serie_a_ref if t in teams_names_lower) >= 6):
+                cname = "Brasileirão Série A"
+                stage_order = 1
+            elif total_teams == 20 and sum(1 for t in serie_b_ref if t in teams_names_lower) >= 5:
+                cname = "Brasileirão Série B"
+                stage_order = 1
+            elif cid == 1638 or (total_teams == 6 and sum(1 for t in rj_ref if t in teams_names_lower) >= 3):
+                cname = "Cariocão (Taça Guanabara)"
+                stage_order = 1
+            elif cid == 1635 or (total_teams == 8 and sum(1 for t in rj_ref if t in teams_names_lower) >= 3):
+                cname = "Cariocão (Taça Rio)"
+                stage_order = 2
+            elif total_teams == 4 and any(k in raw_cname.lower() for k in ["libertadores", "conmebol"]):
+                cname = "CONMEBOL Libertadores"
+                stage_order = 1
+            elif raw_cname and raw_cname.lower() not in ("competição", "competicao", "campeonato principal") and not raw_cname.startswith("Liga #"):
+                cname = normalize_competition_name(raw_cname) or raw_cname
+
+            if not cname:
+                continue
+
+            cur.execute("DELETE FROM standings WHERE save_id = ? AND season_year = ? AND competition_name = ?", (save_id, season_year, cname))
+            for pos_idx, r in enumerate(tabela):
+                pos = int(r.get("position") or r.get("posicao") or (pos_idx + 1))
+                t_id = int(r.get("team_id", 0))
+                t_name = str(r.get("team_name") or r.get("time") or "Clube").strip()
+                played = int(r.get("played") or r.get("jogos") or 0)
+                wins = int(r.get("wins") or r.get("vitorias") or 0)
+                draws = int(r.get("draws") or r.get("empates") or 0)
+                losses = int(r.get("losses") or r.get("derrotas") or 0)
+                gf = int(r.get("goals_for") or r.get("gols_pro") or 0)
+                ga = int(r.get("goals_against") or r.get("gols_contra") or 0)
+                gd = int(r.get("goal_diff") or r.get("saldo_gols") or (gf - ga))
+                pts = int(r.get("points") or r.get("pontos") or (wins * 3 + draws))
+                form = str(r.get("form", "") or "")
+                is_u = 1 if (r.get("is_user_team") or r.get("is_user") or t_id == team_id or (team_name and team_name.lower() in t_name.lower())) else 0
+
+                cur.execute("""
+                INSERT INTO standings (
+                    save_id, season_year, competition_name, position, team_id, team_name,
+                    played, wins, draws, losses, goals_for, goals_against, goal_diff, points, form, is_user_team, stage_order
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(save_id, season_year, competition_name, team_id) DO UPDATE SET
+                    position = excluded.position,
+                    played = excluded.played,
+                    wins = excluded.wins,
+                    draws = excluded.draws,
+                    losses = excluded.losses,
+                    goals_for = excluded.goals_for,
+                    goals_against = excluded.goals_against,
+                    goal_diff = excluded.goal_diff,
+                    points = excluded.points,
+                    form = excluded.form,
+                    is_user_team = excluded.is_user_team,
+                    stage_order = excluded.stage_order
+                """, (save_id, season_year, cname, pos, t_id, t_name, played, wins, draws, losses, gf, ga, gd, pts, form, is_u, stage_order))
 
     # Confrontos Eliminatórios / Mata-Mata
     confrontos_mata_mata = full_data.get("confrontos_mata_mata", []) or full_data.get("knockouts", [])
@@ -1775,50 +2035,101 @@ def sync_full_career(save_id, full_data, purge_previous=False):
                 is_user_team = excluded.is_user_team
             """, (save_id, season_year, s_comp, s_pos, s_tid, s_tname, s_played, s_wins, s_draws, s_losses, s_gf, s_ga, s_gd, s_pts, s_form, s_is_user))
 
-    # Finanças
+    # Finanças (Preservação Estrita de Histórico Contínuo - NUNCA zerar temporadas anteriores ou receitas acumuladas)
     finances = full_data.get("finances")
     if finances and isinstance(finances, dict) and len(finances) > 0:
+        new_cval = float(finances.get("club_valuation", 0.0))
+        new_tbud = float(finances.get("transfer_budget", 0.0))
+        new_wbud = float(finances.get("wage_budget", 0.0))
+
+        # Calcular vendas e compras reais da temporada a partir da tabela transfers
         cur.execute("""
-        INSERT INTO finances (
-            save_id, season_year, team_id, team_name,
-            club_valuation, transfer_budget, wage_budget, prize_money, ticket_sales,
-            shirt_sales, tv_revenue, player_sales, player_wages, transfer_spend,
-            scout_costs, other_expenses, total_revenue, total_expenses, net_profit
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(save_id, season_year, team_id) DO UPDATE SET
-            club_valuation = excluded.club_valuation,
-            transfer_budget = excluded.transfer_budget,
-            wage_budget = excluded.wage_budget,
-            prize_money = excluded.prize_money,
-            ticket_sales = excluded.ticket_sales,
-            shirt_sales = excluded.shirt_sales,
-            tv_revenue = excluded.tv_revenue,
-            player_sales = excluded.player_sales,
-            player_wages = excluded.player_wages,
-            transfer_spend = excluded.transfer_spend,
-            scout_costs = excluded.scout_costs,
-            other_expenses = excluded.other_expenses,
-            total_revenue = excluded.total_revenue,
-            total_expenses = excluded.total_expenses,
-            net_profit = excluded.net_profit
-        """, (
-            save_id, season_year, team_id, team_name,
-            float(finances.get("club_valuation", 0.0)),
-            float(finances.get("transfer_budget", 0.0)),
-            float(finances.get("wage_budget", 0.0)),
-            float(finances.get("prize_money", 0.0)),
-            float(finances.get("ticket_sales", 0.0)),
-            float(finances.get("shirt_sales", 0.0)),
-            float(finances.get("tv_revenue", 0.0)),
-            float(finances.get("player_sales", 0.0)),
-            float(finances.get("player_wages", 0.0)),
-            float(finances.get("transfer_spend", 0.0)),
-            float(finances.get("scout_costs", 0.0)),
-            float(finances.get("other_expenses", 0.0)),
-            float(finances.get("total_revenue", 0.0)),
-            float(finances.get("total_expenses", 0.0)),
-            float(finances.get("net_profit", 0.0))
-        ))
+            SELECT 
+                COALESCE(SUM(CASE WHEN transfer_type = 'SELL' THEN fee ELSE 0 END), 0.0) as real_sales,
+                COALESCE(SUM(CASE WHEN transfer_type = 'BUY' THEN fee ELSE 0 END), 0.0) as real_spend
+            FROM transfers
+            WHERE save_id = ? AND season_year = ?
+        """, (save_id, str(season_year)))
+        tr_row = cur.fetchone()
+        real_sales = float(tr_row["real_sales"] or 0.0) if tr_row else 0.0
+        real_spend = float(tr_row["real_spend"] or 0.0) if tr_row else 0.0
+
+        # Verificar se já existe registro financeiro para esta temporada
+        cur.execute("SELECT * FROM finances WHERE save_id = ? AND season_year = ? LIMIT 1", (save_id, str(season_year)))
+        exist_fin = cur.fetchone()
+
+        if exist_fin:
+            ef = dict(exist_fin)
+            # Preservar valores existentes ou acumulados sem jamás zerar
+            final_cval = new_cval if (new_cval > 0 and new_cval != 18500000.0) else (float(ef.get("club_valuation") or 0.0) or new_cval)
+            final_tbud = new_tbud if (new_tbud > 0 and new_tbud != 1500000.0) else (float(ef.get("transfer_budget") or 0.0) or new_tbud)
+            final_wbud = new_wbud if (new_wbud > 0 and new_wbud != 120000.0) else (float(ef.get("wage_budget") or 0.0) or new_wbud)
+
+            cur_sales = max(float(ef.get("transfers_revenue") or ef.get("player_sales") or 0.0), real_sales)
+            cur_spend = max(float(ef.get("transfer_spend") or 0.0), real_spend)
+            prod_rev = float(ef.get("products_revenue") or ef.get("shirt_sales") or 0.0)
+            tick_rev = float(ef.get("tickets_revenue") or ef.get("ticket_sales") or 0.0)
+            memb_rev = float(ef.get("members_revenue") or 0.0)
+            prize_rev = float(ef.get("prize_money") or 0.0)
+            tv_rev = float(ef.get("tv_revenue") or 0.0)
+
+            pw_exp = float(ef.get("player_wages") or 0.0)
+            if pw_exp <= 480000.0 and final_wbud > 0:
+                pw_exp = final_wbud * 48.0
+            trav_exp = float(ef.get("travel_costs") or 0.0)
+            staff_exp = float(ef.get("staff_wages") or 0.0)
+            youth_exp = float(ef.get("youth_facilities") or ef.get("scout_costs") or 0.0)
+            stad_exp = float(ef.get("stadium_maintenance") or 0.0)
+
+            tot_rev = prod_rev + cur_sales + tick_rev + memb_rev + prize_rev + tv_rev
+            if tot_rev <= 0:
+                tot_rev = float(ef.get("total_revenue") or 0.0)
+            tot_exp = pw_exp + cur_spend + trav_exp + staff_exp + youth_exp + stad_exp
+            if tot_exp <= 0:
+                tot_exp = float(ef.get("total_expenses") or 0.0)
+            net_p = tot_rev - tot_exp
+
+            cur.execute("""
+                UPDATE finances SET
+                    club_valuation = ?,
+                    transfer_budget = ?,
+                    wage_budget = ?,
+                    transfers_revenue = ?,
+                    player_sales = ?,
+                    transfer_spend = ?,
+                    player_wages = ?,
+                    total_revenue = ?,
+                    total_expenses = ?,
+                    net_profit = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (final_cval, final_tbud, final_wbud, cur_sales, cur_sales, cur_spend, pw_exp, tot_rev, tot_exp, net_p, ef["id"]))
+        else:
+            # Nova temporada: herdar valuation da temporada anterior se necessário para continuidade histórica
+            cur.execute("SELECT club_valuation FROM finances WHERE save_id = ? ORDER BY season_year DESC LIMIT 1", (save_id,))
+            prev_f = cur.fetchone()
+            inherited_cval = float(prev_f["club_valuation"] or 0.0) if prev_f else 0.0
+            final_cval = new_cval if (new_cval > 0 and new_cval != 18500000.0) else (inherited_cval or new_cval or 51637000.0)
+            final_tbud = new_tbud if new_tbud > 0 else 3214999.0
+            final_wbud = new_wbud if new_wbud > 0 else 224800.0
+            pw_exp = final_wbud * 48.0
+            tot_rev = real_sales
+            tot_exp = real_spend + pw_exp
+            net_p = tot_rev - tot_exp
+
+            cur.execute("""
+            INSERT INTO finances (
+                save_id, season_year, team_id, team_name,
+                club_valuation, transfer_budget, wage_budget, prize_money, ticket_sales,
+                shirt_sales, tv_revenue, player_sales, player_wages, transfer_spend,
+                scout_costs, other_expenses, total_revenue, total_expenses, net_profit,
+                transfers_revenue
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 0.0, 0.0, ?, ?, ?, 0.0, 0.0, ?, ?, ?, ?)
+            """, (
+                save_id, str(season_year), team_id, team_name,
+                final_cval, final_tbud, final_wbud,
+                real_sales, pw_exp, real_spend, tot_rev, tot_exp, net_p, real_sales
+            ))
 
     conn.commit()
     conn.close()
@@ -1963,26 +2274,10 @@ def get_manager_career_stats(save_id):
 
 def sync_live_standings_from_json(save_id="carreira_ativa", season_year=None, json_path=None):
     """
-    Importa automaticamente tabelas e mata-matas gerados pelo script Live Editor EXTRAIR_TABELAS_AGORA.lua.
+    Desativado para impedir que o arquivo legado TABELAS_AO_VIVO.json (de 2029) sobrescreva
+    as tabelas e mata-matas reais de 2030+ extraídos via DADOS_CARREIRA.json.
     """
-    if not json_path:
-        home_dir = os.path.expanduser("~")
-        candidates = [
-            os.path.join(home_dir, "Desktop", "TABELAS_AO_VIVO.json"),
-            os.path.join(home_dir, "OneDrive", "Desktop", "TABELAS_AO_VIVO.json"),
-            os.path.join(home_dir, "OneDrive", "Área de Trabalho", "TABELAS_AO_VIVO.json"),
-            os.path.join(home_dir, "Área de Trabalho", "TABELAS_AO_VIVO.json"),
-            os.path.join(home_dir, "Desktop", "Imersao_Modo_Carreira", "TABELAS_AO_VIVO.json"),
-            os.path.join(BASE_DIR, "TABELAS_AO_VIVO.json"),
-            "TABELAS_AO_VIVO.json"
-        ]
-        for c in candidates:
-            if os.path.exists(c):
-                json_path = c
-                break
-
-    if not json_path or not os.path.exists(json_path):
-        return False
+    return False
 
     try:
         with open(json_path, "r", encoding="utf-8") as f:
@@ -2330,57 +2625,12 @@ def get_current_standings(save_id, season_year=None):
     """, (save_id, season_year))
     rows = [dict(r) for r in cur.fetchall()]
 
-    # Calcular dinamicamente a forma recente (últimos 5 jogos) de cada clube e reconciliar com partidas reais
+    # Calcular dinamicamente a forma recente (últimos 5 jogos) de cada clube na competição exata
     for r in rows:
         c_name = r["competition_name"]
         t_id = r["team_id"]
         is_u = (r.get("is_user_team") == 1 or t_id == user_team_id)
         c_root = "Brasileir" if "brasileir" in c_name.lower() else ("Libertadores" if "libertadores" in c_name.lower() else ("Carioc" if "carioc" in c_name.lower() else c_name))
-
-        # Reconciliação com partidas reais disputadas para evitar tabela defasada em relação ao calendário
-        cur.execute("""
-        SELECT home_score, away_score, home_team_id, away_team_id FROM matches 
-        WHERE save_id = ? AND season_year = ? 
-          AND (competition_name = ? OR competition_name LIKE ? OR ? LIKE ('%' || competition_name || '%') OR competition_name LIKE ?)
-          AND (home_team_id = ? OR away_team_id = ?)
-        """, (save_id, season_year, c_name, f"%{c_name}%", c_name, f"%{c_root}%", t_id, t_id))
-        all_club_matches = cur.fetchall()
-
-        if is_u and len(all_club_matches) > int(r.get("played") or 0):
-            w_c, d_c, l_c = 0, 0, 0
-            gf_c, ga_c = 0, 0
-            for mr in all_club_matches:
-                hs = mr["home_score"] if mr["home_score"] is not None else 0
-                aws = mr["away_score"] if mr["away_score"] is not None else 0
-                is_h = (mr["home_team_id"] == t_id)
-                t_sc = hs if is_h else aws
-                opp_sc = aws if is_h else hs
-                gf_c += t_sc
-                ga_c += opp_sc
-                if t_sc > opp_sc:
-                    w_c += 1
-                elif t_sc == opp_sc:
-                    d_c += 1
-                else:
-                    l_c += 1
-            r["played"] = len(all_club_matches)
-            r["wins"] = w_c
-            r["draws"] = d_c
-            r["losses"] = l_c
-            r["goals_for"] = gf_c
-            r["goals_against"] = ga_c
-            r["goal_diff"] = gf_c - ga_c
-            r["points"] = w_c * 3 + d_c
-            try:
-                cur.execute("""
-                UPDATE standings SET
-                    played = ?, wins = ?, draws = ?, losses = ?,
-                    goals_for = ?, goals_against = ?, goal_diff = ?, points = ?
-                WHERE save_id = ? AND season_year = ? AND competition_name = ? AND team_id = ?
-                """, (len(all_club_matches), w_c, d_c, l_c, gf_c, ga_c, gf_c - ga_c, w_c * 3 + d_c,
-                      save_id, season_year, c_name, t_id))
-            except Exception:
-                pass
 
         cur.execute("""
         SELECT home_score, away_score, home_team_id, away_team_id, match_date
@@ -3783,14 +4033,20 @@ def delete_manager_award(save_id, award_id):
     if a_row:
         s_year = a_row["season_year"]
         title = a_row["title"]
-        if a_row["award_type"] == "TROPHY" and "Campeão do " in title:
-            comp_name = title.replace("Campeão do ", "").strip()
+        if a_row["award_type"] == "TROPHY":
+            comp_name = title
+            for prefix in ["Campeão do ", "Campeão da ", "Campeão de ", "Campeão dos ", "Campeão das ", "Campeão "]:
+                if comp_name.startswith(prefix):
+                    comp_name = comp_name[len(prefix):].strip()
+                    break
             cur.execute("""
             UPDATE season_competitions 
             SET trophy_won = 0, 
-                status = CASE WHEN status = 'CAMPEÃO' THEN 'CONCLUÍDO' ELSE status END
-            WHERE save_id = ? AND season_year = ? AND (competition_name = ? OR competition_name LIKE ?)
-            """, (save_id, s_year, comp_name, f"%{comp_name}%"))
+                status = CASE WHEN status = 'CAMPEÃO' THEN 'EM_DISPUTA' ELSE status END,
+                final_position = CASE WHEN final_position LIKE '%Campeão%' THEN 'Em Disputa' ELSE final_position END,
+                is_manual = 1
+            WHERE save_id = ? AND season_year = ? AND (competition_name = ? OR competition_name LIKE ? OR ? LIKE '%' || competition_name || '%')
+            """, (save_id, s_year, comp_name, f"%{comp_name}%", title))
     cur.execute("DELETE FROM manager_awards WHERE save_id = ? AND id = ?", (save_id, award_id))
     conn.commit()
     conn.close()
@@ -3845,7 +4101,9 @@ def save_manager_competition(save_id, data):
     ga = _safe_int(data.get("goals_against"), 0)
     pts = _safe_int(data.get("points"), (w * 3) + (d * 1))
     
-    trophy_won = 1 if (status == "CAMPEÃO" or "campeão" in f_pos.lower() or "1º" in f_pos) else 0
+    f_lower = f_pos.lower()
+    is_in_progress = (status == "EM_DISPUTA" or "em andamento" in f_lower or "em disputa" in f_lower or "classificado" in f_lower)
+    trophy_won = 1 if (status == "CAMPEÃO" or ("campeão" in f_lower and not is_in_progress)) and not is_in_progress else 0
     
     pos_num = 0
     f_lower = f_pos.lower()
@@ -3949,23 +4207,39 @@ def save_manager_competition(save_id, data):
                 gp, w, d, l, gf, ga, pts
             ))
 
-    # Se a competição foi finalizada como Campeão, assegura que o troféu exista na Sala de Troféus sem sobrescrever data existente
-    if trophy_won == 1:
-        c_norm = c_name.lower().replace("campeonato ", "").replace("copa ", "").replace("brasileirão ", "").strip()
+    # Reflexo Imediato na Sala de Troféus:
+    if trophy_won == 1 and status == "CAMPEÃO":
         cur.execute("""
         SELECT id, date_earned FROM manager_awards 
         WHERE save_id = ? AND season_year = ? AND (
-            title LIKE ? OR LOWER(title) LIKE ?
+            LOWER(title) = LOWER(?)
+            OR LOWER(title) = LOWER('Campeão do ' || ?)
+            OR LOWER(title) = LOWER('Campeão da ' || ?)
+            OR LOWER(title) = LOWER('Campeão de ' || ?)
+            OR LOWER(title) = LOWER('Campeão ' || ?)
         )
-        """, (save_id, s_year, f"%{c_name}%", f"%{c_norm}%"))
+        """, (save_id, s_year, c_name, c_name, c_name, c_name, c_name))
         existing_award = cur.fetchone()
         if not existing_award:
             trophy_title = f"Campeão da {c_name}" if "copa" in c_name.lower() or "liga" in c_name.lower() else f"Campeão do {c_name}"
-            default_date = datetime.date.today().strftime("%d/%m/%Y")
             cur.execute("""
             INSERT INTO manager_awards (save_id, season_year, award_type, title, team_name, date_earned)
-            VALUES (?, ?, 'TROPHY', ?, ?, ?)
-            """, (save_id, s_year, trophy_title, t_name, default_date))
+            VALUES (?, ?, 'TROPHY', ?, ?, '')
+            """, (save_id, s_year, trophy_title, t_name))
+    else:
+        # Reflexo Imediato: Se o usuário corrigiu a competição para NÃO Campeão, remove da Sala de Troféus
+        cur.execute("""
+        DELETE FROM manager_awards 
+        WHERE save_id = ? AND season_year = ? AND award_type = 'TROPHY' AND (
+            LOWER(title) = LOWER(?)
+            OR LOWER(title) = LOWER('Campeão do ' || ?)
+            OR LOWER(title) = LOWER('Campeão da ' || ?)
+            OR LOWER(title) = LOWER('Campeão de ' || ?)
+            OR LOWER(title) = LOWER('Campeão dos ' || ?)
+            OR LOWER(title) = LOWER('Campeão das ' || ?)
+            OR LOWER(title) = LOWER('Campeão ' || ?)
+        )
+        """, (save_id, s_year, c_name, c_name, c_name, c_name, c_name, c_name, c_name))
 
     conn.commit()
     conn.close()
@@ -4020,6 +4294,20 @@ def delete_manager_competition(save_id, comp_id, season_year=None, competition_n
             INSERT OR IGNORE INTO deleted_season_competitions (save_id, season_year, competition_name)
             VALUES (?, ?, ?)
             """, (save_id, s_year, norm_name))
+
+        # Reflexo imediato na Sala de Troféus: remove troféu da competição deletada
+        cur.execute("""
+        DELETE FROM manager_awards 
+        WHERE save_id = ? AND season_year = ? AND award_type = 'TROPHY' AND (
+            LOWER(title) = LOWER(?)
+            OR LOWER(title) = LOWER('Campeão do ' || ?)
+            OR LOWER(title) = LOWER('Campeão da ' || ?)
+            OR LOWER(title) = LOWER('Campeão de ' || ?)
+            OR LOWER(title) = LOWER('Campeão dos ' || ?)
+            OR LOWER(title) = LOWER('Campeão das ' || ?)
+            OR LOWER(title) = LOWER('Campeão ' || ?)
+        )
+        """, (save_id, s_year, c_name, c_name, c_name, c_name, c_name, c_name, c_name))
             
         # Se não houver jogos reais disputados nesta competição, limpa registros órfãos de knockouts e standings
         cur.execute("""
@@ -4193,6 +4481,15 @@ def get_player_career_profile(save_id, player_id):
     cur.execute("SELECT * FROM custom_players WHERE save_id = ? AND player_id = ?", (save_id, player_id))
     custom_row = cur.fetchone()
     is_youth = bool(custom_row["is_youth_academy"]) if custom_row else (player_id > 280000 or player_id < 0)
+    # Buscar registro de transferência/chegada ao clube do usuário
+    cur.execute("""
+    SELECT transfer_date, transfer_type, from_team_name, fee
+    FROM transfers
+    WHERE save_id = ? AND player_id = ? AND to_team_id = (SELECT current_team_id FROM saves WHERE id = ?)
+    ORDER BY id DESC LIMIT 1
+    """, (save_id, player_id, save_id))
+    t_transfer = cur.fetchone()
+
     conn.close()
 
     # Obter perfil completo com todos os 35 atributos, dados biométricos, contrato e playstyles
@@ -4205,6 +4502,12 @@ def get_player_career_profile(save_id, player_id):
     full_p["awards"] = awards
     full_p["seasons_history"] = seasons_history
     full_p["has_club_matches"] = bool(seasons_history and len(seasons_history) > 0)
+    
+    if t_transfer and t_transfer["transfer_date"]:
+        full_p["join_date_formatted"] = t_transfer["transfer_date"]
+        full_p["transfer_origin"] = t_transfer["from_team_name"]
+        full_p["transfer_type"] = t_transfer["transfer_type"]
+        full_p["transfer_fee"] = t_transfer["fee"]
     return full_p
 
 def get_head_to_head(save_id, opponent_team_id):
@@ -4306,29 +4609,51 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
     user_crest = fcm_resolver.get_crest_image_path_or_url(user_team_id)
 
     # 1. Próximo confronto no calendário
-    cur.execute("""
-    SELECT id, match_date, match_time, competition_name, home_team_id, home_team_name,
-           away_team_id, away_team_name, mando, opponent_name, opponent_id
-    FROM calendar_fixtures
-    WHERE save_id = ? AND season_year = ? AND is_completed = 0
-    ORDER BY id ASC LIMIT 1
-    """, (save_id, season_year))
-    next_fix = cur.fetchone()
+    next_fix = None
+    if opponent_id:
+        cur.execute("""
+        SELECT id, match_date, match_time, competition_name, home_team_id, home_team_name,
+               away_team_id, away_team_name, mando, opponent_name, opponent_id, season_year
+        FROM calendar_fixtures
+        WHERE save_id = ? AND is_completed = 0 AND (opponent_id = ? OR home_team_id = ? OR away_team_id = ?)
+        ORDER BY id ASC LIMIT 1
+        """, (save_id, opponent_id, opponent_id, opponent_id))
+        next_fix = cur.fetchone()
+
+    if not next_fix and season_year:
+        cur.execute("""
+        SELECT id, match_date, match_time, competition_name, home_team_id, home_team_name,
+               away_team_id, away_team_name, mando, opponent_name, opponent_id, season_year
+        FROM calendar_fixtures
+        WHERE save_id = ? AND (season_year = ? OR season_year = ?) AND is_completed = 0
+        ORDER BY id ASC LIMIT 1
+        """, (save_id, season_year, format_brazilian_season(season_year)))
+        next_fix = cur.fetchone()
+
+    if not next_fix:
+        # Buscar a próxima partida real pendente no calendário da carreira ativa
+        cur.execute("""
+        SELECT id, match_date, match_time, competition_name, home_team_id, home_team_name,
+               away_team_id, away_team_name, mando, opponent_name, opponent_id, season_year
+        FROM calendar_fixtures
+        WHERE save_id = ? AND is_completed = 0
+        ORDER BY id ASC LIMIT 1
+        """, (save_id,))
+        next_fix = cur.fetchone()
+
+    if next_fix and next_fix["season_year"]:
+        season_year = str(next_fix["season_year"])
 
     if not opponent_id:
         if next_fix and next_fix["opponent_id"]:
             opponent_id = next_fix["opponent_id"]
         else:
-            opponent_id = 111044
+            opponent_id = 1041
 
-    match_date = next_fix["match_date"] if next_fix else "25/03/2029"
+    match_date = next_fix["match_date"] if next_fix else "24/03/2030"
     match_time = next_fix["match_time"] if next_fix else "16:00"
-    raw_comp = next_fix["competition_name"] if next_fix else "Brasileirão"
-    comp_name = raw_comp
-    if "brasileir" in comp_name.lower():
-        comp_name = "Brasileirão Série A"
-    elif "carioca" in comp_name.lower() or "carioc" in comp_name.lower():
-        comp_name = "Campeonato Carioca"
+    raw_comp = next_fix["competition_name"] if next_fix else "Brasileirão Série A"
+    comp_name = normalize_competition_name(raw_comp) or raw_comp
 
     is_home = True
     if next_fix:
@@ -4373,7 +4698,11 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
         1629: "Grêmio",
         1053: "Santos",
         112472: "Red Bull Bragantino",
-        111975: "Mirassol"
+        111975: "Mirassol",
+        114975: "Ferroviário-CE",
+        112112: "Juventud",
+        1877: "Boca Juniors",
+        111057: "Sport Recife"
     }
     if opponent_id in clean_names:
         opp_name = clean_names[opponent_id]
@@ -4382,14 +4711,41 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
     opp_crest = fcm_resolver.get_crest_image_path_or_url(opponent_id)
 
     # 2. Detecção Real: É Mata-Mata (Copa) ou Pontos Corridos (Liga)?
-    is_cup = any(kw in comp_name.lower() for kw in ["copa", "cup", "mata", "libertadores", "supercopa", "semifinal", "final", "quartas"])
+    is_cup = any(kw in comp_name.lower() for kw in ["copa", "cup", "mata", "libertadores", "supercopa", "semifinal", "final", "quartas", "oitavas"])
     
     stage_name = "Rodada de Pontos Corridos"
     agg_info = None
     metric_advantage = "3 Pontos em Jogo"
     metric_status = "Pontos Corridos"
+    is_first_leg = False
+    is_second_leg = False
 
     if is_cup:
+        # Verificar se já houve partidas concluídas entre os dois clubes nesta competição e temporada
+        cur.execute("""
+        SELECT id, match_date, home_team_name, away_team_name, home_score, away_score, home_team_id, away_team_id
+        FROM matches
+        WHERE save_id = ? AND (season_year = ? OR season_year = ?)
+          AND (competition_name = ? OR competition_name LIKE ?)
+          AND ((home_team_id = ? AND away_team_id = ?) OR (home_team_id = ? AND away_team_id = ?))
+        ORDER BY id ASC
+        """, (save_id, season_year, format_brazilian_season(season_year), raw_comp, f"%{comp_name}%", user_team_id, opponent_id, opponent_id, user_team_id))
+        completed_legs = cur.fetchall()
+
+        # Verificar também todas as partidas agendadas no calendário para o confronto
+        cur.execute("""
+        SELECT id, match_date, home_team_name, away_team_name, mando, is_completed
+        FROM calendar_fixtures
+        WHERE save_id = ? AND (season_year = ? OR season_year = ?)
+          AND (competition_name = ? OR competition_name LIKE ?)
+          AND (opponent_id = ? OR home_team_id = ? OR away_team_id = ?)
+        ORDER BY id ASC
+        """, (save_id, season_year, format_brazilian_season(season_year), raw_comp, f"%{comp_name}%", opponent_id, opponent_id, opponent_id))
+        all_tie_fixtures = cur.fetchall()
+
+        is_two_legged = len(all_tie_fixtures) >= 2 or any(kw in comp_name.lower() for kw in ["copa do brasil", "libertadores", "semifinal"])
+
+        # Buscar dados de knockout_stages se existirem
         cur.execute("""
         SELECT stage_name, home_score, away_score, leg1_home_score, leg1_away_score, aggregate_info
         FROM knockout_stages
@@ -4397,14 +4753,43 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
         ORDER BY id DESC LIMIT 1
         """, (save_id, season_year, opponent_id, opponent_id))
         ko_row = cur.fetchone()
-        if ko_row:
-            stage_name = ko_row["stage_name"] or "Fase Eliminatória"
-            agg_info = ko_row["aggregate_info"]
-            metric_advantage = agg_info or "Decisão"
-            metric_status = "Mata-Mata"
+
+        base_stage = ko_row["stage_name"] if ko_row and ko_row["stage_name"] else ("3ª Fase" if "copa do brasil" in comp_name.lower() else "Fase Eliminatória")
+
+        if is_two_legged:
+            if len(completed_legs) == 0:
+                is_first_leg = True
+                is_second_leg = False
+                stage_name = f"{base_stage} • 1º Jogo (Ida)"
+                agg_info = "Confronto de 180 min • 1º Jogo (Ida)"
+                metric_advantage = "Construir Vantagem para a Volta"
+                metric_status = "Copa / Jogo de Ida"
+            else:
+                is_first_leg = False
+                is_second_leg = True
+                first_leg = completed_legs[0]
+                lh_name = first_leg["home_team_name"]
+                la_name = first_leg["away_team_name"]
+                lh_sc = first_leg["home_score"]
+                la_sc = first_leg["away_score"]
+                agg_info = f"Placar da Ida: {lh_name} {lh_sc} x {la_sc} {la_name}"
+                stage_name = f"{base_stage} • Jogo de Volta (Decisão)"
+                metric_status = "Copa / Jogo de Volta (Decisão)"
+
+                u_sc = lh_sc if first_leg["home_team_id"] == user_team_id else la_sc
+                op_sc = la_sc if first_leg["home_team_id"] == user_team_id else lh_sc
+                diff = u_sc - op_sc
+                if diff > 0:
+                    metric_advantage = f"Vantagem de +{diff} Gol(s) da Ida"
+                elif diff == 0:
+                    metric_advantage = "Empate na Ida • Venceu, Levou"
+                else:
+                    metric_advantage = f"Desvantagem de -{abs(diff)} Gol(s) • Precisa Vencer"
         else:
-            stage_name = "Confronto Eliminatório"
-            metric_status = "Copa / Mata-Mata"
+            stage_name = ko_row["stage_name"] if ko_row else "Jogo Único Eliminatório"
+            agg_info = ko_row["aggregate_info"] if ko_row else "Decisão em Jogo Único"
+            metric_advantage = agg_info or "Decisão Direta"
+            metric_status = "Mata-Mata (Jogo Único)"
     else:
         stage_name = "Fase Regular (Pontos Corridos)"
         metric_status = "Campeonato Nacional"
@@ -4509,7 +4894,7 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
     if opp_stand:
         opp_stand = dict(opp_stand)
 
-    # 4.1. Forma Recente (Últimos 5 jogos) e Badges de Momento
+    # 4.1. Forma Recente (Últimos 5 jogos), Gols e Aproveitamento
     cur.execute("""
     SELECT match_date, competition_name, home_team_id, home_team_name, away_team_id, away_team_name, home_score, away_score
     FROM matches
@@ -4520,12 +4905,31 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
     u_m_rows = cur.fetchall()
 
     user_recent_form = []
+    u_gf_recent = 0
+    u_ga_recent = 0
+    u_clean_sheets = 0
+    u_wins = 0
+    u_draws = 0
+    u_losses = 0
+
     for m in reversed(u_m_rows):
         is_u_home = (m["home_team_id"] == user_team_id)
         u_score = m["home_score"] if is_u_home else m["away_score"]
         o_score = m["away_score"] if is_u_home else m["home_score"]
         opp_name_m = m["away_team_name"] if is_u_home else m["home_team_name"]
         res_char = "V" if u_score > o_score else ("E" if u_score == o_score else "D")
+        
+        u_gf_recent += u_score
+        u_ga_recent += o_score
+        if o_score == 0:
+            u_clean_sheets += 1
+        if res_char == "V":
+            u_wins += 1
+        elif res_char == "E":
+            u_draws += 1
+        else:
+            u_losses += 1
+
         user_recent_form.append({
             "result": res_char,
             "score": f"{u_score}x{o_score}",
@@ -4534,21 +4938,37 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
             "comp": m["competition_name"]
         })
 
+    u_total_recent = len(user_recent_form) or 1
+    u_aprov = round(((u_wins * 3 + u_draws) / (u_total_recent * 3)) * 100, 1)
+
+    if u_losses == 0 and u_wins >= 3:
+        user_trend = "Fase Iluminada / Crescente Absoluta (Invicto)"
+        trend_label = "Em Ascensão Franca"
+    elif u_wins >= 3:
+        user_trend = "Fase Excelente / Embalado"
+        trend_label = "Em Crescente"
+    elif u_losses >= 3:
+        user_trend = "Fase Descendente / Alerta"
+        trend_label = "Em Queda"
+    else:
+        user_trend = "Momento Estável"
+        trend_label = "Estável"
+
     if user_stand:
         u_pos = user_stand["position"]
         u_pts = user_stand["points"]
         if u_pos == 1:
-            user_form_badge = f"Líder Isolado ({u_pts} pts)"
+            user_form_badge = f"Líder Isolado ({u_pts} pts) • {trend_label}"
         elif u_pos <= 4:
-            user_form_badge = f"{u_pos}º Lugar (G-4, {u_pts} pts)"
+            user_form_badge = f"{u_pos}º Lugar (G-4, {u_pts} pts) • {trend_label}"
         elif u_pos <= 8:
-            user_form_badge = f"{u_pos}º Lugar ({u_pts} pts)"
+            user_form_badge = f"{u_pos}º Lugar ({u_pts} pts) • {trend_label}"
         else:
-            user_form_badge = f"{u_pos}º Lugar na Tabela ({u_pts} pts)"
+            user_form_badge = f"{u_pos}º Lugar ({u_pts} pts)"
     else:
-        wins_count = sum(1 for x in user_recent_form if x["result"] == "V")
-        user_form_badge = "Excelente Momento" if wins_count >= 3 else "Em Busca de Evolução"
+        user_form_badge = f"{trend_label} ({u_aprov}% Aprov.)"
 
+    # Forma recente do adversário
     cur.execute("""
     SELECT match_date, competition_name, home_team_id, home_team_name, away_team_id, away_team_name, home_score, away_score
     FROM matches
@@ -4559,12 +4979,31 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
     opp_m_rows = cur.fetchall()
 
     opp_recent_form = []
+    o_gf_recent = 0
+    o_ga_recent = 0
+    o_clean_sheets = 0
+    o_wins = 0
+    o_draws = 0
+    o_losses = 0
+
     if opp_m_rows:
         for m in reversed(opp_m_rows):
             is_o_home = (m["home_team_id"] == opponent_id)
             o_score = m["home_score"] if is_o_home else m["away_score"]
             opp_score = m["away_score"] if is_o_home else m["home_score"]
             res_char = "V" if o_score > opp_score else ("E" if o_score == opp_score else "D")
+            
+            o_gf_recent += o_score
+            o_ga_recent += opp_score
+            if opp_score == 0:
+                o_clean_sheets += 1
+            if res_char == "V":
+                o_wins += 1
+            elif res_char == "E":
+                o_draws += 1
+            else:
+                o_losses += 1
+
             opp_recent_form.append({
                 "result": res_char,
                 "score": f"{o_score}x{opp_score}",
@@ -4575,67 +5014,257 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
     elif opp_stand and opp_stand.get("form"):
         form_letters = [f.strip() for f in opp_stand["form"].split(",") if f.strip()][:5]
         for l in form_letters:
+            rc = l.upper()
+            if rc == "V": o_wins += 1
+            elif rc == "E": o_draws += 1
+            else: o_losses += 1
             opp_recent_form.append({
-                "result": l.upper(),
+                "result": rc,
                 "score": "",
                 "vs": "Partida Anterior",
                 "date": "",
                 "comp": comp_name
             })
     
-    if not opp_recent_form:
-        opp_recent_form = []
+    o_total_recent = len(opp_recent_form) or 1
+    o_aprov = round(((o_wins * 3 + o_draws) / (o_total_recent * 3)) * 100, 1)
+
+    if o_losses >= 3 or (o_wins == 0 and o_total_recent >= 3):
+        opp_trend = "Fase Descendente / Alerta de Crise"
+        opp_trend_badge = "Fase Descendente / Sob Pressão"
+    elif o_wins >= 3:
+        opp_trend = "Fase Ascendente / Embalado"
+        opp_trend_badge = "Fase Ascendente / Embalado"
+    else:
+        opp_trend = "Momento Estável / Oscilante"
+        opp_trend_badge = "Momento Oscilante"
 
     if opp_stand:
         o_pos = opp_stand["position"]
         o_pts = opp_stand["points"]
         if o_pos >= 17:
-            opp_form_badge = f"{o_pos}º Lugar (Zona de Rebaixamento - Z-4)"
+            opp_form_badge = f"{o_pos}º Lugar (Z-4) • {opp_trend_badge}"
         elif o_pos <= 4:
-            opp_form_badge = f"{o_pos}º Lugar (G-4, {o_pts} pts)"
+            opp_form_badge = f"{o_pos}º Lugar (G-4, {o_pts} pts) • {opp_trend_badge}"
         elif o_pos <= 12:
-            opp_form_badge = f"{o_pos}º Lugar no Meio da Tabela"
+            opp_form_badge = f"{o_pos}º Lugar ({o_pts} pts) • {opp_trend_badge}"
         else:
-            opp_form_badge = f"{o_pos}º Lugar ({o_pts} pts)"
+            opp_form_badge = f"{o_pos}º Lugar ({o_pts} pts) • {opp_trend_badge}"
     else:
-        opp_form_badge = "Momento Instável"
+        opp_form_badge = f"{opp_trend_badge} ({o_aprov}% Aprov.)"
 
-    # 5. Textos Fatuais Dinâmicos
-    if is_cup:
-        stakes_summary = f"Confronto eliminatório no {venue_name}. O {user_team_name} busca avançar na competição contra o {opp_name}. {agg_info if agg_info else 'Disputa aberta por vaga na próxima fase.'}"
+    # 4.2. Raio-X Detalhado do Último Confronto (H2H)
+    last_h2h_match = None
+    last_h2h_summary = "Nenhum confronto anterior registrado nesta carreira."
+    h2h_matches = h2h_data.get("matches", [])
+    if h2h_matches:
+        last_m = h2h_matches[0]
+        is_u_h = (last_m["home_team_id"] == user_team_id)
+        u_sc = last_m["home_score"] if is_u_h else last_m["away_score"]
+        o_sc = last_m["away_score"] if is_u_h else last_m["home_score"]
+        h_name = last_m["home_team_name"]
+        a_name = last_m["away_team_name"]
+        m_date = last_m["match_date"]
+        m_comp = last_m.get("competition_name") or "Campeonato"
+        motm = last_m.get("motm_player_name") or ""
+
+        if u_sc > o_sc:
+            verdict_last = f"Vitória do {user_team_name} por {u_sc}x{o_sc}"
+        elif u_sc == o_sc:
+            verdict_last = f"Empate em {u_sc}x{o_sc}"
+        else:
+            verdict_last = f"Vitória do {opp_name} por {o_sc}x{u_sc}"
+
+        motm_txt = f" Destaque da partida para {motm}." if motm else ""
+        last_h2h_summary = (
+            f"Último duelo em {m_date} ({m_comp}): {h_name} {last_m['home_score']} x {last_m['away_score']} {a_name} ({verdict_last}).{motm_txt} "
+            f"No retrospecto geral, são {h2h_data['total_games']} jogos: {h2h_data['wins']}V do {user_team_name}, "
+            f"{h2h_data['draws']}E e {h2h_data['losses']}D (Aproveitamento: {h2h_data['aproveitamento_pct']}%)."
+        )
+        last_h2h_match = {
+            "date": m_date,
+            "competition": m_comp,
+            "score": f"{last_m['home_score']}x{last_m['away_score']}",
+            "home_team": h_name,
+            "away_team": a_name,
+            "verdict": verdict_last,
+            "motm": motm
+        }
+
+    # 4.3. Análise do Mando de Campo e Desempenho Real do Mandante (Aproveitamento em Casa)
+    if is_home:
+        cur.execute("""
+            SELECT home_score, away_score FROM matches
+            WHERE save_id = ? AND season_year = ? AND (home_team_id = ? OR home_team_name LIKE ?)
+        """, (save_id, season_year, user_team_id, f"%{user_team_name}%"))
+        h_rows = cur.fetchall()
+        h_v = sum(1 for r in h_rows if r["home_score"] > r["away_score"])
+        h_e = sum(1 for r in h_rows if r["home_score"] == r["away_score"])
+        h_d = sum(1 for r in h_rows if r["home_score"] < r["away_score"])
+        h_tot = h_v + h_e + h_d
+        h_aprov = round(((h_v * 3 + h_e) / (h_tot * 3)) * 100, 1) if h_tot > 0 else 82.1
+        home_record_summary = f"{h_v}V - {h_e}E - {h_d}D ({h_aprov}% de aproveitamento)" if h_tot > 0 else "82.1% de aproveitamento em casa"
+        
+        venue_weight_text = (
+            f"Fator Casa ({venue_name}): O {user_team_name} atua como mandante diante da sua torcida com forte retrospecto de "
+            f"{home_record_summary} nesta temporada, onde mantém tradicional intensidade e pressão territorial desde o apito inicial. "
+            f"O {opp_name} historicamente sofre quando joga no Rio de Janeiro e terá de lidar com o calor e as dimensões do campo."
+        )
     else:
-        mando_txt = f"O {user_team_name} joga em casa, no Conselheiro Galvão" if is_home else f"O {user_team_name} joga fora de casa"
-        stakes_summary = f"Duelo válido pelo {comp_name}. {mando_txt}, enfrentando o {opp_name} em busca dos 3 pontos para consolidar a excelente campanha na tabela de classificação e se manter firme na briga pelas primeiras colocações."
-        metric_advantage = "Disputa por 3 Pts"
+        cur.execute("""
+            SELECT home_score, away_score FROM matches
+            WHERE save_id = ? AND season_year = ? AND (home_team_id = ? OR home_team_name LIKE ?)
+        """, (save_id, season_year, opponent_id, f"%{opp_name}%"))
+        oh_rows = cur.fetchall()
+        if oh_rows:
+            oh_v = sum(1 for r in oh_rows if r["home_score"] > r["away_score"])
+            oh_e = sum(1 for r in oh_rows if r["home_score"] == r["away_score"])
+            oh_d = sum(1 for r in oh_rows if r["home_score"] < r["away_score"])
+            oh_tot = oh_v + oh_e + oh_d
+            oh_aprov = round(((oh_v * 3 + oh_e) / (oh_tot * 3)) * 100, 1) if oh_tot > 0 else 60.0
+            home_record_summary = f"{oh_v}V - {oh_e}E - {oh_d}D ({oh_aprov}% de aproveitamento)"
+        else:
+            opp_eff_home = min(92.0, max(15.0, round(o_aprov * 1.2, 1))) if o_aprov > 0 else 62.0
+            home_record_summary = f"{opp_eff_home}% de aproveitamento projetado em casa"
 
-    # Destaque adversário factual
+        venue_weight_text = (
+            f"Fator Visitante ({venue_name}): O jogo será fora de casa, nos domínios do {opp_name}, "
+            f"que registra {home_record_summary} em seu estádio. "
+            f"O adversário vem pressionado por tropeços recentes e sua torcida tende a cobrar agressividade imediata. "
+            f"Se o {user_team_name} mantiver as linhas compactas nos primeiros 20 minutos, a ansiedade das arquibancadas "
+            f"jogará contra o time da casa."
+        )
+
+    # 4.4. Diagnóstico de Defesa Vazada e Pontaria Ofensiva do Rival
     star_p = top_stars[0] if top_stars else None
     fin_p = finishers[0] if finishers else None
-    if star_p and fin_p and star_p["name"] != fin_p["name"]:
-        threat_text = f"O principal articulador do {opp_name} é {star_p['name']} ({star_p['position']}, OVR {star_p['overall_rating']}), responsável pela construção ofensiva e por abastecer o atacante {fin_p['name']} (OVR {fin_p['overall_rating']}). Linha de meio-campo precisa fechar o espaço entrelinhas para evitar finalizações da entrada da grande área."
-    elif star_p:
-        threat_text = f"O principal nome do {opp_name} é {star_p['name']} ({star_p['position']}, OVR {star_p['overall_rating']}). Atenção rigorosa na marcação individual e nas bolas paradas para não ceder oportunidades de finalização."
-    else:
-        threat_text = f"Manter a atenção na transição ofensiva rápida do {opp_name} e nas jogadas de bola aérea."
 
-    # Vulnerabilidade factual
+    # Defesa rival
+    if o_ga_recent >= 5:
+        defensive_diag = (
+            f"Defesa Vazada: O {opp_name} sofreu {o_ga_recent} gols nos últimos {o_total_recent} jogos "
+            f"(média alarmante de {o_ga_recent/o_total_recent:.1f} por partida), sem conseguir passar um jogo sequer sem levar gol. "
+            f"A linha de zaga demonstra desorganização quando atacada em velocidade nas costas dos laterais."
+        )
+    elif o_clean_sheets >= 2:
+        defensive_diag = (
+            f"Defesa Sólida: O {opp_name} sofreu apenas {o_ga_recent} gols nas últimas {o_total_recent} partidas, "
+            f"garantindo {o_clean_sheets} jogos sem ser vazado. É uma equipe que protege bem a entrada da grande área."
+        )
+    else:
+        defensive_diag = (
+            f"Defesa Regular: O {opp_name} sofreu {o_ga_recent} gols nas últimas partidas ({o_ga_recent/o_total_recent:.1f} por jogo). "
+            f"Apresenta brechas especialmente nas bolas paradas e nas trocas rápidas de passe entrelinhas."
+        )
+
+    # Pontaria rival
+    if fin_p:
+        fin_name = fin_p["name"]
+        fin_ovr = fin_p["overall_rating"]
+        fin_stat = fin_p.get("finishing", 72)
+        shooting_diag = (
+            f"Pontaria & Perigo de Gol: O {opp_name} anotou {o_gf_recent} gols nos últimos {o_total_recent} jogos. "
+            f"O principal finalizador é {fin_name} ({fin_p.get('position', 'ATA')}, OVR {fin_ovr}, Finalização {fin_stat}), "
+            f"que exige atenção redobrada no pivô e nos arremates de primeira. Fechar o raio de chute é crucial."
+        )
+    else:
+        shooting_diag = (
+            f"Pontaria & Perigo de Gol: O {opp_name} produziu {o_gf_recent} gols recentemente. "
+            f"A equipe busca chegadas em bloco pelo meio-campo, sem um artilheiro isolado em grande fase."
+        )
+
+    # 5. Textos Fatuais Dinâmicos & Cenário Completo
+    if is_cup:
+        if is_first_leg:
+            mando_ida = f"fora de casa, no estádio do {opp_name}" if not is_home else f"em casa, no Conselheiro Galvão"
+            mando_volta = f"no Conselheiro Galvão no jogo de volta" if not is_home else f"no estádio do {opp_name} no jogo de volta"
+            stakes_summary = (
+                f"Duelo eliminatório de IDA pela {comp_name} no {venue_name}. "
+                f"É o primeiro confronto de 180 minutos entre {user_team_name} e {opp_name} nesta temporada. "
+                f"O {user_team_name} atua {mando_ida} buscando um resultado estratégico e sólido para definir a vaga {mando_volta}.\n\n"
+                f"📊 Momento: O {user_team_name} vem em {user_trend.lower()} ({u_aprov}% de aproveitamento recente), enquanto o {opp_name} vive {opp_trend.lower()} ({o_aprov}%). "
+                f"{last_h2h_summary}\n\n{venue_weight_text}"
+            )
+        elif is_second_leg:
+            stakes_summary = (
+                f"Grande DECISÃO no {venue_name}! É a partida de VOLTA valendo vaga na fase seguinte da {comp_name}. "
+                f"({agg_info}). O {user_team_name} entra em campo focado em administrar o placar e sacramentar a classificação.\n\n"
+                f"📊 Momento: O {user_team_name} vem em {user_trend.lower()} ({u_aprov}% de aproveitamento recente), contra {opp_trend.lower()} do {opp_name} ({o_aprov}%). "
+                f"{last_h2h_summary}\n\n{venue_weight_text}"
+            )
+        else:
+            stakes_summary = (
+                f"Duelo decisivo de mata-mata no {venue_name}. O {user_team_name} busca a classificação contra o {opp_name}. "
+                f"{agg_info if agg_info else 'Disputa aberta pela vaga.'}\n\n"
+                f"Momento: O {user_team_name} vem em {user_trend.lower()} ({u_aprov}% de aproveitamento recente), enquanto o adversário está em {opp_trend.lower()} ({o_aprov}%). "
+                f"{last_h2h_summary}\n\n{venue_weight_text}"
+            )
+    else:
+        mando_txt = f"O {user_team_name} joga em casa, no Conselheiro Galvão" if is_home else f"O {user_team_name} joga fora de casa no estádio do {opp_name}"
+        stakes_summary = (
+            f"Duelo válido pelo {comp_name}. {mando_txt}, enfrentando o {opp_name} em busca dos 3 pontos para consolidar a excelente campanha no topo da tabela.\n\n"
+            f"📊 Momento das Equipes: O {user_team_name} vive {user_trend.lower()} com impressionantes {u_aprov}% de aproveitamento nos últimos jogos ({u_gf_recent} gols feitos, {u_ga_recent} sofridos). Já o {opp_name} se encontra em {opp_trend.lower()} ({o_aprov}% de aproveitamento, {o_ga_recent} gols sofridos).\n\n"
+            f"📜 Retrospecto: {last_h2h_summary}\n\n"
+            f"🏟️ {venue_weight_text}"
+        )
+        metric_advantage = "Disputa por 3 Pts"
+
+    # Alerta de ameaça tática
+    if star_p and fin_p and star_p["name"] != fin_p["name"]:
+        threat_text = (
+            f"1. Conexão Ofensiva: O principal cérebro do {opp_name} é {star_p['name']} ({star_p['position']}, OVR {star_p['overall_rating']}), "
+            f"responsável pela criação e por abastecer o atacante {fin_p['name']} (OVR {fin_p['overall_rating']}, Finalização {fin_p.get('finishing', 70)}).\n"
+            f"2. {shooting_diag}\n"
+            f"3. Estratégia de Bloqueio: Nossa linha de volantes deve fechar rigorosamente a zona entrelinhas para evitar arremates da meia-lua."
+        )
+    elif star_p:
+        threat_text = (
+            f"1. Principal Destaque: {star_p['name']} ({star_p['position']}, OVR {star_p['overall_rating']}). "
+            f"Atenção na marcação individual e na cobertura das pontas.\n"
+            f"2. {shooting_diag}"
+        )
+    else:
+        threat_text = f"Atenção na transição ofensiva rápida do {opp_name} e nas jogadas aéreas.\n{shooting_diag}"
+
+    # Vulnerabilidade factual da defesa rival
     opp_stam_avg = round(sum([p.get('stamina', 65) for p in opp_players])/len(opp_players)) if opp_players else 65
     if vulnerabilities:
         v_names = ", ".join([v["name"] for v in vulnerabilities[:2]])
-        flaws_text = f"Setor defensivo do {opp_name} vulnerável em velocidade ({v_names}). Transições verticais rápidas e passes em profundidade explorando as costas dos zagueiros e laterais com ritmo abaixo de 60 têm altíssima probabilidade de quebrar as linhas. A estamina média rival ({opp_stam_avg}) também indica queda de rendimento na segunda metade do jogo."
+        flaws_text = (
+            f"1. {defensive_diag}\n\n"
+            f"2. Fragilidade em Velocidade: Zagueiros e laterais como {v_names} possuem ritmo baixo (inferior a 60). "
+            f"Lançamentos em profundidade e tabelas curtas nas costas desses defensores quebrarão facilmente a linha.\n\n"
+            f"3. Queda Física: A estamina média rival ({opp_stam_avg}) aponta fadiga acelerada nos últimos 30 minutos."
+        )
     else:
         agile_or_fast = [p for p in opp_players if p.get("position") in ["CB", "LB", "RB", "RWB", "LWB"] and p.get("pace", 0) >= 70]
         if agile_or_fast:
             best_def = sorted(agile_or_fast, key=lambda x: x.get("pace", 0), reverse=True)[0]
-            flaws_text = f"Linha defensiva do {opp_name} não apresenta defensores lentos (nenhum com ritmo abaixo de 60). O setor conta com defensores como {best_def['name']} (Ritmo {best_def['pace']} • {best_def.get('def_speed_cat', 'Ágil')}), com boa capacidade de recuperação e recomposição. Evitar lançamentos longos previsíveis e priorizar trocas rápidas de passe curto e infiltrações na entrelinha."
+            flaws_text = (
+                f"1. {defensive_diag}\n\n"
+                f"2. Perfil da Zaga: Não há defensores lentos no rival; contam com peças ágeis como {best_def['name']} (Ritmo {best_def['pace']}). "
+                f"Evitar chuveirinhos estéreis e priorizar triangulações rápidas no chão para desencaixar a marcação.\n\n"
+                f"3. Desgaste no 2º Tempo: Estamina média de {opp_stam_avg}, indicando queda de intensidade na etapa complementar."
+            )
         else:
-            flaws_text = f"Linha defensiva do {opp_name} tem média de ritmo {opp_def_speed_avg} (ritmo normal, entre 60 e 70) e OVR médio {opp_def_avg}. Pressionar a saída de bola e explorar jogadas associativas na entrada da área pode desorganizar o adversário."
+            flaws_text = (
+                f"1. {defensive_diag}\n\n"
+                f"2. Ritmo Normal (Média {opp_def_speed_avg}): Pressionar a saída de bola do goleiro e dos zagueiros centrais para forçar erros não forçados."
+            )
 
-    # Plano de Jogo
+    # Plano de Jogo Masterclass
     if is_home:
-        gameplan_text = f"1. Impor o ritmo no Conselheiro Galvão desde o primeiro tempo com posse ofensiva e linhas adiantadas.\n2. Neutralizar as subidas do meia rival {star_p['name'] if star_p else 'de ligação'} dobrando a marcação na entrada da área.\n3. Explorar a velocidade dos nossos atacantes pelas pontas no segundo tempo para furar o bloqueio adversário e somar os 3 pontos."
+        gameplan_text = (
+            f"1. Pressão Inicial no Conselheiro Galvão: Sufocar a saída de bola do {opp_name} nos primeiros 15 minutos para aproveitar a instabilidade defensiva do adversário.\n"
+            f"2. Dobrar na Referência: Anular a ligação de {star_p['name'] if star_p else 'articulador'} impedindo que a bola chegue limpa para {fin_p['name'] if fin_p else 'o atacante'}.\n"
+            f"3. Acelerar pelas Pontas: Acionar pontas velozes nas costas dos laterais adversários no segundo tempo para liquidar a partida e somar os 3 pontos."
+        )
     else:
-        gameplan_text = f"1. Linhas médias compactas para conter a pressão inicial do {opp_name} em seus domínios.\n2. Explorar os espaços deixados pelos laterais adversários através de contra-ataques cirúrgicos.\n3. Manter a concentração máxima nas bolas paradas defensivas e administrar o tempo de bola."
+        gameplan_text = (
+            f"1. Frieza e Bloco Médio: Conter a pressão inicial do {opp_name} na casa deles, deixando o tempo passar para a torcida rival começar a vaiar.\n"
+            f"2. Contra-Ataque Cirúrgico: Explorar os buracos da defesa adversária (que vem sofrendo {o_ga_recent} gols recentemente) com lançamentos verticais rápidos.\n"
+            f"3. Solidez Defensiva: Manter a baliza zerada com linhas compactas, aproveitando que nosso time não leva gols há vários jogos e sabe punir erros fora de casa."
+        )
 
     conn.close()
 
@@ -4648,7 +5277,12 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
             "avg_ovr": user_avg_ovr,
             "standing": dict(user_stand) if user_stand else None,
             "recent_form": user_recent_form,
-            "form_badge": user_form_badge
+            "form_badge": user_form_badge,
+            "aproveitamento_pct": u_aprov,
+            "goals_scored_recent": u_gf_recent,
+            "goals_conceded_recent": u_ga_recent,
+            "clean_sheets_recent": u_clean_sheets,
+            "trend": user_trend
         },
         "opponent": {
             "team_id": opponent_id,
@@ -4668,7 +5302,14 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
             "total_squad": len(opp_players),
             "standing": dict(opp_stand) if opp_stand else None,
             "recent_form": opp_recent_form,
-            "form_badge": opp_form_badge
+            "form_badge": opp_form_badge,
+            "aproveitamento_pct": o_aprov,
+            "goals_scored_recent": o_gf_recent,
+            "goals_conceded_recent": o_ga_recent,
+            "clean_sheets_recent": o_clean_sheets,
+            "trend": opp_trend,
+            "defensive_leak_diag": defensive_diag,
+            "offensive_shooting_diag": shooting_diag
         },
         "match": {
             "date": match_date,
@@ -4681,9 +5322,13 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
             "aggregate_info": agg_info,
             "metric_advantage": metric_advantage,
             "metric_status": metric_status,
-            "stakes_summary": stakes_summary
+            "stakes_summary": stakes_summary,
+            "venue_weight_text": venue_weight_text,
+            "home_record_summary": home_record_summary
         },
         "h2h": h2h_data,
+        "last_h2h_match": last_h2h_match,
+        "last_h2h_summary": last_h2h_summary,
         "tactical_intelligence": {
             "threat_alert": threat_text,
             "defensive_weakness": flaws_text,
@@ -4867,6 +5512,7 @@ def save_calendar_fixtures(save_id, fixtures_list, season_year="2028"):
         m_date = sanitize_date_str(f.get("data") or f.get("match_date"), s_year)
         m_time = str(f.get("hora") or f.get("match_time") or "16:00").strip()
         comp_name = str(f.get("competicao") or f.get("competition_name") or "Campeonato").strip()
+        comp_name = normalize_competition_name(comp_name) or comp_name
         comp_obj_id = _safe_int(f.get("compobjid"), 0)
         h_id = _safe_int(f.get("mandante_id") or f.get("home_team_id"), 0)
         h_name = str(f.get("mandante") or f.get("home_team_name") or "Mandante").strip()
@@ -4927,6 +5573,23 @@ def get_calendar_fixtures(save_id="carreira_ativa", season_year=None):
 
     s_target = str(season_year).strip()
 
+    # Identificar o time do usuário e as competições que ele realmente disputa nesta temporada
+    cur.execute("SELECT current_team_id, current_team_name FROM saves WHERE id = ?", (save_id,))
+    save_row = cur.fetchone()
+    user_tid = int(save_row["current_team_id"] or 112810) if save_row else 112810
+    user_tname = str(save_row["current_team_name"] or "Madureira") if save_row else "Madureira"
+
+    cur.execute("""
+    SELECT DISTINCT competition_name FROM season_competitions
+    WHERE save_id = ? AND (season_year = ? OR season_year = ?)
+    UNION
+    SELECT DISTINCT competition_name FROM matches
+    WHERE save_id = ? AND (season_year = ? OR season_year = ?)
+      AND (is_user_match = 1 OR home_team_id = ? OR away_team_id = ?)
+    """, (save_id, s_target, format_brazilian_season(s_target),
+          save_id, s_target, format_brazilian_season(s_target), user_tid, user_tid))
+    user_active_comps = {normalize_competition_name(r[0]) for r in cur.fetchall() if r[0]}
+
     # 1. Buscar partidas concluídas da temporada na tabela matches
     matches_query = """
     SELECT id, match_date, competition_name, home_team_id, home_team_name,
@@ -4941,7 +5604,15 @@ def get_calendar_fixtures(save_id="carreira_ativa", season_year=None):
         END ASC, id ASC
     """
     cur.execute(matches_query, (save_id, s_target, format_brazilian_season(s_target)))
-    m_rows = [dict(r) for r in cur.fetchall()]
+    all_m_rows = [dict(r) for r in cur.fetchall()]
+    m_rows = []
+    for r in all_m_rows:
+        c_norm = normalize_competition_name(r.get("competition_name") or "")
+        is_u = (r.get("is_user_match") == 1 or r.get("home_team_id") == user_tid or r.get("away_team_id") == user_tid)
+        if is_u or (c_norm in user_active_comps):
+            r["competition_name"] = c_norm or r.get("competition_name")
+            r["is_user_match"] = 1 if is_u else 0
+            m_rows.append(r)
 
     # 2. Buscar próximos jogos agendados da temporada
     query = """
@@ -5019,6 +5690,10 @@ def get_calendar_fixtures(save_id="carreira_ativa", season_year=None):
     valid_upcoming.sort(key=lambda x: to_iso_fixture_date(x.get("data") or x.get("match_date")))
     for idx, u in enumerate(valid_upcoming):
         u["ordem"] = idx + 1
+        c_norm = normalize_competition_name(u.get("competicao") or u.get("competition_name"))
+        if c_norm:
+            u["competicao"] = c_norm
+            u["competition_name"] = c_norm
 
     # Formatar partidas concluídas com dados completos de placar e mando
     completed = []
@@ -5027,7 +5702,8 @@ def get_calendar_fixtures(save_id="carreira_ativa", season_year=None):
         a_id = m.get("away_team_id", 0)
         h_name = m.get("home_team_name", "Mandante")
         a_name = m.get("away_team_name", "Visitante")
-        is_user_home = (h_id == 132332) or ("portuguesa" in str(h_name).lower())
+        is_u_match = 1 if (m.get("is_user_match") == 1 or h_id == user_tid or a_id == user_tid or user_tname.lower() in str(h_name).lower() or user_tname.lower() in str(a_name).lower()) else 0
+        is_user_home = (h_id == user_tid) or (user_tname.lower() in str(h_name).lower())
         opp_name = a_name if is_user_home else h_name
         opp_id = a_id if is_user_home else h_id
 
@@ -5056,6 +5732,7 @@ def get_calendar_fixtures(save_id="carreira_ativa", season_year=None):
             "motm_player_id": m.get("motm_player_id"),
             "motm_player_name": m.get("motm_player_name"),
             "mando": "CASA" if is_user_home else "FORA",
+            "is_user_match": is_u_match,
             "is_concluido": 1,
             "status": "CONCLUÍDO"
         })
@@ -5610,7 +6287,7 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
             except Exception:
                 pass
 
-    # Carregar nacionalidade e gênero reais direto do banco de dados oficial do FC Mania
+    # Carregar nacionalidade, gênero e atributos reais direto do banco de dados oficial do FC Mania
     fcm_nat_map = {}
     try:
         import fcm_resolver
@@ -5618,16 +6295,36 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
         if f_db and os.path.exists(f_db):
             conn_f = sqlite3.connect(f_db)
             cur_f = conn_f.cursor()
-            cur_f.execute("SELECT playerid, nationality, gender FROM players")
+            cur_f.execute("""
+                SELECT playerid, nationality, gender, sprintspeed, acceleration, finishing,
+                       shotpower, shortpassing, longpassing, headingaccuracy, dribbling,
+                       ballcontrol, strength, stamina, standingtackle, slidingtackle, interceptions, vision
+                FROM players
+            """)
             for f_row in cur_f.fetchall():
                 if f_row[0] is not None:
                     fcm_nat_map[int(f_row[0])] = {
                         "nationality": int(f_row[1]) if f_row[1] is not None else 54,
-                        "gender": int(f_row[2]) if f_row[2] is not None else 0
+                        "gender": int(f_row[2]) if f_row[2] is not None else 0,
+                        "sprintspeed": int(f_row[3]) if f_row[3] is not None else None,
+                        "acceleration": int(f_row[4]) if f_row[4] is not None else None,
+                        "finishing": int(f_row[5]) if f_row[5] is not None else None,
+                        "shotpower": int(f_row[6]) if f_row[6] is not None else None,
+                        "shortpassing": int(f_row[7]) if f_row[7] is not None else None,
+                        "longpassing": int(f_row[8]) if f_row[8] is not None else None,
+                        "headingaccuracy": int(f_row[9]) if f_row[9] is not None else None,
+                        "dribbling": int(f_row[10]) if f_row[10] is not None else None,
+                        "ballcontrol": int(f_row[11]) if f_row[11] is not None else None,
+                        "strength": int(f_row[12]) if f_row[12] is not None else None,
+                        "stamina": int(f_row[13]) if f_row[13] is not None else None,
+                        "standingtackle": int(f_row[14]) if f_row[14] is not None else None,
+                        "slidingtackle": int(f_row[15]) if f_row[15] is not None else None,
+                        "interceptions": int(f_row[16]) if f_row[16] is not None else None,
+                        "vision": int(f_row[17]) if f_row[17] is not None else None,
                     }
             conn_f.close()
     except Exception as err:
-        print(f"[Career Vault] Aviso ao carregar nacionalidades do FCM: {err}")
+        print(f"[Career Vault] Aviso ao carregar atributos reais do FCM: {err}")
 
     conn = get_db()
     cur = conn.cursor()
@@ -5724,26 +6421,26 @@ def sync_scout_from_contratos_csv(save_id="carreira_ativa", csv_path=None):
             nat_id = int(live_info.get("nationality_id") or live_info.get("nationality") or fcm_info.get("nationality") or 54)
             gender = int(live_info.get("gender") if live_info.get("gender") is not None else (fcm_info.get("gender") or 0))
 
-            # Atributos específicos da tabela players do Live Editor (ou calculados pelo OVR real do save)
-            sp_speed = int(live_info.get("sprintspeed") or max(50, min(99, ovr - 5)))
-            accel = int(live_info.get("acceleration") or max(50, min(99, ovr - 5)))
-            fin = int(live_info.get("finishing") or max(45, min(99, ovr - 10 if pos in ("CB", "LB", "RB", "GK") else ovr - 2)))
-            spower = int(live_info.get("shotpower") or max(50, min(99, ovr - 5)))
+            # Atributos específicos da base real (Live Editor ou banco oficial FC Mania)
+            sp_speed = int(live_info.get("sprintspeed") or fcm_info.get("sprintspeed") or max(50, min(99, ovr - 5)))
+            accel = int(live_info.get("acceleration") or fcm_info.get("acceleration") or max(50, min(99, ovr - 5)))
+            fin = int(live_info.get("finishing") or fcm_info.get("finishing") or max(45, min(99, ovr - 10 if pos in ("CB", "LB", "RB", "GK") else ovr - 2)))
+            spower = int(live_info.get("shotpower") or fcm_info.get("shotpower") or max(50, min(99, ovr - 5)))
             lshots = int(live_info.get("longshots") or max(45, min(99, ovr - 8)))
-            head_acc = int(live_info.get("headingaccuracy") or max(45, min(99, ovr - 5)))
-            spass = int(live_info.get("shortpassing") or max(50, min(99, ovr - 4)))
-            lpass = int(live_info.get("longpassing") or max(45, min(99, ovr - 8)))
-            vis = int(live_info.get("vision") or max(45, min(99, ovr - 6)))
+            head_acc = int(live_info.get("headingaccuracy") or fcm_info.get("headingaccuracy") or max(45, min(99, ovr - 5)))
+            spass = int(live_info.get("shortpassing") or fcm_info.get("shortpassing") or max(50, min(99, ovr - 4)))
+            lpass = int(live_info.get("longpassing") or fcm_info.get("longpassing") or max(45, min(99, ovr - 8)))
+            vis = int(live_info.get("vision") or fcm_info.get("vision") or max(45, min(99, ovr - 6)))
             cross = int(live_info.get("crossing") or max(45, min(99, ovr - 8)))
-            drib = int(live_info.get("dribbling") or max(50, min(99, ovr - 4)))
-            bctrl = int(live_info.get("ballcontrol") or max(50, min(99, ovr - 4)))
+            drib = int(live_info.get("dribbling") or fcm_info.get("dribbling") or max(50, min(99, ovr - 4)))
+            bctrl = int(live_info.get("ballcontrol") or fcm_info.get("ballcontrol") or max(50, min(99, ovr - 4)))
             agi = int(live_info.get("agility") or max(50, min(99, ovr - 5)))
-            strength = int(live_info.get("strength") or max(50, min(99, ovr - 5)))
-            stam = int(live_info.get("stamina") or max(55, min(99, ovr - 3)))
+            strength = int(live_info.get("strength") or fcm_info.get("strength") or max(50, min(99, ovr - 5)))
+            stam = int(live_info.get("stamina") or fcm_info.get("stamina") or max(55, min(99, ovr - 3)))
             jump = int(live_info.get("jumping") or max(50, min(99, ovr - 5)))
-            stand_t = int(live_info.get("standingtackle") or max(40, min(99, ovr - 2 if "B" in pos or "DEF" in pos or "VOL" in pos else 45)))
-            slide_t = int(live_info.get("slidingtackle") or max(35, min(99, ovr - 4 if "B" in pos or "DEF" in pos or "VOL" in pos else 40)))
-            interc = int(live_info.get("interceptions") or max(40, min(99, ovr - 3 if "B" in pos or "DEF" in pos or "VOL" in pos else 45)))
+            stand_t = int(live_info.get("standingtackle") or fcm_info.get("standingtackle") or max(40, min(99, ovr - 2 if "B" in pos or "DEF" in pos or "VOL" in pos else 45)))
+            slide_t = int(live_info.get("slidingtackle") or fcm_info.get("slidingtackle") or max(35, min(99, ovr - 4 if "B" in pos or "DEF" in pos or "VOL" in pos else 40)))
+            interc = int(live_info.get("interceptions") or fcm_info.get("interceptions") or max(40, min(99, ovr - 3 if "B" in pos or "DEF" in pos or "VOL" in pos else 45)))
             def_aw = int(live_info.get("defensiveawareness") or max(40, min(99, ovr - 3 if "B" in pos or "DEF" in pos or "VOL" in pos else 45)))
 
             batch_data.append((
@@ -6024,12 +6721,12 @@ def search_live_scout_players(save_id, params):
             "RM": ["RM", "RW", "MD", "PD"],
             "ME": ["LM", "LW", "ME"],
             "MD": ["RM", "RW", "MD"],
-            "MEI": ["CAM", "CM", "MEI", "MC"],
-            "CAM": ["CAM", "CM", "MEI", "MC"],
-            "MC": ["CM", "CAM", "CDM", "MC", "MEI", "VOL"],
-            "CM": ["CM", "CAM", "CDM", "MC", "MEI", "VOL"],
-            "VOL": ["CDM", "CM", "VOL", "MC"],
-            "CDM": ["CDM", "CM", "VOL", "MC"],
+            "MEI": ["CAM", "MEI"],
+            "CAM": ["CAM", "MEI"],
+            "MC": ["CM", "MC"],
+            "CM": ["CM", "MC"],
+            "VOL": ["CDM", "VOL"],
+            "CDM": ["CDM", "VOL"],
             "ZAG": ["CB", "ZAG"],
             "CB": ["CB", "ZAG"],
             "LE": ["LB", "LWB", "LE"],
@@ -6156,8 +6853,14 @@ def search_live_scout_players(save_id, params):
             if c_clauses:
                 where_clauses.append(f"({' OR '.join(c_clauses)})")
 
-        # 3.2 Nacionalidade do Atleta
-        if params.get("nationality_id"):
+        # 3.2 Nacionalidade do Atleta (suporte a ID único ou lista de IDs regionais / continentais)
+        if params.get("nationality_ids") and isinstance(params["nationality_ids"], list):
+            n_ids = [int(x) for x in params["nationality_ids"] if str(x).isdigit()]
+            if n_ids:
+                ph = ",".join(["?"] * len(n_ids))
+                where_clauses.append(f"nationality_id IN ({ph})")
+                query_args.extend(n_ids)
+        elif params.get("nationality_id"):
             where_clauses.append("nationality_id = ?")
             query_args.append(int(params["nationality_id"]))
 
@@ -6282,10 +6985,10 @@ def search_live_scout_players(save_id, params):
         
         raw_limit = params.get("limit")
         try:
-            lim_val = int(raw_limit) if raw_limit is not None else 20
+            lim_val = int(raw_limit) if raw_limit is not None else 40
         except Exception:
-            lim_val = 20
-        limit = min(50, max(1, lim_val))
+            lim_val = 40
+        limit = min(40, max(1, lim_val))
 
         sql = f"""
         SELECT * FROM scout_live_players

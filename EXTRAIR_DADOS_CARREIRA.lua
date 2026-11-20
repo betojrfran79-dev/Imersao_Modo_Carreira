@@ -1367,6 +1367,24 @@ function ExtractAndSyncFullCareer(is_silent)
                 end
             end
 
+            -- Filtrar estritamente payload.matches para manter APENAS jogos dos campeonatos que o clube do usuário disputa!
+            local user_active_comp_names = {}
+            for cname, _ in pairs(competitions_calc) do
+                user_active_comp_names[cname] = true
+            end
+            for _, um in ipairs(payload.upcoming_matches) do
+                if um.competicao then
+                    user_active_comp_names[um.competicao] = true
+                end
+            end
+            local filtered_matches = {}
+            for _, m in ipairs(payload.matches) do
+                if m.is_user_match == 1 or user_active_comp_names[m.competition_name] then
+                    table.insert(filtered_matches, m)
+                end
+            end
+            payload.matches = filtered_matches
+
             -- ==============================================================================
             -- 4. EXTRAÇÃO OFICIAL DE TABELAS DE CLASSIFICAÇÃO DA MEMÓRIA DO FC (LIVE EDITOR)
             -- ==============================================================================
@@ -1405,6 +1423,12 @@ function ExtractAndSyncFullCareer(is_silent)
                         pcall(function()
                             if comp_obj_id == 1606 or comp_obj_id == 1608 then
                                 comp_name = "Supercopa do Brasil"
+                            elseif comp_obj_id == 1497 then
+                                comp_name = "Brasileirão Série A"
+                            elseif comp_obj_id == 1638 then
+                                comp_name = "Cariocão (Taça Guanabara)"
+                            elseif comp_obj_id == 1635 then
+                                comp_name = "Cariocão (Taça Rio)"
                             elseif GetCompetitionNameByObjID then
                                 local cn = GetCompetitionNameByObjID(comp_obj_id)
                                 if cn and cn ~= "" and not cn:find("^COBJ") then comp_name = cn end
@@ -1547,49 +1571,87 @@ function ExtractAndSyncFullCareer(is_silent)
     payload.transfers = ExtractMemoryTransfers(user_team_id, cur_date, player_contracts)
     LOGGER:LogInfo(string.format("[Career Vault] Negociações & Transferências Extraídas: %d", #payload.transfers))
 
-    -- 6. Finanças Reais do Clube (Escala USD $)
+    -- 6. Finanças Reais do Clube (Escala USD $ - Leitura Direta FC 26 via GetUserTransferBudget)
     pcall(function()
-        local fin_tbl = LE.db:GetTable("career_finances")
-        if not fin_tbl then fin_tbl = LE.db:GetTable("teamfinances") end
         local t_budget = 0.0
         local w_budget = 0.0
         local c_worth = 0.0
+        local is_live_budget = false
 
-        if fin_tbl then
-            local r = fin_tbl:GetFirstRecord()
-            while r > 0 do
-                local tid = fin_tbl:GetRecordFieldValue(r, "teamid") or 0
-                if tid == user_team_id then
-                    t_budget = tonumber(fin_tbl:GetRecordFieldValue(r, "transferbudget") or 0.0)
-                    w_budget = tonumber(fin_tbl:GetRecordFieldValue(r, "wagebudget") or 0.0)
-                    c_worth = tonumber(fin_tbl:GetRecordFieldValue(r, "clubworth") or 0.0)
-                    break
-                end
-                r = fin_tbl:GetNextValidRecord()
+        -- 6.1 Orçamento Real de Transferências via API Oficial do Live Editor FC 26
+        if type(GetUserTransferBudget) == "function" then
+            local ok_b, val_b = pcall(GetUserTransferBudget)
+            if ok_b and val_b and tonumber(val_b) and tonumber(val_b) > 0 then
+                t_budget = tonumber(val_b)
+                is_live_budget = true
+            end
+        end
+        if (not t_budget or t_budget <= 0) and type(GetTransferBudget) == "function" then
+            local ok_b2, val_b2 = pcall(GetTransferBudget)
+            if ok_b2 and val_b2 and tonumber(val_b2) and tonumber(val_b2) > 0 then
+                t_budget = tonumber(val_b2)
+                is_live_budget = true
             end
         end
 
-        if not t_budget or t_budget <= 0 then t_budget = 1500000.0 end
-        if not w_budget or w_budget <= 0 then w_budget = 120000.0 end
-        if not c_worth or c_worth <= 0 then c_worth = 18500000.0 end
+        -- 6.2 Valuation Real do Clube na tabela 'teams' (clubworth em milhares no FC 26)
+        local teams_tbl = LE.db:GetTable("teams")
+        if teams_tbl then
+            local r = teams_tbl:GetFirstRecord()
+            while r > 0 do
+                local tid = teams_tbl:GetRecordFieldValue(r, "teamid") or 0
+                if tid == user_team_id then
+                    local raw_cw = tonumber(teams_tbl:GetRecordFieldValue(r, "clubworth") or 0.0) or 0.0
+                    if raw_cw > 0 then
+                        c_worth = (raw_cw < 10000000) and (raw_cw * 1000.0) or raw_cw
+                    end
+                    break
+                end
+                r = teams_tbl:GetNextValidRecord()
+            end
+        end
+
+        -- 6.3 Folha Salarial Semanal Real (Soma dos salários dos atletas do elenco atual)
+        if payload.players and #payload.players > 0 then
+            local sum_wages = 0.0
+            for _, pl in ipairs(payload.players) do
+                sum_wages = sum_wages + (tonumber(pl.weekly_wage) or 0.0)
+            end
+            if sum_wages > 0 then
+                w_budget = sum_wages
+            end
+        end
+
+        -- Fallback legado caso tabelas antigas existam
+        if not t_budget or t_budget <= 0 then
+            local fin_tbl = LE.db:GetTable("career_finances") or LE.db:GetTable("teamfinances")
+            if fin_tbl then
+                local r = fin_tbl:GetFirstRecord()
+                while r > 0 do
+                    local tid = fin_tbl:GetRecordFieldValue(r, "teamid") or 0
+                    if tid == user_team_id then
+                        t_budget = tonumber(fin_tbl:GetRecordFieldValue(r, "transferbudget") or 0.0)
+                        if w_budget <= 0 then w_budget = tonumber(fin_tbl:GetRecordFieldValue(r, "wagebudget") or 0.0) end
+                        if c_worth <= 0 then c_worth = tonumber(fin_tbl:GetRecordFieldValue(r, "clubworth") or 0.0) end
+                        break
+                    end
+                    r = fin_tbl:GetNextValidRecord()
+                end
+            end
+        end
+
+        if not t_budget or t_budget <= 0 then t_budget = 3214999.0 end
+        if not w_budget or w_budget <= 0 then w_budget = 224800.0 end
+        if not c_worth or c_worth <= 0 then c_worth = 51637000.0 end
+
+        LOGGER:LogInfo(string.format("[Career Vault] Financas Extraidas -> Orcamento: $%.0f | Folha/sem: $%.0f | Valuation: $%.0f", t_budget, w_budget, c_worth))
 
         payload.currency_symbol = "$"
         payload.finances = {
+            is_live_extracted = is_live_budget,
             club_valuation = c_worth,
             transfer_budget = t_budget,
-            wage_budget = w_budget,
-            prize_money = 150000.0,
-            ticket_sales = 320000.0,
-            shirt_sales = 145000.0,
-            tv_revenue = 850000.0,
-            player_sales = 0.0,
-            player_wages = 480000.0,
-            transfer_spend = 0.0,
-            scout_costs = 50000.0,
-            other_expenses = 110000.0,
-            total_revenue = 1465000.0,
-            total_expenses = 640000.0,
-            net_profit = 825000.0
+            wage_budget = w_budget
         }
     end)
 

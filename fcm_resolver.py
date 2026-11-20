@@ -364,6 +364,54 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
 
     raw = dict(live_p) if live_p else {}
 
+    # Se o atleta pertence ao elenco do técnico no save ativo, prioriza os dados contratuais e do time atual
+    user_team_match = None
+    user_transfer_match = None
+    if os.path.exists(vault_db):
+        try:
+            conn = sqlite3.connect(vault_db)
+            conn.row_factory = sqlite3.Row
+            cur = conn.cursor()
+            cur.execute("""
+            SELECT s.current_team_id, s.current_team_name, pss.weekly_wage, pss.overall_rating, pss.potential, pss.position
+            FROM saves s
+            JOIN player_season_stats pss ON pss.save_id = s.id AND pss.player_id = ?
+            WHERE s.id = ?
+            ORDER BY pss.id DESC LIMIT 1
+            """, (player_id, save_id))
+            user_team_match = cur.fetchone()
+            
+            cur.execute("""
+            SELECT transfer_date, fee, from_team_name, transfer_type, season_year
+            FROM transfers
+            WHERE save_id = ? AND player_id = ?
+            ORDER BY id DESC LIMIT 1
+            """, (save_id, player_id))
+            user_transfer_match = cur.fetchone()
+            conn.close()
+        except Exception:
+            pass
+
+    if user_team_match:
+        raw["team_id"] = user_team_match["current_team_id"]
+        raw["team_name"] = user_team_match["current_team_name"]
+        if user_team_match["weekly_wage"] and float(user_team_match["weekly_wage"]) > 0:
+            raw["weekly_wage"] = float(user_team_match["weekly_wage"])
+        if user_team_match["overall_rating"]:
+            raw["overall_rating"] = user_team_match["overall_rating"]
+        if user_team_match["potential"]:
+            raw["potential"] = user_team_match["potential"]
+        if user_team_match["position"]:
+            raw["position"] = user_team_match["position"]
+
+    if user_transfer_match and user_transfer_match["transfer_date"]:
+        raw["join_date_formatted"] = user_transfer_match["transfer_date"]
+        raw["transfer_origin"] = user_transfer_match["from_team_name"]
+        raw["transfer_type"] = user_transfer_match["transfer_type"]
+        raw["transfer_fee"] = user_transfer_match["fee"]
+        t_yr = int(user_transfer_match["season_year"] or 2030)
+        raw["contract_valid_until"] = t_yr + 2
+
     # Consulta complementar ao banco oficial do FC Mania com TODAS as colunas
     fcm_p = None
     f_db = find_fcm_db()
@@ -436,8 +484,11 @@ def get_full_player_profile(player_id, save_id="carreira_ativa"):
     else:
         calc_age = int(raw.get("age") or 24)
 
-    raw_join = fcm_p.get("playerjointeamdate") if fcm_p and fcm_p.get("playerjointeamdate") else raw.get("playerjointeamdate")
-    join_date_formatted = format_date_pt(raw_join) if raw_join else ""
+    if raw.get("join_date_formatted"):
+        join_date_formatted = raw["join_date_formatted"]
+    else:
+        raw_join = fcm_p.get("playerjointeamdate") if fcm_p and fcm_p.get("playerjointeamdate") else raw.get("playerjointeamdate")
+        join_date_formatted = format_date_pt(raw_join) if raw_join else ""
 
     # 7. Contrato, Salário e Valores de Mercado (career_playercontract e calibração oficial)
     contract_until = int(raw.get("contract_valid_until") or (fcm_p.get("contractvaliduntil") if fcm_p else 2028) or 2028)
@@ -1174,8 +1225,14 @@ def search_scout_players(params, current_year=None, save_id="carreira_ativa"):
             query_args.extend(pos_list)
             query_args.extend(pos_list)
 
-    # 2.5 Nacionalidade
-    if params.get("nationality_id"):
+    # 2.5 Nacionalidade (suporte a ID único ou lista de IDs de região/continente)
+    if params.get("nationality_ids") and isinstance(params["nationality_ids"], list):
+        n_ids = [int(x) for x in params["nationality_ids"] if str(x).isdigit()]
+        if n_ids:
+            ph = ",".join(["?"] * len(n_ids))
+            where_clauses.append(f"nationality IN ({ph})")
+            query_args.extend(n_ids)
+    elif params.get("nationality_id"):
         where_clauses.append("nationality = ?")
         query_args.append(int(params["nationality_id"]))
 
@@ -1500,7 +1557,7 @@ def search_scout_players(params, current_year=None, save_id="carreira_ativa"):
     min_height = _safe_int(params.get("min_height"))
     max_height = _safe_int(params.get("max_height"))
     is_wonderkid = params.get("is_wonderkid", False)
-    limit = min(50, int(params.get("limit", 20)))
+    limit = min(40, int(params.get("limit", 40)))
 
     for r in rows:
         name = r["commonname"] if r["commonname"] else f"{r['firstname']} {r['lastname']}".strip()
@@ -1818,6 +1875,34 @@ NATIONALITY_DEMONYMS_MAP = {
     50: ["gales", "galeses", "galesa", "galesas", "nascido no pais de gales", "wal"]
 }
 
+CONTINENT_REGIONS_MAP = {
+    "america_do_sul": {
+        "name": "América do Sul",
+        "keywords": [
+            "america do sul", "américa do sul", "sul-americano", "sulamericano", 
+            "sul-americana", "sulamericana", "sul-americanos", "sulamericanos", 
+            "sul-americanas", "sulamericanas", "conmebol", "paises da america do sul",
+            "paises da américa do sul", "pais da america do sul", "pais da américa do sul",
+            "aqui da america do sul", "aqui da américa do sul", "sul americano", "sul americana",
+            "nascido na america do sul", "nascidos na américa do sul", "futebol sul americano", "futebol sul-americano"
+        ],
+        "nationality_ids": [52, 53, 54, 55, 56, 57, 58, 59, 60, 61],
+        "countries": ["Argentina", "Bolívia", "Brasil", "Chile", "Colômbia", "Equador", "Paraguai", "Peru", "Uruguai", "Venezuela"]
+    },
+    "europa": {
+        "name": "Europa",
+        "keywords": ["europa", "europeu", "europeus", "europeia", "europeias", "uefa", "continente europeu", "paises europeus", "pais europeu"],
+        "nationality_ids": [14, 18, 21, 27, 34, 38, 45, 7, 10, 13, 36, 37, 46, 47, 48],
+        "countries": ["Inglaterra", "França", "Alemanha", "Itália", "Holanda", "Portugal", "Espanha", "Bélgica", "Croácia", "Dinamarca", "Noruega", "Polônia", "Suécia", "Suíça", "Turquia"]
+    },
+    "africa": {
+        "name": "África",
+        "keywords": ["africa", "áfrica", "africano", "africanos", "africana", "africanas", "continente africano", "caf", "paises africanos", "pais africano"],
+        "nationality_ids": [133, 136, 129, 114, 117],
+        "countries": ["Nigéria", "Senegal", "Marrocos", "Costa do Marfim", "Gana"]
+    }
+}
+
 EA_FC_SEARCH_DICTIONARY = {
     # 1. Posições (mapeia fala em português para a sigla/ID do FC Mania)
     "posicoes": {
@@ -1838,16 +1923,20 @@ EA_FC_SEARCH_DICTIONARY = {
             "termos": ["lb", "lwb", "lateral esquerdo", "laterais esquerdos", "ala esquerdo", "alas esquerdos", "ala esquerda", "alas esquerdas", "le", "ade"]
         },
         "volante": {
+            "siglas": ["CDM"],
+            "termos": ["cdm", "volante", "volantes", "primeiro volante", "trinco", "cabeça de área", "cabeca de area", "meio-campo defensivo", "vol", "marcação no meio", "cão de guarda", "cao de guarda", "pitbull"]
+        },
+        "segundo_volante": {
             "siglas": ["CDM", "CM"],
-            "termos": ["cdm", "volante", "volantes", "primeiro volante", "trinco", "cabeça de área", "cabeca de area", "meio-campo defensivo", "vol", "marcação no meio"]
+            "termos": ["segundo volante", "segundos volantes", "volante que sai", "volante misto", "volante construtor"]
         },
         "meia_central": {
-            "siglas": ["CM", "CAM"],
-            "termos": ["cm", "meia central", "segundo volante", "meia", "meias", "ritmista", "meio-campo", "meio campo", "mc"]
+            "siglas": ["CM"],
+            "termos": ["cm", "meia central", "meias centrais", "ritmista", "meio-campo central", "meio campo central", "mc"]
         },
         "meia_atacante": {
             "siglas": ["CAM"],
-            "termos": ["cam", "meia atacante", "armador", "armadores", "camisa 10", "meia de ligação", "meia de ligacao", "meia ofensivo", "meia de criação", "meia de criacao", "mei"]
+            "termos": ["cam", "meia atacante", "armador", "armadores", "camisa 10", "meia de ligação", "meia de ligacao", "meia ofensivo", "meia de criação", "meia de criacao", "mei", "meia armador"]
         },
         "ponta_direita": {
             "siglas": ["RW", "RM"],
@@ -2049,8 +2138,23 @@ def parse_natural_language_scout_query(user_msg):
     o EA_FC_SEARCH_DICTIONARY e distinguindo setores, ligas de atuação e nacionalidade.
     """
     norm = normalize_text(user_msg)
+    # Limite padrão de 40 jogadores (com suporte a menção explícita na frase, máx 40)
+    scout_limit = 40
+    m_lim = re.search(r'(?:top|mostrar?|listar?|trazer?|traga|mostre|liste|ate)\s*(\d{1,3})\b', norm)
+    if not m_lim:
+        m_lim = re.search(r'\b(\d{1,3})\s*(?:jogadores|atletas|nomes|opcoes|opções|alvos)\b', norm)
+    if m_lim:
+        try:
+            cand_lim = int(m_lim.group(1))
+            if 1 <= cand_lim <= 40:
+                scout_limit = cand_lim
+            elif cand_lim > 40:
+                scout_limit = 40
+        except Exception:
+            pass
+
     params = {
-        "limit": 20,
+        "limit": scout_limit,
         "order_by": "ovr_desc",
         "recognized": False
     }
@@ -2100,7 +2204,7 @@ def parse_natural_language_scout_query(user_msg):
             params["club_country_name"] = " / ".join([COUNTRY_ACTING_MAP[cid]["name"] for cid in matched_countries])
 
     # =========================================================================
-    # 0.3 NACIONALIDADE DE NASCIMENTO (GENTÍLICOS E TERMOS DE CIDADANIA)
+    # 0.3 NACIONALIDADE DE NASCIMENTO (CONTINENTES, REGIÕES E GENTÍLICOS)
     # =========================================================================
     norm_for_nat = norm
     if params.get("club_country"):
@@ -2112,16 +2216,31 @@ def parse_natural_language_scout_query(user_msg):
         for kw in detected_league["keywords"]:
             norm_for_nat = norm_for_nat.replace(kw, " ")
 
-    all_nat_candidates = []
-    for nat_id, demonyms in NATIONALITY_DEMONYMS_MAP.items():
-        for d in demonyms:
-            if has_keyword(norm_for_nat, [d]):
-                all_nat_candidates.append((len(d), nat_id, demonyms[0]))
-    if all_nat_candidates:
-        all_nat_candidates.sort(key=lambda x: x[0], reverse=True)
-        _, best_nat_id, best_nat_name = all_nat_candidates[0]
-        params["nationality_id"] = best_nat_id
-        params["nationality_name"] = best_nat_name.capitalize()
+    # 0.3.1 Continentes e Regiões Amplas (ex: América do Sul, Europa, África)
+    matched_region = None
+    for r_key, r_data in CONTINENT_REGIONS_MAP.items():
+        for kw in r_data["keywords"]:
+            if has_keyword(norm_for_nat, [kw]) or (len(kw.split()) > 1 and kw in norm_for_nat):
+                matched_region = r_data
+                break
+        if matched_region:
+            break
+
+    if matched_region:
+        params["region"] = matched_region["name"]
+        params["nationality_ids"] = list(matched_region["nationality_ids"])
+        params["nationality_name"] = matched_region["name"]
+    else:
+        all_nat_candidates = []
+        for nat_id, demonyms in NATIONALITY_DEMONYMS_MAP.items():
+            for d in demonyms:
+                if has_keyword(norm_for_nat, [d]):
+                    all_nat_candidates.append((len(d), nat_id, demonyms[0]))
+        if all_nat_candidates:
+            all_nat_candidates.sort(key=lambda x: x[0], reverse=True)
+            _, best_nat_id, best_nat_name = all_nat_candidates[0]
+            params["nationality_id"] = best_nat_id
+            params["nationality_name"] = best_nat_name.capitalize()
 
     # =========================================================================
     # 1. SETORES E POSIÇÕES ESPECÍFICAS (VIA EA_FC_SEARCH_DICTIONARY)
@@ -2175,11 +2294,25 @@ def parse_natural_language_scout_query(user_msg):
 
     # Piso explícito: "acima de 75", "mínimo 75", "a partir de 75", "over maior que 75", "mais de 75 de over"
     if "min_ovr" not in params:
-        m_min_ovr = re.search(r'(?:acima\s*de|no\s*minimo|minimo|piso\s*de|piso|maior\s*que|a\s*partir\s*de|mais\s*de|superior\s*a|com\s*over\s*acima\s*de)\s*(?:de\s*)?(\d{2})\s*(?:de\s*)?(?:overall|ovr|rating|over|geral|nota)?(?!\s*(?:anos?|milh|mi\b|m\b|mil\b|k\b|reais|euros))', norm)
+        # 1. Padrões explícitos com over / overall / rating / nota
+        m_min_ovr = re.search(r'(?:overall|ovr|rating|over|geral|nota)\s*(?:acima\s*de|no\s*minimo|minimo|piso|maior\s*que|a\s*partir\s*de|mais\s*de|superior\s*a|com\s*over\s*acima\s*de)\s*(?:de\s*)?(\d{2})', norm)
         if not m_min_ovr:
-            m_min_ovr = re.search(r'(?:overall|ovr|rating|over|geral|nota)\s*(?:acima\s*de|no\s*minimo|minimo|piso|maior\s*que|a\s*partir\s*de|mais\s*de|superior\s*a)\s*(?:de\s*)?(\d{2})', norm)
+            m_min_ovr = re.search(r'(?:acima\s*de|no\s*minimo|minimo|piso\s*de|piso|maior\s*que|a\s*partir\s*de|mais\s*de|superior\s*a)\s*(?:de\s*)?(\d{2})\s*(?:de\s*)?(?:overall|ovr|rating|over|geral|nota)', norm)
         if not m_min_ovr:
             m_min_ovr = re.search(r'(\d{2})\s*(?:de\s*)?(?:overall|ovr|rating|over|geral|nota)\s*(?:para\s*cima|no\s*minimo|minimo|piso|ou\s*mais)', norm)
+        
+        # 2. Padrão genérico "acima de 75", DESDE QUE NÃO seja preceded/followed por atributos específicos (ritmo, passe, etc.)
+        if not m_min_ovr:
+            m_cand_generic = re.search(r'(?:acima\s*de|no\s*minimo|minimo|piso\s*de|piso|maior\s*que|a\s*partir\s*de|mais\s*de|superior\s*a)\s*(?:de\s*)?(\d{2})', norm)
+            if m_cand_generic:
+                s_idx, e_idx = m_cand_generic.start(), m_cand_generic.end()
+                before_ctx = norm[max(0, s_idx - 30):s_idx].strip()
+                after_ctx = norm[e_idx:min(len(norm), e_idx + 30)].strip()
+                attr_terms = ["ritmo", "pace", "velocidade", "rapidez", "chute", "finalizacao", "passe", "drible", "defesa", "desarme", "fisico", "forca", "altura", "estatura", "idade", "anos", "potencial", "pot", "milh", "mi", "mil"]
+                is_attr_related = any(has_keyword(before_ctx, [t]) or has_keyword(after_ctx, [t]) for t in attr_terms)
+                if not is_attr_related:
+                    m_min_ovr = m_cand_generic
+
         if m_min_ovr:
             cand = int(m_min_ovr.group(1))
             if 40 <= cand <= 99:
@@ -2596,7 +2729,7 @@ def call_gemini_scout_parser(user_msg, language="pt", api_key=""):
 Sua missão é interpretar a solicitação de voz/texto do treinador (que pode estar em Português, Inglês ou Espanhol) e convertê-la EXCLUSIVAMENTE em um objeto JSON com os filtros técnicos de pesquisa.
 
 Campos aceitos no JSON (inclua apenas os parâmetros solicitados ou fortemente implícitos):
-- positions: lista de siglas canônicas da posição (ex: ["ST"], ["CF"], ["CB"], ["LB", "LWB"], ["RB", "RWB"], ["CDM", "CM"], ["CAM"], ["LW", "LM"], ["RW", "RM"], ["GK"]).
+- positions: lista de siglas canônicas da posição (ex: ["ST"], ["CF"], ["CB"], ["LB", "LWB"], ["RB", "RWB"], ["CDM"], ["CM"], ["CAM"], ["LW", "LM"], ["RW", "RM"], ["GK"]). IMPORTANTE: Se o treinador pedir 'volante' ou 'volantes', retorne estritamente ["CDM"]. JAMAIS inclua 'CAM' ou 'MEI' em buscas de volantes.
 - min_ovr: inteiro (40 a 99)
 - max_ovr: inteiro (40 a 99)
 - min_pot: inteiro (50 a 99)
@@ -2616,12 +2749,14 @@ Campos aceitos no JSON (inclua apenas os parâmetros solicitados ou fortemente i
 - min_skillmoves: inteiro de 1 a 5 (estrelas de finta/drible)
 - min_weakfoot: inteiro de 1 a 5 (estrelas de perna ruim / ambidestro = 5)
 - is_wonderkid: boolean (true se pediu joia, promessa mundial, wonderkid, futuro craque)
-- nationality_name: string com o país de nascimento (ex: 'Brasil', 'Argentina', 'França', 'Inglaterra', 'Espanha', etc.)
+- region: continente ou região caso mencionada (ex: 'América do Sul', 'Europa', 'África'). Quando o treinador falar 'América do Sul' ou 'sul-americano', preencha region: 'América do Sul'.
+- nationality_name: string com o país de nascimento individual (ex: 'Brasil', 'Argentina', 'França', 'Inglaterra', 'Espanha', etc.)
 - league_name: string com a liga onde joga (ex: 'Premier League', 'LALIGA', 'Brasileirão', 'Serie A', 'Bundesliga', etc.)
 - club_country: string com o país onde joga caso mencione apenas um país (ex: 'Brasil', 'Espanha', 'Inglaterra')
 - club_countries: lista de strings com os países onde joga caso mencione um ou mais países (ex: ['Brasil', 'México'])
 - query: string caso o usuário queira buscar um jogador específico pelo nome (ex: 'Endrick', 'Haaland', 'Vini Jr')
 - order_by: ordenação mais lógica para o pedido ('ovr_desc', 'pace_desc', 'finishing_desc', 'passing_desc', 'dribbling_desc', 'defending_desc', 'strength_desc', 'heading_desc', 'pot_desc', 'value_asc')
+- limit: inteiro de jogadores a retornar (padrão: 40, máximo: 40)
 - gender: 0 para masculino, 1 para feminino
 
 REGRAS OBRIGATÓRIAS:
@@ -2670,23 +2805,47 @@ REGRAS OBRIGATÓRIAS:
                         # Pós-processamento e enriquecimento de dados
                         parsed_params["recognized"] = True
                         if "limit" not in parsed_params:
-                            parsed_params["limit"] = 20
+                            parsed_params["limit"] = 40
+                        else:
+                            try:
+                                parsed_params["limit"] = min(40, max(1, int(parsed_params["limit"])))
+                            except Exception:
+                                parsed_params["limit"] = 40
 
-                        # Resolver Nacionalidade para ID numérico
-                        nat_name = parsed_params.get("nationality_name")
-                        if nat_name:
-                            nat_norm = normalize_text(nat_name)
-                            found_nat_id = None
-                            for nid, terms in NATIONALITY_DEMONYMS_MAP.items():
-                                for t in terms:
-                                    t_norm = normalize_text(t)
-                                    if t_norm == nat_norm or t_norm in nat_norm or nat_norm in t_norm:
-                                        found_nat_id = nid
+                        # Resolver Região / Continente para IDs numéricos (ex: América do Sul)
+                        region_cand = parsed_params.get("region") or parsed_params.get("nationality_name") or ""
+                        if region_cand:
+                            reg_norm = normalize_text(region_cand)
+                            for r_key, r_data in CONTINENT_REGIONS_MAP.items():
+                                if any(kw in reg_norm or reg_norm in kw for kw in r_data["keywords"]):
+                                    parsed_params["region"] = r_data["name"]
+                                    parsed_params["nationality_ids"] = list(r_data["nationality_ids"])
+                                    parsed_params["nationality_name"] = r_data["name"]
+                                    break
+
+                        # Resolver Nacionalidade individual para ID numérico (se não for continente)
+                        if not parsed_params.get("nationality_ids"):
+                            nat_name = parsed_params.get("nationality_name")
+                            if nat_name:
+                                nat_norm = normalize_text(nat_name)
+                                found_nat_id = None
+                                for nid, terms in NATIONALITY_DEMONYMS_MAP.items():
+                                    for t in terms:
+                                        t_norm = normalize_text(t)
+                                        if t_norm == nat_norm or t_norm in nat_norm or nat_norm in t_norm:
+                                            found_nat_id = nid
+                                            break
+                                    if found_nat_id:
                                         break
                                 if found_nat_id:
-                                    break
-                            if found_nat_id:
-                                parsed_params["nationality_id"] = found_nat_id
+                                    parsed_params["nationality_id"] = found_nat_id
+
+                        # Garantir que busca de 'volante' não traga posições de armador ofensivo ('CAM' / 'MEI')
+                        if parsed_params.get("positions") and isinstance(parsed_params["positions"], list):
+                            pos_up = [p.upper() for p in parsed_params["positions"]]
+                            if "CDM" in pos_up and "CAM" in pos_up and not any(k in clean_msg.lower() for k in ["cam", "mei", "armador", "ofensivo", "camisa 10"]):
+                                pos_up.remove("CAM")
+                            parsed_params["positions"] = pos_up
 
                         # Resolver Pé Preferencial
                         if parsed_params.get("preferred_foot") == 2:

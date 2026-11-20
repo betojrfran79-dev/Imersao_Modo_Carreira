@@ -12,13 +12,14 @@
   
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Favicon / App Icon -->
   <link rel="icon" type="image/x-icon" href="/siga_logo.ico">
   <link rel="shortcut icon" type="image/x-icon" href="/siga_logo.ico">
   
   <!-- Main CSS -->
-  <link rel="stylesheet" href="style.css?v=4.2">
+  <link rel="stylesheet" href="style.css?v=6.2">
 
   <!-- html2canvas CDN (Exportação de cards e capas de jornais em imagem PNG) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -136,6 +137,10 @@
         <button class="nav-item" data-tab="squad">
           <i data-lucide="users"></i>
           <span data-i18n="menu.squad">Elenco & Atletas</span>
+        </button>
+        <button class="nav-item" data-tab="youth">
+          <i data-lucide="graduation-cap"></i>
+          <span>Categorias de Base</span>
         </button>
         <button class="nav-item" data-tab="transfers">
           <i data-lucide="arrow-left-right"></i>
@@ -506,6 +511,32 @@
           </div>
         </div>
 
+        <!-- Painel Executivo de Patrocínios, TV & Governança de Orçamento (Painel do Momento) -->
+        <div class="glass-card" id="dashSponsorshipQuickBar" style="padding: 1rem 1.35rem; margin-bottom: 1.35rem; border: 1px solid rgba(245, 158, 11, 0.35); background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(30, 41, 59, 0.85)); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 1rem; flex: 1; min-width: 280px;">
+            <div style="width: 46px; height: 46px; border-radius: 12px; background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.4); display: flex; align-items: center; justify-content: center; color: #fbbf24; flex-shrink: 0;">
+              <i data-lucide="handshake" style="width: 24px; height: 24px;"></i>
+            </div>
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; margin-bottom: 3px;">
+                <span class="badge-tag gold" id="dashSponsTierBadge" style="font-size: 0.72rem;">CARREGANDO ESCALÃO...</span>
+                <span class="badge-tag blue" id="dashSponsWindowBadge" style="font-size: 0.72rem;">CALENDÁRIO COMERCIAL</span>
+                <span class="badge-tag green" id="dashSponsBudgetBadge" style="font-size: 0.72rem;">Caixa: $ 3,21M</span>
+              </div>
+              <h4 style="margin: 0; font-size: 1.02rem; color: #f8fafc;">Conselho Comercial: Patrocínios de Uniforme, Cotas de TV &amp; Orçamento</h4>
+              <p id="dashSponsQuickSummary" style="margin: 2px 0 0 0; font-size: 0.82rem; color: #94a3b8;">Análise contínua do histórico do clube sem zerar temporadas anteriores. Negocie marcas reais e injete verbas no save (F9).</p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn-primary" onclick="openSponsorshipMeetingModal(true)" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; padding: 0.6rem 1.05rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+              <i data-lucide="briefcase"></i> Reunião de Patrocínios &amp; TV
+            </button>
+            <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.12); color: #34d399; font-weight: 700; padding: 0.6rem 1rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+              <i data-lucide="coins"></i> Solicitar Mais Verba à Diretoria
+            </button>
+          </div>
+        </div>
+
         <!-- Layout Grid: Última Partida & Próximo Confronto -->
         <div class="dash-grid-2">
           
@@ -792,6 +823,12 @@
             </div>
             <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
               <span id="bmGeneratedAt" style="font-size: 0.78rem; color: var(--text-dim);">—</span>
+              <button type="button" class="btn-secondary" onclick="openSponsorshipMeetingModal(true)" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24;">
+                <i data-lucide="briefcase"></i> Patrocínios &amp; TV
+              </button>
+              <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); color: #34d399;">
+                <i data-lucide="coins"></i> Pedir Mais Verba
+              </button>
               <button type="button" class="btn-secondary" onclick="openSquadAuditMatrix()" style="border-color: rgba(56, 189, 248, 0.45); color: #38bdf8;">
                 <i data-lucide="layout-grid"></i> Ver Matriz do Elenco
               </button>
@@ -919,8 +956,17 @@
 
           <!-- Jogos Realizados na Temporada -->
           <div class="glass-card">
-            <div class="card-header">
-              <div class="ch-title"><i data-lucide="calendar"></i> Partidas da Temporada</div>
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+              <div class="ch-title"><i data-lucide="calendar"></i> Partidas da Temporada (<span id="seasonMatchesCountBadge">0</span>)</div>
+              <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <select id="seasonMatchesScopeFilter" class="vault-select" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px; background: rgba(15, 23, 42, 0.85); color: #f8fafc; border: 1px solid rgba(96, 165, 250, 0.4);" onchange="renderSeasonMatchesList()">
+                  <option value="USER_ONLY" selected>⭐ Só Jogos do Meu Time</option>
+                  <option value="ALL_TEAMS">⚽ Todos os Jogos dos Meus Campeonatos</option>
+                </select>
+                <select id="seasonMatchesCompFilter" class="vault-select" style="padding: 4px 10px; font-size: 0.8rem; border-radius: 6px; background: rgba(15, 23, 42, 0.85); color: #f8fafc; border: 1px solid rgba(148, 163, 184, 0.3);" onchange="renderSeasonMatchesList()">
+                  <option value="TODAS">Todas as Competições</option>
+                </select>
+              </div>
             </div>
             <div class="matches-scroll-list" id="seasonMatchesList">
               <!-- Partidas da temporada -->
@@ -949,20 +995,29 @@
 
         <!-- Filtros e Tabs do Calendário -->
         <div class="calendar-filters-bar glass-card">
-          <div class="cal-filter-group">
-            <span class="filter-label"><i data-lucide="filter"></i> Filtrar por Competição:</span>
-            <div class="comp-filter-chips" id="calCompFilterChips">
-              <button class="filter-chip active" data-comp="TODAS">Todas as Competições</button>
+          <div class="cal-filter-group" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+              <span class="filter-label"><i data-lucide="filter"></i> Filtrar por Competição:</span>
+              <div class="comp-filter-chips" id="calCompFilterChips">
+                <button class="filter-chip active" data-comp="TODAS">Todas as Competições</button>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="filter-label" style="font-size: 0.82rem; color: #94a3b8;"><i data-lucide="shield"></i> Exibir:</span>
+              <select id="calTeamScopeSelect" class="vault-select" style="padding: 6px 12px; font-size: 0.84rem; border-radius: 8px; background: rgba(15, 23, 42, 0.9); color: #f8fafc; border: 1px solid rgba(96, 165, 250, 0.45); font-weight: 600;">
+                <option value="USER_ONLY" selected>⭐ Só Jogos do Meu Time</option>
+                <option value="ALL_TEAMS">⚽ Todos os Jogos dos Meus Campeonatos</option>
+              </select>
             </div>
           </div>
           <div class="cal-status-tabs">
-            <button class="cal-tab-btn active" data-status="UPCOMING" id="calTabUpcoming">
+            <button class="cal-tab-btn" data-status="UPCOMING" id="calTabUpcoming">
               <i data-lucide="clock"></i> Próximos Jogos (<span id="calCountUpcoming">0</span>)
             </button>
             <button class="cal-tab-btn" data-status="COMPLETED" id="calTabCompleted">
               <i data-lucide="check-circle-2"></i> Jogos Concluídos (<span id="calCountCompleted">0</span>)
             </button>
-            <button class="cal-tab-btn" data-status="ALL" id="calTabAll">
+            <button class="cal-tab-btn active" data-status="ALL" id="calTabAll">
               <i data-lucide="list"></i> Todas as Partidas (<span id="calCountAll">0</span>)
             </button>
           </div>
@@ -1436,6 +1491,204 @@
       </section>
 
       <!-- ======================================================== -->
+      <!-- ABA: CATEGORIAS DE BASE & TRANSIÇÃO (LUCAS VALENÇA)      -->
+      <!-- ======================================================== -->
+      <section class="tab-pane" id="pane-youth">
+        
+        <!-- Hero Banner: Apresentação do Coordenador de Base Lucas Valença -->
+        <div class="youth-hero-banner">
+          <div class="youth-scout-intro">
+            <div class="youth-scout-avatar-wrap">
+              <img src="/assets/avatars/lucas_valenca.png" onerror="this.src='/assets/avatars/AndreRizek.jpg'" alt="Lucas Valença" class="youth-scout-img">
+              <span class="youth-scout-badge-online">ATIVO</span>
+            </div>
+            <div class="youth-scout-text">
+              <h2>
+                Lucas Valença
+                <span class="youth-specialty-pill"><i data-lucide="graduation-cap"></i> Coordenador Geral das Categorias de Base</span>
+              </h2>
+              <p class="youth-scout-desc">
+                Monitoramento contínuo das promessas do CT, leitura de potencial dinâmico (teto OVR), evolução temporal dos atributos e parecer comparativo rigoroso com o elenco profissional.
+              </p>
+            </div>
+          </div>
+          <div class="youth-banner-actions">
+            <button type="button" class="btn-primary" onclick="reloadYouthAcademyData()" style="display: flex; align-items: center; gap: 6px;">
+              <i data-lucide="refresh-cw"></i> Sincronizar Base
+            </button>
+          </div>
+        </div>
+
+        <!-- Layout Grid: Barra Lateral de Promessas + Painel Principal -->
+        <div class="youth-layout-grid">
+          
+          <!-- Barra Lateral com Lista de Jogadores da Base -->
+          <aside class="youth-list-sidebar">
+            <div class="youth-section-title">
+              <i data-lucide="users"></i>
+              <span>Promessas da Academia (<span id="youthTotalCount">0</span>)</span>
+            </div>
+            <div class="youth-cards-scroll" id="youthPlayersList">
+              <div style="padding: 1.5rem; text-align: center; color: var(--text-dim); font-size: 0.85rem;">
+                <i data-lucide="loader-2" class="spin" style="margin-bottom: 0.5rem;"></i>
+                <div>Carregando atletas da base...</div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Painel Principal de Detalhes -->
+          <main class="youth-main-panel">
+            
+            <!-- Placeholder quando nenhum jogador está selecionado -->
+            <div class="youth-empty-placeholder" id="youthEmptyPlaceholder">
+              <i data-lucide="graduation-cap" style="width: 48px; height: 48px; opacity: 0.4; margin: 0 auto; display: block;"></i>
+              <h3>Selecione uma Joia da Base</h3>
+              <p>Clique em qualquer atleta na lista ao lado para ver sua ficha técnica completa, radar de atributos e análise de transição.</p>
+            </div>
+
+            <!-- Ficha Técnica Completa do Jovem Atleta -->
+            <div id="youthProfileContainer" style="display: none;">
+              
+              <!-- Cabeçalho do Jogador -->
+              <div class="player-sheet-header youth-custom-header" style="display: flex; align-items: flex-start; gap: 1.5rem; padding: 1.25rem 1.5rem; background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 14px; margin-bottom: 1.25rem; position: relative;">
+                <div class="psm-avatar-container" style="position: relative !important; width: 104px !important; height: 104px !important; min-width: 104px !important; max-width: 104px !important; min-height: 104px !important; max-height: 104px !important; border-radius: 16px !important; overflow: hidden !important; background: #0b1120 !important; border: 2px solid rgba(245, 158, 11, 0.45) !important; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5) !important; flex-shrink: 0 !important; display: block !important;">
+                  <img id="yProfileFace" class="psm-head-img" src="" alt="Face" style="width: 104px !important; height: 104px !important; max-width: 104px !important; max-height: 104px !important; min-width: 104px !important; min-height: 104px !important; object-fit: cover !important; object-position: center top !important; border-radius: 14px !important; display: block !important;">
+                  <span class="psm-pos-badge" id="yProfilePosition" style="position: absolute !important; bottom: 4px !important; right: 4px !important; background: rgba(15, 23, 42, 0.95) !important; border: 1px solid rgba(245, 158, 11, 0.4) !important; color: var(--accent-gold) !important; font-size: 0.7rem !important; font-weight: 800 !important; padding: 2px 6px !important; border-radius: 4px !important; z-index: 2 !important;">ATA</span>
+                </div>
+                <div class="psm-main-info">
+                  <div class="psm-name-row">
+                    <h2 class="psm-player-name" id="yProfileName">Nome do Jogador</h2>
+                    <span class="psm-player-id-tag" id="yProfileIdTag">ID #000000</span>
+                  </div>
+                  <div class="psm-badges-row">
+                    <span class="psm-stat-pill ovr" id="yProfileOvr">OVR 65</span>
+                    <span class="psm-stat-pill pot" id="yProfilePot">POT 82-88</span>
+                    <span class="psm-meta-pill" id="yProfileAge">17 anos</span>
+                    <span class="psm-meta-pill" id="yProfileFoot">Destro</span>
+                  </div>
+                  <div class="psm-quick-meta-grid">
+                    <div class="psm-qm-item">
+                      <span class="psm-qm-label">FÍSICO / ALTURA</span>
+                      <strong class="psm-qm-val" id="yProfilePhys">178 cm / 72 kg</strong>
+                    </div>
+                    <div class="psm-qm-item">
+                      <span class="psm-qm-label">PERNA BOA</span>
+                      <strong class="psm-qm-val" id="yProfilePerna">Destro</strong>
+                    </div>
+                    <div class="psm-qm-item">
+                      <span class="psm-qm-label">DRIBLES / SKILLS</span>
+                      <strong class="psm-qm-val" id="yProfileSkills">⭐⭐⭐</strong>
+                    </div>
+                    <div class="psm-qm-item">
+                      <span class="psm-qm-label">PERNA RUIM</span>
+                      <strong class="psm-qm-val" id="yProfileWeakFoot">⭐⭐⭐</strong>
+                    </div>
+                    <div class="psm-qm-item">
+                      <span class="psm-qm-label">TEMPO NO CT</span>
+                      <strong class="psm-qm-val" id="yProfileMonths">4 meses</strong>
+                    </div>
+                    <div class="psm-qm-item">
+                      <span class="psm-qm-label">TETO MÁXIMO</span>
+                      <strong class="psm-qm-val text-gold" id="yProfilePotRange">88 OVR</strong>
+                    </div>
+                    <div class="psm-qm-item">
+                      <span class="psm-qm-label">RITMO DE EVOLUÇÃO</span>
+                      <strong class="psm-qm-val" id="yProfileGrowthSpeed">📈 Moderado</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Ação de Transição / Comparativo -->
+              <div style="margin: 1.25rem 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                <button type="button" class="btn-primary" onclick="runYouthComparison()" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; font-weight: 800; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                  <i data-lucide="swords"></i> Cruzar com Elenco Profissional & Parecer de Transição
+                </button>
+                <button type="button" class="btn-secondary" onclick="toggleAllYouthCategoryCards()" style="font-size: 0.82rem; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                  <i data-lucide="chevrons-up-down"></i> <span id="yToggleAllText">Recolher Todos</span>
+                </button>
+              </div>
+
+              <!-- Seção de Comparativo com Time Principal & Parecer de Lucas Valença -->
+              <div id="youthComparisonSection" style="display: none; margin-bottom: 1.5rem;">
+                <div class="youth-comp-topbar">
+                  <div class="youth-comp-title">
+                    <i data-lucide="scale"></i>
+                    <span>Diagnóstico de Transição: Base &rarr; Profissional</span>
+                  </div>
+                  <span class="youth-comp-badge" id="youthCompRivalsCount">0 atletas concorrentes no time principal</span>
+                </div>
+
+                <div class="youth-chart-box">
+                  <div class="youth-chart-header">
+                    <h4>Radar Multicamadas: Atributos da Joia vs Concorrentes Diretos da Posição</h4>
+                  </div>
+                  <div style="position: relative; height: 320px; width: 100%;">
+                    <canvas id="youthRadarChart"></canvas>
+                  </div>
+                </div>
+
+                <!-- Parecer do Coordenador de Base -->
+                <div class="youth-verdict-card">
+                  <div class="youth-verdict-header">
+                    <div class="youth-verdict-author">
+                      <img src="/assets/avatars/lucas_valenca.png" onerror="this.src='/assets/avatars/AndreRizek.jpg'" class="yv-author-img" alt="Lucas Valença">
+                      <div>
+                        <h4>Parecer Técnico de Lucas Valença</h4>
+                        <span>Avaliação Factual de Maturação & Prontidão</span>
+                      </div>
+                    </div>
+                    <span class="youth-status-pill status-ready" id="yVerdictStatusPill">Em Avaliação</span>
+                  </div>
+
+                  <div class="youth-verdict-text" id="yVerdictText">
+                    Cruzando atributos com o elenco profissional...
+                  </div>
+
+                  <div class="youth-verdict-grid">
+                    <div class="yv-mini-card">
+                      <span class="yv-label">Pontos Fortes Imediatos</span>
+                      <div class="yv-value text-green" id="yVerdictAdv">-</div>
+                    </div>
+                    <div class="yv-mini-card">
+                      <span class="yv-label">Gargalos / Atenção</span>
+                      <div class="yv-value text-gold" id="yVerdictDisadv">-</div>
+                    </div>
+                    <div class="yv-mini-card">
+                      <span class="yv-label">Projeção Máxima</span>
+                      <div class="yv-value" id="yVerdictCeiling">-</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Gráfico de Evolução Temporal das 7 Categorias -->
+              <div class="youth-chart-box" style="margin-bottom: 1.5rem;">
+                <div class="youth-chart-header">
+                  <h4><i data-lucide="trending-up"></i> Curva de Evolução Temporal (Notas das 7 Categorias Oficiais)</h4>
+                  <span style="font-size: 0.75rem; color: var(--text-dim);">Acompanhamento longitudinal de treinos</span>
+                </div>
+                <div style="position: relative; height: 260px; width: 100%;">
+                  <canvas id="youthEvolutionLineChart"></canvas>
+                </div>
+              </div>
+
+              <!-- Grid com as 7 Categorias Oficiais de Atributos Detalhados -->
+              <div style="margin-bottom: 0.75rem; font-size: 0.9rem; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                <i data-lucide="clipboard-list" style="color: var(--accent-gold);"></i>
+                <span>Ficha Técnica Detalhada (As 7 Categorias Oficiais do FC)</span>
+              </div>
+              <div id="yCategoryCardsGrid" class="psm-categories-grid">
+                <!-- Injetado dinamicamente via youth_academy.js -->
+              </div>
+
+            </div>
+          </main>
+        </div>
+
+      </section>
+
+      <!-- ======================================================== -->
       <!-- ABA 5: TRANSFERÊNCIAS & MERCADO                          -->
       <!-- ======================================================== -->
       <section class="tab-pane" id="pane-transfers">
@@ -1606,6 +1859,116 @@
             </div>
           </div>
 
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- CENTRAL DE PATROCÍNIOS (3 SLOTS), DIREITOS DE TV & ORÇAMENTO     -->
+        <!-- ================================================================ -->
+        <div class="glass-card" style="margin-top: 1.5rem; padding: 1.35rem; border: 1px solid rgba(245, 158, 11, 0.35);">
+          <div class="flex-between" style="flex-wrap: wrap; gap: 1rem; margin-bottom: 1.15rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.65rem; flex-wrap: wrap;">
+                <h3 style="margin: 0; font-size: 1.18rem; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                  <i data-lucide="handshake" style="color: #fbbf24;"></i> Ecossistema de Patrocínios, Cotas de TV &amp; Governança Contínua
+                </h3>
+                <span class="badge-tag gold" id="finSponsTierTag">Escalão do Clube</span>
+                <span class="badge-tag blue" id="finSponsMultTag">Exposição 1.0x</span>
+                <span class="badge-tag green" id="finSponsDateTag">Calendário</span>
+              </div>
+              <p id="finSponsExposureDesc" style="margin: 4px 0 0 0; font-size: 0.84rem; color: #94a3b8;">
+                Cálculo contínuo baseado no histórico de títulos, divisão e campanhas anteriores (dados de temporadas passadas 100% preservados).
+              </p>
+            </div>
+            <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
+              <button type="button" class="btn-primary" onclick="openSponsorshipMeetingModal(true)" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; cursor: pointer;">
+                <i data-lucide="briefcase"></i> Abrir Reunião de Patrocínios &amp; TV
+              </button>
+              <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.12); color: #34d399; font-weight: 700; cursor: pointer;">
+                <i data-lucide="coins"></i> Solicitar Mais Verba à Diretoria
+              </button>
+            </div>
+          </div>
+
+          <!-- Os 3 Espaços Oficiais do Uniforme (Máster, Mangas, Calção) -->
+          <div style="margin-bottom: 1.35rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+              <h4 style="margin: 0; font-size: 0.98rem; color: #e2e8f0; display: flex; align-items: center; gap: 6px;">
+                <i data-lucide="shirt" style="width: 17px; height: 17px; color: #38bdf8;"></i> Os 3 Espaços Oficiais de Uniforme (Regra de Exclusividade de Segmento Ativa)
+              </h4>
+              <span style="font-size: 0.78rem; color: #94a3b8;">Ciclo: 55%-60% à vista em Janeiro • 40%-45% em Julho (Metas) • Recall Anual (+30% a +45%) no 2º Ano</span>
+            </div>
+            <div id="finSponsorshipSlotsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
+              <!-- Renderizado via JS -->
+            </div>
+          </div>
+
+          <!-- Grid 2 Colunas: Direitos de Transmissão de TV & Premiações Esportivas Resgatáveis -->
+          <div class="dash-grid-2" style="margin-bottom: 1.35rem;">
+            <div class="glass-card" style="background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(56, 189, 248, 0.25);">
+              <div class="card-header">
+                <div class="ch-title" style="color: #38bdf8;"><i data-lucide="tv"></i> Cota Anual de Transmissão (TV &amp; Streaming)</div>
+                <span class="badge-tag blue" id="finTvStatusBadge">Status</span>
+              </div>
+              <div id="finTvRightsBox" style="padding-top: 0.5rem;">
+                <!-- Renderizado via JS -->
+              </div>
+            </div>
+
+            <div class="glass-card" style="background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(16, 185, 129, 0.25);">
+              <div class="card-header">
+                <div class="ch-title" style="color: #34d399;"><i data-lucide="trophy"></i> Premiações Oficiais de Competições (CBF / CONMEBOL)</div>
+                <span class="badge-tag green">Proteção Anti-Reset EA</span>
+              </div>
+              <div id="finClaimablePrizesBox" style="padding-top: 0.5rem; max-height: 280px; overflow-y: auto;">
+                <!-- Renderizado via JS -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Memória Histórica Contínua (Linha do Tempo multi-temporadas 2026..2030 sem zerar anos anteriores) -->
+          <div class="glass-card" style="background: rgba(15, 23, 42, 0.55); margin-bottom: 1.35rem;">
+            <div class="card-header">
+              <div class="ch-title"><i data-lucide="history"></i> Memória Financeira &amp; Esportiva Contínua (Histórico Acumulado Sem Reset)</div>
+              <span class="badge-tag gold">Dados de Anos Anteriores Preservados</span>
+            </div>
+            <div class="table-responsive">
+              <table class="vault-table">
+                <thead>
+                  <tr>
+                    <th>Temporada</th>
+                    <th>Divisão</th>
+                    <th>Conquistas &amp; Títulos no Ano</th>
+                    <th class="text-right">Valuation</th>
+                    <th class="text-right">Arrecadado (Vendas)</th>
+                    <th class="text-right">Investido (Compras)</th>
+                    <th class="text-right">Receita Total</th>
+                    <th class="text-right">Resultado Líquido</th>
+                  </tr>
+                </thead>
+                <tbody id="finHistoricalTimelineBody">
+                  <!-- Renderizado via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Livro-Razão da Diretoria (Extrato de Aportes & Script F9) -->
+          <div class="glass-card" style="background: rgba(15, 23, 42, 0.55);">
+            <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+              <div class="ch-title"><i data-lucide="scroll-text"></i> Livro-Razão da Diretoria &amp; Injeções no Live Editor (F9)</div>
+              <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+                <button type="button" class="btn-primary btn-xs" onclick="window.copyLatestBoardLuaScript()" style="background: linear-gradient(135deg, #10b981, #059669); border: none; font-weight: 800; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; cursor: pointer; border-radius: 6px; color: #0f172a;">
+                  <i data-lucide="copy" style="width: 14px; height: 14px;"></i> <span id="btnCopyLatestLuaText">Copiar Script da Verba (F9)</span>
+                </button>
+                <button type="button" class="btn-secondary btn-xs" onclick="window.downloadLatestBoardLuaScript()" style="font-size: 0.78rem; display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; cursor: pointer; border-radius: 6px;">
+                  <i data-lucide="download" style="width: 14px; height: 14px;"></i> <span>Baixar .lua</span>
+                </button>
+              </div>
+            </div>
+            <div id="finBoardLedgerList" style="max-height: 260px; overflow-y: auto; padding-top: 0.5rem;">
+              <!-- Renderizado via JS -->
+            </div>
+          </div>
         </div>
       </section>
 
@@ -2408,9 +2771,14 @@
             <div style="display: flex; justify-content: flex-end; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.08);">
               <span id="socialGenStatusHint" style="font-size: 0.78rem; color: var(--text-dim); margin-right: auto;"></span>
 
-              <button type="submit" class="btn-primary" id="btnSubmitGenerateMedia" style="font-size: 0.9rem; padding: 0.65rem 1.6rem; display: flex; align-items: center; gap: 0.5rem;">
+              <button type="submit" class="btn-primary" id="btnSubmitGenerateMedia" style="font-size: 0.9rem; padding: 0.65rem 1.4rem; display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                 <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
-                <span>Gerar Publicação & Matéria Completa</span>
+                <span>Gerar Matéria Tradicional</span>
+              </button>
+
+              <button type="button" class="btn-primary" id="btnGenerateWithFullContext" onclick="handleGenerateWithCareerContext(event)" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; font-size: 0.9rem; padding: 0.65rem 1.4rem; display: flex; align-items: center; gap: 0.5rem; color: #0f172a; font-weight: 800; cursor: pointer;">
+                <i data-lucide="database-zap" style="width: 16px; height: 16px;"></i>
+                <span>Cruzar com Dados Reais do Save (Tabela, Elenco e Histórico)</span>
               </button>
             </div>
 
@@ -2698,6 +3066,19 @@
               <img id="pmClubCrest" src="" class="psm-crest-mini" onerror="this.src='/assets/default_crest.png'" alt="">
               <span id="pmTeam">Clube Atual</span>
             </div>
+          </div>
+
+          <!-- Informações de Contrato e Chegada -->
+          <div class="psm-contract-row" style="margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; font-size: 0.82rem; color: #94a3b8; align-items: center;">
+            <span style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.25); color: #60a5fa; padding: 2px 8px; border-radius: 6px;">
+              <i data-lucide="calendar" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 3px;"></i> Chegada: <b id="pmJoinDate" style="color: #fff;">-</b>
+            </span>
+            <span style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); color: #34d399; padding: 2px 8px; border-radius: 6px;">
+              <i data-lucide="dollar-sign" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 1px;"></i> Salário: <b id="pmWeeklyWage" style="color: #fff;">-</b>
+            </span>
+            <span style="background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.25); color: #fbbf24; padding: 2px 8px; border-radius: 6px;">
+              <i data-lucide="file-text" style="width: 13px; height: 13px; vertical-align: -2px; margin-right: 3px;"></i> Vínculo: <b id="pmContractValid" style="color: #fff;">-</b>
+            </span>
           </div>
         </div>
       </div>
@@ -3403,9 +3784,9 @@
             <label for="trophyInputSeason">Temporada *</label>
             <input type="text" id="trophyInputSeason" class="vault-input" placeholder="Ex: 2026 ou 2027" value="2026" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" style="display: none;">
             <label for="trophyInputDate">Data da Conquista</label>
-            <input type="text" id="trophyInputDate" class="vault-input" placeholder="DD/MM/AAAA" value="17/10/2026">
+            <input type="text" id="trophyInputDate" class="vault-input" placeholder="DD/MM/AAAA" value="">
           </div>
         </div>
 
@@ -3435,7 +3816,7 @@
         <div class="mhc-icon" style="background: rgba(245, 158, 11, 0.15); color: #fbbf24;"><i data-lucide="trophy"></i></div>
         <div>
           <h2>Editar Conquista / Troféu</h2>
-          <p>Ajuste os detalhes da conquista ou a data oficial em que o título foi erguido.</p>
+          <p>Ajuste os detalhes da conquista ou a temporada em que o título foi conquistado.</p>
         </div>
       </div>
 
@@ -3463,9 +3844,9 @@
             <label for="editTrophySeason">Temporada *</label>
             <input type="text" id="editTrophySeason" class="vault-input" placeholder="Ex: 2028" required>
           </div>
-          <div class="form-group">
-            <label for="editTrophyDate">Data da Conquista *</label>
-            <input type="text" id="editTrophyDate" class="vault-input" placeholder="DD/MM/AAAA" required>
+          <div class="form-group" style="display: none;">
+            <label for="editTrophyDate">Data da Conquista</label>
+            <input type="text" id="editTrophyDate" class="vault-input" placeholder="DD/MM/AAAA">
           </div>
         </div>
 
@@ -3937,7 +4318,7 @@
             <span class="os-wifi"><i data-lucide="wifi"></i> CT Conselheiro Galvão (5G)</span>
           </div>
           <div class="os-bar-center">
-            <span class="os-device-tag"><i data-lucide="shield"></i> SCOUTPAD PRO 2029 • INTELIGÊNCIA TÁTICA</span>
+            <span class="os-device-tag"><i data-lucide="shield"></i> <span id="spHeaderSeasonTitle">SCOUTPAD PRO 2030</span> • INTELIGÊNCIA TÁTICA</span>
           </div>
           <div class="os-bar-right">
             <span class="os-battery">94% <i data-lucide="battery-charging"></i></span>
@@ -3957,7 +4338,7 @@
             </div>
             <div class="sp-match-status-badge">
               <span class="sp-pulse-dot"></span>
-              <span id="spCompStage">Cariocão 2029 • Semifinal (Volta)</span>
+              <span id="spCompStage">Dossiê Tático Pré-Jogo</span>
             </div>
           </div>
 
@@ -3966,7 +4347,7 @@
             <div class="sp-team home">
               <img id="spHomeCrest" class="sp-crest-lg" src="" onerror="this.src='/assets/default_crest.png'" alt="">
               <div class="sp-team-info">
-                <span class="sp-team-name" id="spHomeName">Madureira</span>
+                <span class="sp-team-name" id="spHomeName">Meu Clube</span>
                 <span class="sp-mando-badge home" id="spHomeMando">MANDANTE</span>
               </div>
             </div>
@@ -3974,15 +4355,15 @@
             <div class="sp-versus-pill">
               <div class="sp-vs-circle">VS</div>
               <div class="sp-match-meta">
-                <span class="sp-meta-date" id="spDate">25/03/2029 • 16:00</span>
-                <span class="sp-meta-venue" id="spVenue">Estádio Conselheiro Galvão</span>
+                <span class="sp-meta-date" id="spDate">--/--/---- • 16:00</span>
+                <span class="sp-meta-venue" id="spVenue">Estádio</span>
                 <span class="sp-meta-agg" id="spAggInfo" style="display: none;"></span>
               </div>
             </div>
 
             <div class="sp-team away">
               <div class="sp-team-info right">
-                <span class="sp-team-name" id="spAwayName">Coritiba</span>
+                <span class="sp-team-name" id="spAwayName">Adversário</span>
                 <span class="sp-mando-badge away" id="spAwayMando">VISITANTE</span>
               </div>
               <img id="spAwayCrest" class="sp-crest-lg" src="" onerror="this.src='/assets/default_crest.png'" alt="">
@@ -4027,6 +4408,10 @@
                   <div class="sp-metric-box">
                     <span class="sp-metric-label">Local</span>
                     <span class="sp-metric-val gold" id="spMetricVenue">Conselheiro Galvão</span>
+                  </div>
+                  <div class="sp-metric-box">
+                    <span class="sp-metric-label">Desempenho no Mando</span>
+                    <span class="sp-metric-val gold" id="spMetricVenueRecord">82.1% em Casa</span>
                   </div>
                 </div>
               </div>
@@ -4103,6 +4488,12 @@
           <!-- 2. Aba Raio-X Histórico (H2H) -->
           <div class="sp-panel" id="spPanelH2H">
             <div class="sp-h2h-container">
+              <!-- Destaque do Último Confronto -->
+              <div id="spLastH2HCard" class="sp-card" style="border-left: 3px solid #38bdf8; margin-bottom: 1rem;">
+                <div class="sp-card-title cyan"><i data-lucide="sparkles"></i> Destaque do Último Confronto & Retrospecto</div>
+                <p id="spLastH2HText" style="color: #e2e8f0; font-size: 0.85rem; line-height: 1.5; margin: 0; padding: 0.5rem 0;">Carregando retrospecto do duelo...</p>
+              </div>
+
               <!-- Placar Geral do Histórico -->
               <div class="sp-h2h-summary-card">
                 <div class="sp-h2h-stat-box">
@@ -4144,6 +4535,18 @@
           <!-- 3. Aba Espionagem do Elenco -->
           <div class="sp-panel" id="spPanelSquad">
             <div class="sp-squad-spy-container">
+              <!-- Diagnóstico Factual de Desempenho, Defesa Vazada e Pontaria -->
+              <div class="sp-squad-split" style="margin-bottom: 1rem;">
+                <div class="sp-card" style="border-left: 3px solid #f87171;">
+                  <div class="sp-card-title red"><i data-lucide="shield-alert"></i> Solidez Defensiva & Defesa Vazada</div>
+                  <p id="spDefensiveLeakText" style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.5; margin: 0; padding: 0.5rem 0;">Carregando análise defensiva...</p>
+                </div>
+                <div class="sp-card" style="border-left: 3px solid #fbbf24;">
+                  <div class="sp-card-title gold"><i data-lucide="crosshair"></i> Pontaria & Ataque Rival</div>
+                  <p id="spOffensiveShootingText" style="color: #cbd5e1; font-size: 0.85rem; line-height: 1.5; margin: 0; padding: 0.5rem 0;">Carregando análise de finalização...</p>
+                </div>
+              </div>
+
               <!-- Destaques Principais (Top Stars) -->
               <div class="sp-card">
                 <div class="sp-card-title">
@@ -4235,7 +4638,7 @@
         <!-- Barra Inferior do Tablet (Footer) -->
         <div class="scoutpad-footer">
           <div class="sp-status-chip">
-            <span class="sp-indicator-green"></span> Base de Dados FC 25 & Scout Sincronizados
+            <span class="sp-indicator-green"></span> Base de Dados EA FC 26 & Scout Sincronizados
           </div>
           <div class="sp-footer-btns">
             <button class="sp-btn-action" onclick="printScoutReport()"><i data-lucide="printer"></i> Imprimir Dossiê</button>
@@ -4251,8 +4654,10 @@
 
   <!-- Social Media & Press Studio Module -->
   <script src="social_media.js?v=1.0"></script>
+  <!-- Categorias de Base & Transição Module -->
+  <script src="youth_academy.js?v=2.1"></script>
   <!-- Main JavaScript Application -->
-  <script src="app.js?v=4.6"></script>
+  <script src="app.js?v=6.2"></script>
 
   <!-- Modal: Registrar Prêmio Individual -->
   <div class="modal-overlay" id="modalAddPlayerAward" style="display: none;">
@@ -4400,6 +4805,174 @@
     <div class="modal-card" style="max-width: 560px; width: 94%;">
       <button class="modal-close-btn" type="button" onclick="closeBoardPlayerAdviceModal()">&times;</button>
       <div id="bmPlayerAdviceBody"></div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- MODAL 1: REUNIÃO EXECUTIVA DE PATROCÍNIOS, DIREITOS DE TV & RESCISÃO   -->
+  <!-- ====================================================================== -->
+  <div class="modal-overlay" id="modalSponsorshipMeeting">
+    <div class="modal-card wide-modal" style="max-width: 1040px; width: 96%; max-height: 92vh; overflow-y: auto;">
+      <button class="modal-close-btn" type="button" onclick="closeSponsorshipMeetingModal()">&times;</button>
+      <div class="modal-header-clean" style="border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.9rem;">
+        <div class="mhc-icon" style="background: rgba(245, 158, 11, 0.18); color: #fbbf24;"><i data-lucide="handshake"></i></div>
+        <div style="flex: 1;">
+          <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
+            <h2 style="margin: 0;">Mesa do Conselho: Patrocínios de Uniforme &amp; Direitos de TV</h2>
+            <span class="badge-tag gold" id="smModalTierTag">Escalão</span>
+            <span class="badge-tag blue" id="smModalWindowTag">Janela</span>
+          </div>
+          <p id="smModalSubtitle" style="margin-top: 3px;">Deliberação comercial baseada no histórico contínuo de temporadas do clube.</p>
+        </div>
+      </div>
+
+      <!-- Diálogo Imersivo da Diretoria Comercial com o Manager -->
+      <div id="smBoardGreetingBox" style="margin: 1rem 0; padding: 1rem 1.2rem; border-radius: 10px; background: rgba(245, 158, 11, 0.08); border-left: 4px solid #f59e0b; color: #f8fafc; font-size: 0.9rem; line-height: 1.5;">
+        Carregando pronunciamento do Diretor Comercial...
+      </div>
+
+      <!-- Seletor de Abas Internas da Reunião -->
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 0.75rem;">
+        <button type="button" class="btn-secondary btn-sm" id="btnSmTabMaster" onclick="switchSponsorshipModalSlot('MASTER')" style="font-weight: 700;">
+          👕 1. Patrocínio Máster (Peito)
+        </button>
+        <button type="button" class="btn-secondary btn-sm" id="btnSmTabSleeve" onclick="switchSponsorshipModalSlot('SLEEVE')" style="font-weight: 700;">
+          💪 2. Mangas &amp; Ombros
+        </button>
+        <button type="button" class="btn-secondary btn-sm" id="btnSmTabShorts" onclick="switchSponsorshipModalSlot('SHORTS')" style="font-weight: 700;">
+          🩳 3. Calção &amp; Barra
+        </button>
+        <button type="button" class="btn-secondary btn-sm" id="btnSmTabTv" onclick="switchSponsorshipModalSlot('TV')" style="font-weight: 700;">
+          📺 4. Cotas de TV &amp; Premiações
+        </button>
+      </div>
+
+      <!-- Corpo Dinâmico das Propostas / Mesa de Rescisão -->
+      <div id="smModalDynamicBody">
+        <!-- Renderizado via JS -->
+      </div>
+
+      <!-- Central Oficial de Script Lua & Live Editor F9 (Injeção de Verba 1 Clique) -->
+      <div class="script-hub-section" id="scriptHubSection" style="margin-top: 1.25rem;">
+        <div class="sh-header">
+          <div class="sh-title">
+            <i data-lucide="code-2" style="color: #fbbf24;"></i>
+            <span>Script Oficial do Live Editor (Lua Engine)</span>
+            <span class="sh-badge">Pronto para Injeção</span>
+          </div>
+          <div class="sh-actions">
+            <button type="button" class="btn-copy-script" id="btnCopyScript" onclick="copyLuaScriptToClipboard()">
+              <i data-lucide="copy"></i> <span id="btnCopyText">Copiar Script Lua</span>
+            </button>
+            <button type="button" class="btn-download-lua" onclick="downloadLuaScriptFile()">
+              <i data-lucide="download"></i> <span>Baixar Arquivo .lua</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Instruções Passo a Passo de Como Executar no Live Editor -->
+        <div class="instructions-banner">
+          <div class="ib-step">
+            <div class="ib-num">1</div>
+            <div class="ib-text">
+              <h6>Abra o EA FC 26</h6>
+              <p>Carregue o save do Madureira pelo Launcher do Live Editor com o Patch FCM.</p>
+            </div>
+          </div>
+          <div class="ib-step">
+            <div class="ib-num">2</div>
+            <div class="ib-text">
+              <h6>Pressione F9</h6>
+              <p>Abra o overlay do Live Editor e clique na aba <b>"Lua Engine"</b>.</p>
+            </div>
+          </div>
+          <div class="ib-step">
+            <div class="ib-num">3</div>
+            <div class="ib-text">
+              <h6>Cole o Código</h6>
+              <p>Clique em <b>"Copiar Script Lua"</b> acima, cole na caixa do F9 e aperte <b>"Run Code"</b>.</p>
+            </div>
+          </div>
+          <div class="ib-step">
+            <div class="ib-num">4</div>
+            <div class="ib-text">
+              <h6>Dinheiro no Caixa!</h6>
+              <p>O Live Editor atualiza o saldo na hora. Basta olhar no menu Finanças do jogo!</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Caixa de Visualização do Código -->
+        <div class="lua-code-wrapper">
+          <div class="lua-code-header">
+            <span>ARQUIVO: APLICAR_VERBA_DIRETORIA.lua</span>
+            <span style="color: #fbbf24;">FUNÇÃO: SetUserTransferBudget()</span>
+          </div>
+          <div class="lua-code-area" id="luaTerminalOutput">-- Script pronto para execução no Live Editor
+-- Clique em qualquer negociação ou liberação de verba acima para gerar o código em tempo real!
+require 'imports/career_mode/helpers'
+if IsInCM() then
+    local saldo_atual = GetUserTransferBudget()
+    print("[Live Editor] Sistema conectado. Saldo atual: $" .. tostring(saldo_atual))
+end</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- MODAL 2: SOLICITAÇÃO EXTRAORDINÁRIA DE VERBA À DIRETORIA (PERMANENTE)  -->
+  <!-- ====================================================================== -->
+  <div class="modal-overlay" id="modalExtraFundsRequest">
+    <div class="modal-card" style="max-width: 620px; width: 95%;">
+      <button class="modal-close-btn" type="button" onclick="closeExtraFundsRequestModal()">&times;</button>
+      <div class="modal-header-clean">
+        <div class="mhc-icon" style="background: rgba(16, 185, 129, 0.16); color: #34d399;"><i data-lucide="coins"></i></div>
+        <div>
+          <h2>Solicitação Extraordinária de Verba</h2>
+          <p>Reunião de emergência com a Presidência e o CFO para suplementação orçamentária mediante reajuste rígido de metas.</p>
+        </div>
+      </div>
+
+      <div id="efBoardContextBox" style="margin: 1rem 0; padding: 0.9rem 1.1rem; border-radius: 10px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255,255,255,0.1); font-size: 0.85rem;">
+        <!-- Renderizado via JS -->
+      </div>
+
+      <form id="formExtraFundsRequest" onsubmit="submitExtraFundsRequest(event)">
+        <div class="form-group" style="margin-bottom: 0.9rem;">
+          <label for="efInputAmount">Valor Solicitado ao Conselho (USD $) *</label>
+          <input type="number" id="efInputAmount" class="vault-input" min="50000" step="50000" placeholder="Ex: 1000000" required>
+          <small id="efCeilingHint" style="color: #94a3b8; font-size: 0.76rem; display: block; margin-top: 4px;">Teto prudencial disponível: —</small>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 0.9rem;">
+          <label for="efInputReason">Justificativa Executiva do Pedido *</label>
+          <select id="efInputReason" class="vault-select">
+            <option value="Contracao de Reforco Titular na Janela">Contratação de Reforço Titular de Impacto</option>
+            <option value="Cobertura de Multa Rescisoria / Luvas">Cobertura de Multa Rescisória / Luvas de Pré-Contrato</option>
+            <option value="Renovacao Salarial de Lideres do Elenco">Renovação Salarial de Líderes do Elenco</option>
+            <option value="Reforco Emergencial por Lesao / Desfalque">Reforço Emergencial para Mata-Mata Continental / Nacional</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 1.1rem;">
+          <label for="efInputNewGoal">Contrapartida Obrigatória: Nova Meta Esportiva Exigida pela Diretoria *</label>
+          <select id="efInputNewGoal" class="vault-select">
+            <option value="Conquistar o Titulo do Brasileirao Serie A ou Copa do Brasil e Semifinal da Libertadores">🏆 Obrigação de Título Nacional (Série A ou Copa do Brasil) + Semifinal da Libertadores</option>
+            <option value="Terminar no Top 2 do Brasileirao e disputar Final de Copa">🥈 Terminar no Top 2 do Brasileirão e chegar à Final de Copa</option>
+            <option value="Classificacao Direta no G-4 da Serie A e Quartas da Libertadores">🌎 Garantir Vaga Direta no G-4 e Quartas da Libertadores</option>
+          </select>
+        </div>
+
+        <div id="efResultMessageBox" style="display: none; margin-bottom: 1rem; padding: 0.85rem 1rem; border-radius: 8px; font-size: 0.86rem;"></div>
+
+        <div class="modal-actions" style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn-secondary" onclick="closeExtraFundsRequestModal()">Fechar</button>
+          <button type="submit" class="btn-primary" style="background: #10b981; border: none; color: #0f172a; font-weight: 800;">
+            <i data-lucide="gavel"></i> Submeter Pedido ao Conselho
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 </body>

@@ -24,6 +24,7 @@ let transfersSortKey = "transfer_date";
 let transfersSortDir = "desc";
 
 let cachedSeasonPlayers = [];
+let cachedSeasonMatches = [];
 let seasonSquadSortKey = "goals";
 let seasonSquadSortDir = "desc";
 
@@ -37,7 +38,8 @@ let cachedCalendarData = {
   ano_temporada: ""
 };
 let currentCalendarCompFilter = "TODAS";
-let currentCalendarStatusFilter = "UPCOMING";
+let currentCalendarStatusFilter = "ALL";
+let currentCalendarTeamScope = "USER_ONLY";
 
 // Inicialização
 document.addEventListener("DOMContentLoaded", () => {
@@ -1127,12 +1129,12 @@ async function loadManagerData() {
             <div class="ai-icon">${a.award_type === 'TROPHY' ? '🏆' : (a.award_type === 'ACCESS' ? '🚀' : '🎖️')}</div>
             <div class="ai-text">
               <span class="ai-title">${escapeHtml(a.title)}</span>
-              <span class="ai-sub">${escapeHtml(a.team_name)} • ${a.season_year} (${a.date_earned})</span>
+              <span class="ai-sub">${escapeHtml(a.team_name)} • Temporada ${a.season_year}</span>
             </div>
           </div>
           <div style="display: flex; align-items: center; gap: 6px;">
             ${a.id ? `
-              <button class="btn-secondary btn-xs" onclick="openEditTrophyModalByIndex(${idx})" title="Editar conquista / data" style="padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
+              <button class="btn-secondary btn-xs" onclick="openEditTrophyModalByIndex(${idx})" title="Editar conquista" style="padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;">
                 <i data-lucide="edit-3" style="width: 13px; height: 13px;"></i> Editar
               </button>
               <button class="btn-secondary btn-xs text-danger" onclick="deleteManagerAwardById(${a.id}, ${idx})" title="Remover conquista" style="padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; cursor: pointer;">
@@ -1217,13 +1219,16 @@ async function loadSeasonsList() {
     const data = await res.json();
     allSeasonsList = data.seasons || ["GERAL", "2027", "2026"];
 
+    const defaultSeasonIdx = allSeasonsList.length > 1 && allSeasonsList[0].toUpperCase() === "GERAL" ? 1 : 0;
+    const defaultSeason = allSeasonsList[defaultSeasonIdx] || allSeasonsList[0];
+
     const btnBar = document.getElementById("seasonsButtonsBar");
     if (btnBar) {
       btnBar.innerHTML = allSeasonsList.map((s, idx) => {
         const isGeral = s.toUpperCase() === "GERAL";
         const label = isGeral ? "⭐ Acumulado Geral (Todas)" : `Temp. ${s}`;
         return `
-          <button class="season-pill-btn ${idx === 0 ? 'active' : ''}" onclick="selectSeason('${s}', this)">
+          <button class="season-pill-btn ${idx === defaultSeasonIdx ? 'active' : ''}" onclick="selectSeason('${s}', this)">
             ${label}
           </button>
         `;
@@ -1281,7 +1286,7 @@ async function loadSeasonsList() {
     }
 
     if (allSeasonsList.length > 0) {
-      loadSeasonDetails(allSeasonsList[0]);
+      loadSeasonDetails(defaultSeason);
     }
   } catch (err) {
     console.error("Erro ao carregar lista de temporadas:", err);
@@ -1325,41 +1330,96 @@ async function loadSeasonDetails(seasonYear) {
     renderSeasonSquadTableRows(sortedPlayers);
 
     // 3. Partidas da Temporada (Ordenadas cronologicamente de forma estrita por data)
-    const matchesList = document.getElementById("seasonMatchesList");
-    if (data.matches && data.matches.length > 0) {
-      const sortedMatches = [...data.matches].sort((a, b) => {
-        const timeA = parseBrazilianDate(a.match_date).getTime();
-        const timeB = parseBrazilianDate(b.match_date).getTime();
-        if (timeA !== timeB) return timeA - timeB;
-        return (a.id || 0) - (b.id || 0);
+    cachedSeasonMatches = data.matches || [];
+    const compSelect = document.getElementById("seasonMatchesCompFilter");
+    if (compSelect) {
+      const prevVal = compSelect.value || "TODAS";
+      const compSet = new Set();
+      cachedSeasonMatches.forEach(m => {
+        if (m.competition_name) compSet.add(m.competition_name);
       });
-
-      matchesList.innerHTML = sortedMatches.map(m => `
-        <div class="season-match-row">
-          <div class="sm-header">
-            <span class="sm-comp">${m.competition_name}</span>
-            <span class="sm-date">${m.match_date}</span>
-          </div>
-          <div class="sm-teams">
-            <div class="sm-team-side sm-home">
-              <span>${m.home_team_name}</span>
-              <img class="team-crest-sm" src="${m.home_crest || ''}" onerror="this.style.display='none'" alt="">
-            </div>
-            <b class="sm-score">${m.home_score} x ${m.away_score}</b>
-            <div class="sm-team-side sm-away">
-              <img class="team-crest-sm" src="${m.away_crest || ''}" onerror="this.style.display='none'" alt="">
-              <span>${m.away_team_name}</span>
-            </div>
-          </div>
-        </div>
-      `).join('');
-    } else {
-      matchesList.innerHTML = `<span class="empty-hint">Nenhuma partida jogada nesta temporada</span>`;
+      const compsArr = Array.from(compSet).sort();
+      compSelect.innerHTML = `<option value="TODAS">Todas as Competições</option>` +
+        compsArr.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+      if (compsArr.includes(prevVal)) {
+        compSelect.value = prevVal;
+      } else {
+        compSelect.value = "TODAS";
+      }
     }
+    renderSeasonMatchesList();
 
     initLucideIcons();
   } catch (err) {
     console.error("Erro ao carregar detalhes da temporada:", err);
+  }
+}
+
+function isUserClubMatch(m) {
+  if (!m) return false;
+  if (Number(m.is_user_match) === 1) return true;
+  const userTid = Number(cachedDashboardData?.save?.current_team_id || 112810);
+  const userClub = (cachedDashboardData?.save?.current_team_name || "madureira").toLowerCase().trim();
+  const hId = Number(m.id_time_mandante || m.mandante_id || m.home_team_id || 0);
+  const aId = Number(m.id_time_visitante || m.visitante_id || m.away_team_id || 0);
+  if (userTid > 0 && (hId === userTid || aId === userTid)) return true;
+  const hName = String(m.time_mandante || m.mandante || m.home_team_name || "").toLowerCase();
+  const aName = String(m.time_visitante || m.visitante || m.away_team_name || "").toLowerCase();
+  return Boolean(userClub && (hName.includes(userClub) || aName.includes(userClub)));
+}
+
+function renderSeasonMatchesList() {
+  const matchesList = document.getElementById("seasonMatchesList");
+  if (!matchesList) return;
+
+  const scopeSelect = document.getElementById("seasonMatchesScopeFilter");
+  const compSelect = document.getElementById("seasonMatchesCompFilter");
+  const countBadge = document.getElementById("seasonMatchesCountBadge");
+
+  const scope = scopeSelect ? scopeSelect.value : "USER_ONLY";
+  const compFilter = compSelect ? compSelect.value : "TODAS";
+
+  let filtered = [...(cachedSeasonMatches || [])];
+  if (scope === "USER_ONLY") {
+    filtered = filtered.filter(m => isUserClubMatch(m));
+  }
+  if (compFilter && compFilter !== "TODAS") {
+    filtered = filtered.filter(m => m.competition_name === compFilter);
+  }
+
+  if (countBadge) {
+    countBadge.textContent = filtered.length;
+  }
+
+  if (filtered.length > 0) {
+    const sortedMatches = filtered.sort((a, b) => {
+      const timeA = parseBrazilianDate(a.match_date).getTime();
+      const timeB = parseBrazilianDate(b.match_date).getTime();
+      if (timeA !== timeB) return timeA - timeB;
+      return (a.id || 0) - (b.id || 0);
+    });
+
+    matchesList.innerHTML = sortedMatches.map(m => `
+      <div class="season-match-row">
+        <div class="sm-header">
+          <span class="sm-comp">${escapeHtml(m.competition_name)}</span>
+          <span class="sm-date">${escapeHtml(m.match_date)}</span>
+        </div>
+        <div class="sm-teams">
+          <div class="sm-team-side sm-home">
+            <span>${escapeHtml(m.home_team_name)}</span>
+            <img class="team-crest-sm" src="${m.home_crest || ''}" onerror="this.style.display='none'" alt="">
+          </div>
+          <b class="sm-score">${m.home_score} x ${m.away_score}</b>
+          <div class="sm-team-side sm-away">
+            <img class="team-crest-sm" src="${m.away_crest || ''}" onerror="this.style.display='none'" alt="">
+            <span>${escapeHtml(m.away_team_name)}</span>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } else {
+    matchesList.innerHTML = `<span class="empty-hint">Nenhuma partida encontrada para o filtro selecionado</span>`;
   }
 }
 
@@ -1946,6 +2006,7 @@ async function loadFinancesData(seasonYear = null) {
       </div>
     `).join('');
 
+    await loadSponsorshipDashboardData();
     initLucideIcons();
   } catch (err) {
     console.error("Erro ao carregar finanças:", err);
@@ -2299,6 +2360,20 @@ async function openPlayerModal(playerId) {
       crestEl.onerror = function() { this.src = '/assets/default_crest.png'; };
     }
 
+    // 3.5 Contrato e Data de Chegada / Assinatura
+    const joinDateEl = document.getElementById("pmJoinDate");
+    const wageEl = document.getElementById("pmWeeklyWage");
+    const validUntilEl = document.getElementById("pmContractValid");
+
+    if (joinDateEl) joinDateEl.textContent = data.join_date_formatted || data.join_date || "Não informada";
+    if (wageEl) {
+      const rawW = Number(data.weekly_wage || 0);
+      wageEl.textContent = rawW > 0 ? `${formatCurrency(rawW)}/sem` : "Não informado";
+    }
+    if (validUntilEl) {
+      validUntilEl.textContent = data.contract_valid_until ? `Até ${data.contract_valid_until}` : "Vigente";
+    }
+
     // 4. Totais Acumulados no Clube
     const tot = data.totals || {};
     const totApps = document.getElementById("pmTotApps");
@@ -2333,7 +2408,7 @@ async function openPlayerModal(playerId) {
             <div class="ai-icon" style="font-size: 1.25rem;">🏆</div>
             <div class="ai-text">
               <span class="ai-title" style="font-weight: 700; color: #fbbf24; font-size: 0.88rem;">${escapeHtml(a.award_title || a.title || 'Prêmio Individual')}</span>
-              <span class="ai-sub" style="display: block; font-size: 0.76rem; color: #94a3b8;">${a.season_year} • ${a.date_earned || ''}</span>
+              <span class="ai-sub" style="display: block; font-size: 0.76rem; color: #94a3b8;">Temporada ${a.season_year}</span>
             </div>
           </div>
         `).join('');
@@ -5087,7 +5162,8 @@ function initAddTrophyModal() {
       const title = document.getElementById("trophyInputTitle").value.trim();
       const awardType = document.getElementById("trophySelectType").value;
       const seasonYear = document.getElementById("trophyInputSeason").value.trim() || "2026";
-      const dateEarned = document.getElementById("trophyInputDate").value.trim() || new Date().toLocaleDateString('pt-BR');
+      const dateEl = document.getElementById("trophyInputDate");
+      const dateEarned = dateEl ? dateEl.value.trim() : "";
       const teamName = document.getElementById("trophyInputTeam").value.trim() || "Meu Clube";
 
       if (!title) {
@@ -5224,10 +5300,11 @@ function initEditTrophyModal() {
       const title = document.getElementById("editTrophyTitle").value.trim();
       const awardType = document.getElementById("editTrophySelectType").value;
       const seasonYear = document.getElementById("editTrophySeason").value.trim() || "2028";
-      const dateEarned = document.getElementById("editTrophyDate").value.trim() || new Date().toLocaleDateString('pt-BR');
+      const dateEl = document.getElementById("editTrophyDate");
+      const dateEarned = dateEl ? dateEl.value.trim() : "";
       const teamName = document.getElementById("editTrophyTeam").value.trim() || "Meu Clube";
 
-      if (!title || !seasonYear || !dateEarned) {
+      if (!title || !seasonYear) {
         showToast("Preencha todos os campos obrigatórios (*)", "error");
         return;
       }
@@ -6024,6 +6101,27 @@ function initCalendarEvents() {
     });
   });
 
+  // Seletor de escopo de jogos do calendário (Só Jogos do Meu Time vs Todos os Jogos dos Meus Campeonatos)
+  const teamScopeSelect = document.getElementById("calTeamScopeSelect");
+  if (teamScopeSelect) {
+    teamScopeSelect.addEventListener("change", () => {
+      currentCalendarTeamScope = teamScopeSelect.value || "USER_ONLY";
+      if (currentCalendarTeamScope === "ALL_TEAMS" && currentCalendarStatusFilter === "UPCOMING") {
+        currentCalendarStatusFilter = "COMPLETED";
+        const statusTabs = document.querySelectorAll(".cal-tab-btn");
+        statusTabs.forEach(b => {
+          if (b.getAttribute("data-status") === "COMPLETED") {
+            b.classList.add("active");
+          } else {
+            b.classList.remove("active");
+          }
+        });
+      }
+      updateCalendarTabCounters();
+      renderCalendarMatchesGrid();
+    });
+  }
+
   // Botão no card do Dashboard: Ver Calendário Completo
   const btnDashFullCal = document.getElementById("btnNextMatchFullCal");
   if (btnDashFullCal) {
@@ -6031,6 +6129,42 @@ function initCalendarEvents() {
       navigateToTab("calendar");
     });
   }
+}
+
+function normalizeCompNameClient(name) {
+  if (!name) return "";
+  const s = String(name).trim();
+  const lower = s.toLowerCase();
+  if (lower === "brasileirão" || lower === "brasileirao" || lower === "campeonato brasileiro") {
+    return "Brasileirão Série A";
+  }
+  return s;
+}
+
+function updateCalendarTabCounters() {
+  const proximos = cachedCalendarData.proximos_jogos || [];
+  let concluidos = cachedCalendarData.partidas_concluidas || [];
+  if (currentCalendarTeamScope === "USER_ONLY") {
+    concluidos = concluidos.filter(m => isUserClubMatch(m));
+  }
+  if (currentCalendarCompFilter !== "TODAS") {
+    concluidos = concluidos.filter(m => normalizeCompNameClient(m.competicao || m.competition_name) === currentCalendarCompFilter);
+  }
+  const filteredProximos = currentCalendarCompFilter !== "TODAS"
+    ? proximos.filter(m => normalizeCompNameClient(m.competicao || m.competition_name) === currentCalendarCompFilter)
+    : proximos;
+
+  const countUpcoming = filteredProximos.length;
+  const countCompleted = concluidos.length;
+  const countAll = countUpcoming + countCompleted;
+
+  const elUp = document.getElementById("calCountUpcoming");
+  const elComp = document.getElementById("calCountCompleted");
+  const elAll = document.getElementById("calCountAll");
+  if (elUp) elUp.textContent = countUpcoming;
+  if (elComp) elComp.textContent = countCompleted;
+  if (elAll) elAll.textContent = countAll;
+  return { countUpcoming, countCompleted, countAll };
 }
 
 async function loadCalendarData() {
@@ -6047,17 +6181,8 @@ async function loadCalendarData() {
       seasonPill.textContent = `Temporada: ${yr}`;
     }
 
-    // Atualizar contadores das abas de status
-    const countUpcoming = data.proximos_jogos?.length || 0;
-    const countCompleted = data.partidas_concluidas?.length || 0;
-    const countAll = countUpcoming + countCompleted;
-
-    const elUp = document.getElementById("calCountUpcoming");
-    const elComp = document.getElementById("calCountCompleted");
-    const elAll = document.getElementById("calCountAll");
-    if (elUp) elUp.textContent = countUpcoming;
-    if (elComp) elComp.textContent = countCompleted;
-    if (elAll) elAll.textContent = countAll;
+    // Atualizar contadores das abas de status respeitando o filtro de escopo
+    const { countUpcoming, countCompleted } = updateCalendarTabCounters();
 
     // Se não houver próximos jogos agendados mas houver jogos concluídos na temporada ativa,
     // ajustar o filtro inicial para COMPLETED para que os jogos apareçam imediatamente
@@ -6233,14 +6358,24 @@ function renderCalendarCompChips(data) {
   const compSet = new Set();
   if (data.proximos_jogos) {
     data.proximos_jogos.forEach(m => {
-      const c = m.competicao || m.competition_name;
-      if (c) compSet.add(c);
+      let c = m.competicao || m.competition_name;
+      if (c) {
+        c = normalizeCompNameClient(c);
+        m.competicao = c;
+        m.competition_name = c;
+        compSet.add(c);
+      }
     });
   }
   if (data.partidas_concluidas) {
     data.partidas_concluidas.forEach(m => {
-      const c = m.competition_name || m.competicao;
-      if (c) compSet.add(c);
+      let c = m.competition_name || m.competicao;
+      if (c) {
+        c = normalizeCompNameClient(c);
+        m.competicao = c;
+        m.competition_name = c;
+        compSet.add(c);
+      }
     });
   }
 
@@ -6261,6 +6396,7 @@ function renderCalendarCompChips(data) {
       chips.forEach(ch => ch.classList.remove("active"));
       chip.classList.add("active");
       currentCalendarCompFilter = chip.getAttribute("data-comp") || "TODAS";
+      updateCalendarTabCounters();
       renderCalendarMatchesGrid();
     });
   });
@@ -6271,8 +6407,13 @@ function renderCalendarMatchesGrid() {
   if (!grid) return;
 
   const proximos = cachedCalendarData.proximos_jogos || [];
-  const concluidos = cachedCalendarData.partidas_concluidas || [];
-  const userClub = (cachedDashboardData?.save?.current_team_name || "Meu Clube").toLowerCase();
+  let concluidos = cachedCalendarData.partidas_concluidas || [];
+  const userClub = (cachedDashboardData?.save?.current_team_name || "Madureira").toLowerCase();
+
+  // Filtrar jogos concluídos conforme o escopo (Só Jogos do Meu Time vs Todos os Jogos dos Meus Campeonatos)
+  if (currentCalendarTeamScope === "USER_ONLY") {
+    concluidos = concluidos.filter(m => isUserClubMatch(m));
+  }
 
   let listToRender = [];
 
@@ -6281,16 +6422,16 @@ function renderCalendarMatchesGrid() {
   } else if (currentCalendarStatusFilter === "COMPLETED") {
     listToRender = concluidos.map(m => ({ ...m, _type: "COMPLETED" }));
   } else {
-    // ALL: Próximos primeiro, depois concluídos
-    const pList = proximos.map(m => ({ ...m, _type: "UPCOMING" }));
+    // ALL: Jogos Concluídos primeiro (cronológico), depois Próximos Jogos
     const cList = concluidos.map(m => ({ ...m, _type: "COMPLETED" }));
-    listToRender = [...pList, ...cList];
+    const pList = proximos.map(m => ({ ...m, _type: "UPCOMING" }));
+    listToRender = [...cList, ...pList];
   }
 
   // Filtrar por competição se não for "TODAS"
   if (currentCalendarCompFilter !== "TODAS") {
     listToRender = listToRender.filter(m => {
-      const comp = m.competicao || m.competition_name;
+      const comp = normalizeCompNameClient(m.competicao || m.competition_name);
       return comp === currentCalendarCompFilter;
     });
   }
@@ -6320,7 +6461,9 @@ function renderCalendarMatchesGrid() {
     const hCrest = m.home_crest || (hId ? `/assets/crest/l${hId}.png` : '/assets/default_crest.png');
     const aCrest = m.away_crest || (aId ? `/assets/crest/l${aId}.png` : '/assets/default_crest.png');
 
-    const isUserHome = (m.mando === "CASA") || hName.toLowerCase().includes(userClub);
+    const isUserMatch = isUserClubMatch(m);
+    const isUserHome = isUserMatch && ((m.mando === "CASA") || hName.toLowerCase().includes(userClub) || Number(hId) === Number(cachedDashboardData?.save?.current_team_id || 112810));
+    const isUserAway = isUserMatch && !isUserHome;
     const oppId = isUserHome ? aId : hId;
     const oppName = isUserHome ? aName : hName;
 
@@ -6355,7 +6498,7 @@ function renderCalendarMatchesGrid() {
 
           <div class="cal-team-item">
             <img class="cal-team-crest" src="${aCrest}" onerror="this.src='/assets/default_crest.png'" alt="${escapeHtml(aName)}">
-            <span class="cal-team-name ${!isUserHome ? 'user-highlight' : ''}">${escapeHtml(aName)}</span>
+            <span class="cal-team-name ${isUserAway ? 'user-highlight' : ''}">${escapeHtml(aName)}</span>
           </div>
         </div>
 
@@ -6363,13 +6506,17 @@ function renderCalendarMatchesGrid() {
           <div class="cal-date-time">
             <i data-lucide="calendar" style="width: 12px; height: 12px;"></i>
             <span>${matchDate}</span>
-            <span style="opacity: 0.5;">•</span>
-            <span style="color: ${isUserHome ? '#10b981' : '#3b82f6'}; font-weight: 700;">${isUserHome ? 'CASA' : 'FORA'}</span>
+            ${isUserMatch ? `
+              <span style="opacity: 0.5;">•</span>
+              <span style="color: ${isUserHome ? '#10b981' : '#3b82f6'}; font-weight: 700;">${isUserHome ? 'CASA' : 'FORA'}</span>
+            ` : ''}
             ${m.fase_nome ? `<span style="opacity: 0.5;">•</span><span style="color: #cbd5e1;">${escapeHtml(m.fase_nome)}</span>` : ''}
           </div>
-          <button class="cal-h2h-btn" onclick="navigateToH2H(${oppId}, '${escapeJs(oppName)}')" title="Ver Raio-X contra ${escapeHtml(oppName)}">
-            <i data-lucide="swords" style="width: 12px; height: 12px;"></i> Raio-X (H2H)
-          </button>
+          ${isUserMatch ? `
+            <button class="cal-h2h-btn" onclick="navigateToH2H(${oppId}, '${escapeJs(oppName)}')" title="Ver Raio-X contra ${escapeHtml(oppName)}">
+              <i data-lucide="swords" style="width: 12px; height: 12px;"></i> Raio-X (H2H)
+            </button>
+          ` : `<span style="font-size: 0.72rem; color: #64748b;">Jogo da Rodada</span>`}
         </div>
       </div>
     `;
@@ -8428,7 +8575,7 @@ async function openScoutPad(opponentId = null) {
 
   try {
     const sId = currentSaveId || 'carreira_ativa';
-    const yr = cachedDashboardData?.active_season || '2029';
+    const yr = cachedDashboardData?.active_season || '2030';
     let url = `/api/match/scout-dossier?save_id=${encodeURIComponent(sId)}&season_year=${encodeURIComponent(yr)}`;
     if (opponentId) {
       url += `&opponent_id=${encodeURIComponent(opponentId)}`;
@@ -8496,7 +8643,11 @@ function renderScoutPadDossier(data) {
   if (userClubName) userClubName.textContent = `${(user.team_name || "MADUREIRA").toUpperCase()} EC • SCOUT & DESEMPENHO`;
 
   const compStage = document.getElementById("spCompStage");
-  if (compStage) compStage.textContent = `${match.competition || "Campeonato"} 2029 • ${match.stage || "Decisão"}`;
+  const actYear = match.date ? (match.date.split('/')[2] || "2030") : "2030";
+  if (compStage) compStage.textContent = `${match.competition || "Campeonato"} ${actYear} • ${match.stage || "Decisão"}`;
+
+  const spHeaderTitle = document.getElementById("spHeaderSeasonTitle");
+  if (spHeaderTitle) spHeaderTitle.textContent = `SCOUTPAD PRO ${actYear}`;
 
   // 2. Banner de Duelo (Faceoff)
   const homeCrest = document.getElementById("spHomeCrest");
@@ -8539,7 +8690,10 @@ function renderScoutPadDossier(data) {
 
   // 3. Aba 1: Visão Geral & Momento
   const stakesText = document.getElementById("spStakesText");
-  if (stakesText) stakesText.textContent = match.stakes_summary || "Partida regular do campeonato.";
+  if (stakesText) {
+    stakesText.style.whiteSpace = "pre-line";
+    stakesText.innerHTML = (match.stakes_summary || "Partida regular do campeonato.").replace(/\n/g, '<br>');
+  }
 
   const metricAdvantage = document.getElementById("spMetricAdvantage");
   if (metricAdvantage) metricAdvantage.textContent = match.metric_advantage || "Disputa por 3 Pts";
@@ -8549,6 +8703,11 @@ function renderScoutPadDossier(data) {
 
   const metricVenue = document.getElementById("spMetricVenue");
   if (metricVenue) metricVenue.textContent = isHome ? "Conselheiro Galvão" : (opp.team_name ? `Estádio do ${opp.team_name}` : "Fora");
+
+  const metricVenueRecord = document.getElementById("spMetricVenueRecord");
+  if (metricVenueRecord) {
+    metricVenueRecord.textContent = match.home_record_summary || (isHome ? "82.1% em Casa" : "Desempenho Fora");
+  }
 
   const metricLabelAdv = document.getElementById("spMetricLabelAdv");
   if (metricLabelAdv) metricLabelAdv.textContent = match.is_knockout ? "Vantagem Agregada" : "Objetivo da Partida";
@@ -8641,6 +8800,11 @@ function renderScoutPadDossier(data) {
   }
 
   // 4. Aba 2: Raio-X Histórico (H2H)
+  const lastH2HEl = document.getElementById("spLastH2HText");
+  if (lastH2HEl) {
+    lastH2HEl.innerHTML = (data.last_h2h_summary || "Nenhum confronto anterior registrado no histórico da carreira.").replace(/\n/g, '<br>');
+  }
+
   const h2hTotal = document.getElementById("spH2HTotal");
   const h2hWins = document.getElementById("spH2HWins");
   const h2hDraws = document.getElementById("spH2HDraws");
@@ -8687,6 +8851,15 @@ function renderScoutPadDossier(data) {
   }
 
   // 5. Aba 3: Espionagem do Elenco (Squad Spy)
+  const defLeakEl = document.getElementById("spDefensiveLeakText");
+  if (defLeakEl) {
+    defLeakEl.innerHTML = (opp.defensive_leak_diag || "Dados de solidez defensiva em análise.").replace(/\n/g, '<br>');
+  }
+  const offShootEl = document.getElementById("spOffensiveShootingText");
+  if (offShootEl) {
+    offShootEl.innerHTML = (opp.offensive_shooting_diag || "Dados de pontaria e finalização em análise.").replace(/\n/g, '<br>');
+  }
+
   const squadCountEl = document.getElementById("spSquadTotalCount");
   if (squadCountEl) squadCountEl.textContent = `${opp.total_squad || 0} Atletas no Elenco`;
 
@@ -8754,13 +8927,22 @@ function renderScoutPadDossier(data) {
 
   // 6. Aba 4: Dossiê Tático da IA
   const threatsEl = document.getElementById("spTacticsThreats");
-  if (threatsEl) threatsEl.textContent = tactics.threat_alert || "Atenção com contra-ataques adversários.";
+  if (threatsEl) {
+    threatsEl.style.whiteSpace = "pre-line";
+    threatsEl.innerHTML = (tactics.threat_alert || "Atenção com contra-ataques adversários.").replace(/\n/g, '<br>');
+  }
 
   const flawsEl = document.getElementById("spTacticsFlaws");
-  if (flawsEl) flawsEl.textContent = tactics.defensive_weakness || "Explorar espaços nas costas dos zagueiros e laterais rivais.";
+  if (flawsEl) {
+    flawsEl.style.whiteSpace = "pre-line";
+    flawsEl.innerHTML = (tactics.defensive_weakness || "Explorar espaços nas costas dos zagueiros e laterais rivais.").replace(/\n/g, '<br>');
+  }
 
   const gameplanEl = document.getElementById("spTacticsGameplan");
-  if (gameplanEl) gameplanEl.textContent = tactics.recommended_gameplan || "Manter as linhas compactas e ditar o ritmo de jogo.";
+  if (gameplanEl) {
+    gameplanEl.style.whiteSpace = "pre-line";
+    gameplanEl.innerHTML = (tactics.recommended_gameplan || "Manter as linhas compactas e ditar o ritmo de jogo.").replace(/\n/g, '<br>');
+  }
 }
 
 function printScoutReport() {
@@ -9352,4 +9534,866 @@ function closeBoardPlayerAdviceModal() {
   const modal = document.getElementById("modalBoardPlayerAdvice");
   if (modal) modal.style.display = "none";
 }
+
+// ==============================================================================
+// 25. ECOSSISTEMA DE PATROCÍNIOS (3 SLOTS), DIREITOS DE TV & ORÇAMENTO CONTÍNUO
+// ==============================================================================
+let cachedSponsorshipDashboard = null;
+let currentSponsorshipModalTab = "MASTER";
+
+async function loadSponsorshipDashboardData(allowNegotiation = false) {
+  try {
+    const res = await fetch(`${API_BASE}/sponsorships/dashboard?save_id=${currentSaveId}&allow_negotiation=${allowNegotiation}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    cachedSponsorshipDashboard = data;
+    renderSponsorshipDashboard(data);
+    return data;
+  } catch (err) {
+    console.error("Erro ao carregar ecossistema de patrocínios:", err);
+    return null;
+  }
+}
+
+function renderSponsorshipDashboard(data) {
+  if (!data || !data.context) return;
+  const ctx = data.context;
+
+  // 1. Atualizar Barra Executiva no Painel do Momento (Dashboard)
+  const dTier = document.getElementById("dashSponsTierBadge");
+  const dWin = document.getElementById("dashSponsWindowBadge");
+  const dBud = document.getElementById("dashSponsBudgetBadge");
+  const dSum = document.getElementById("dashSponsQuickSummary");
+
+  if (dTier) dTier.textContent = `${ctx.tier_label} • ${ctx.exposure_multiplier}x`;
+  if (dWin) {
+    dWin.textContent = ctx.window_open ? `🟢 ${ctx.window_label}` : `🔒 ${ctx.window_label}`;
+    dWin.className = `badge-tag ${ctx.window_open ? 'green' : 'blue'}`;
+  }
+  if (dBud) dBud.textContent = `Caixa Atual: ${formatCurrency(ctx.current_transfer_budget)}`;
+
+  const activeCount = ["MASTER", "SLEEVE", "SHORTS"].filter(k => data.slots && data.slots[k] && data.slots[k].active_contract).length;
+  const tvSigned = data.tv_rights && data.tv_rights.signed;
+  if (dSum) {
+    dSum.textContent = `Memória Histórica Contínua (${ctx.historical_timeline.map(t => t.season_year).join(' → ')}) • Uniforme: ${activeCount}/3 Patrocinadores Ativos • TV ${ctx.active_season}: ${tvSigned ? data.tv_rights.contract.broadcaster_name : 'Disponível para Assinatura'}.`;
+  }
+
+  // 2. Atualizar Cabeçalho na Aba Finanças
+  const fTier = document.getElementById("finSponsTierTag");
+  const fMult = document.getElementById("finSponsMultTag");
+  const fDate = document.getElementById("finSponsDateTag");
+  const fDesc = document.getElementById("finSponsExposureDesc");
+
+  if (fTier) fTier.textContent = ctx.tier_label;
+  if (fMult) fMult.textContent = `Exposição Comercial: ${ctx.exposure_multiplier}x`;
+  if (fDate) fDate.textContent = `Data no Save: ${ctx.in_game_date}`;
+  if (fDesc && ctx.exposure_reasons) {
+    fDesc.innerHTML = `<b>Fatores Históricos Contínuos:</b> ${ctx.exposure_reasons.map(r => escapeHtml(r)).join(" • ")}`;
+  }
+
+  // 3. Renderizar os 3 Slots Oficiais de Uniforme
+  const slotsGrid = document.getElementById("finSponsorshipSlotsGrid");
+  if (slotsGrid && data.slots) {
+    const slotOrder = ["MASTER", "SLEEVE", "SHORTS"];
+    const slotIcons = { MASTER: "👕 Peito Central", SLEEVE: "💪 Mangas & Ombros", SHORTS: "🩳 Calção & Barra" };
+
+    slotsGrid.innerHTML = slotOrder.map(slotKey => {
+      const sObj = data.slots[slotKey];
+      if (!sObj) return "";
+      const deal = sObj.active_contract;
+
+      if (deal) {
+        return `
+          <div class="glass-card" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.4); display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+                <span class="badge-tag gold" style="font-size: 0.7rem;">${slotIcons[slotKey]} • ${escapeHtml(sObj.slot_name)}</span>
+                <span class="badge-tag green" style="font-size: 0.68rem;">ATIVO (${deal.start_season}–${deal.end_season})</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.9rem; background: rgba(255,255,255,0.04); padding: 0.75rem; border-radius: 10px; margin-bottom: 0.75rem;">
+                <div style="width: 68px; height: 52px; background: #ffffff; border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <img src="${deal.logo_url}" alt="${escapeHtml(deal.brand_name)}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.style.display='none'">
+                </div>
+                <div>
+                  <h4 style="margin: 0; font-size: 1.05rem; color: #f8fafc;">${escapeHtml(deal.brand_name)}</h4>
+                  <span style="font-size: 0.73rem; color: #38bdf8; font-weight: 700;">Segmento: ${escapeHtml(deal.brand_segment)}</span>
+                  <p style="margin: 2px 0 0 0; font-size: 0.75rem; color: #94a3b8; font-style: italic;">"${escapeHtml(deal.slogan || '')}"</p>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.65rem; font-size: 0.8rem;">
+                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 0.5rem; border-radius: 8px;">
+                  <span style="color: #94a3b8; font-size: 0.7rem; display: block;">1ª PARCELA (JANEIRO)</span>
+                  <strong style="color: #34d399; font-size: 0.92rem;">${formatCurrency(deal.upfront_amount)} ✅</strong>
+                </div>
+                <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); padding: 0.5rem; border-radius: 8px;">
+                  <span style="color: #94a3b8; font-size: 0.7rem; display: block;">2ª PARCELA (JULHO/METAS)</span>
+                  <strong style="color: #fbbf24; font-size: 0.92rem;">${formatCurrency(deal.midseason_bonus_amount)} ${deal.midseason_paid ? '✅' : '⏳'}</strong>
+                </div>
+              </div>
+              <div style="font-size: 0.78rem; color: #cbd5e1; background: rgba(255,255,255,0.03); padding: 0.55rem 0.7rem; border-radius: 6px;">
+                🎯 <b>Meta Contratual:</b> ${escapeHtml(deal.goal_description)}
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+              ${sObj.can_recall_january ? `
+                <button type="button" class="btn-primary btn-sm" onclick="triggerSponsorInstallment(${deal.id}, 'RECALL_JAN')" style="background: linear-gradient(135deg, #a855f7, #7e22ce); border: none; width: 100%; font-weight: 800; cursor: pointer;">
+                  🚀 Aplicar Recall de Janeiro (+Reajuste &amp; 1ª Parcela ${ctx.active_season})
+                </button>
+              ` : ''}
+              ${sObj.can_claim_midseason ? `
+                <button type="button" class="btn-primary btn-sm" onclick="triggerSponsorInstallment(${deal.id}, 'MIDSEASON')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; color: #0f172a; width: 100%; font-weight: 800; cursor: pointer;">
+                  💰 Liberar 2ª Parcela Semestral (+${formatCurrency(deal.midseason_bonus_amount)})
+                </button>
+              ` : (deal.midseason_paid ? `
+                <div class="badge-tag green" style="text-align: center; padding: 6px 10px; font-size: 0.76rem; border-radius: 6px;">
+                  ✅ 2ª Parcela Semestral Creditada
+                </div>
+              ` : `
+                <div class="badge-tag blue" style="text-align: center; padding: 6px 10px; font-size: 0.74rem; opacity: 0.9; border-radius: 6px;" title="A 2ª parcela semestral só pode ser deliberada e liberada a partir de Julho/${ctx.active_season}">
+                  🔒 2ª Parcela Bloqueada (Prevista para Julho/${ctx.active_season})
+                </div>
+              `)}
+              <button type="button" class="btn-secondary btn-sm" onclick="openSponsorshipMeetingModal(false, '${slotKey}')" style="width: 100%; cursor: pointer;">
+                📄 Ver Contrato Ativo &amp; Cronograma
+              </button>
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="glass-card" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.45); border: 1px dashed rgba(148, 163, 184, 0.35); display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+                <span class="badge-tag blue" style="font-size: 0.7rem;">${slotIcons[slotKey]} • ${escapeHtml(sObj.slot_name)}</span>
+                <span class="badge-tag red" style="font-size: 0.68rem;">ESPAÇO VAGO</span>
+              </div>
+              <div style="padding: 1.15rem 0.75rem; text-align: center; background: rgba(255,255,255,0.02); border-radius: 10px; margin-bottom: 0.65rem;">
+                <i data-lucide="shirt" style="width: 32px; height: 32px; color: #fbbf24; margin-bottom: 6px;"></i>
+                <h4 style="margin: 0; font-size: 0.96rem; color: #f8fafc;">3 Marcas Oficiais Interessadas</h4>
+                <p style="margin: 4px 0 0 0; font-size: 0.78rem; color: #94a3b8;">
+                  Propostas de até <b style="color: #34d399;">${sObj.proposals && sObj.proposals[2] ? formatCurrency(sObj.proposals[2].annual_value) : '—'}/ano</b> prontas na mesa.
+                </p>
+              </div>
+            </div>
+            <button type="button" class="btn-primary btn-sm" onclick="openSponsorshipMeetingModal(false, '${slotKey}')" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; width: 100%; cursor: pointer;">
+              🤝 Negociar &amp; Assinar Patrocinador (${sObj.proposals ? sObj.proposals.length : 3} Opções)
+            </button>
+          </div>
+        `;
+      }
+    }).join("");
+  }
+
+  // 4. Renderizar Cota Anual de TV & Streaming
+  const tvBox = document.getElementById("finTvRightsBox");
+  const tvBadge = document.getElementById("finTvStatusBadge");
+  if (tvBox && data.tv_rights) {
+    if (data.tv_rights.signed && data.tv_rights.contract) {
+      const tv = data.tv_rights.contract;
+      if (tvBadge) {
+        tvBadge.textContent = `ASSINADO ${tv.season_year}`;
+        tvBadge.className = "badge-tag green";
+      }
+      tvBox.innerHTML = `
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 10px; padding: 0.9rem;">
+          <div style="font-size: 0.75rem; color: #38bdf8; font-weight: 800;">EMISSORA OFICIAL • TEMPORADA ${tv.season_year}</div>
+          <h4 style="margin: 3px 0; font-size: 1.05rem; color: #f8fafc;">📺 ${escapeHtml(tv.broadcaster_name)}</h4>
+          <p style="margin: 0 0 8px 0; font-size: 0.78rem; color: #94a3b8;">${escapeHtml(tv.broadcaster_channel || '')}</p>
+          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px;">
+            <span style="font-size: 0.8rem; color: #cbd5e1;">Cota Total Creditada em Janeiro:</span>
+            <strong style="font-size: 1.05rem; color: #34d399;">+${formatCurrency(tv.total_quota)} ✅</strong>
+          </div>
+        </div>
+      `;
+    } else {
+      if (tvBadge) {
+        tvBadge.textContent = `${data.tv_rights.offers.length} PROPOSTAS NA MESA`;
+        tvBadge.className = "badge-tag gold";
+      }
+      tvBox.innerHTML = `
+        <p style="font-size: 0.8rem; color: #cbd5e1; margin: 0 0 0.65rem 0;">
+          Escolha a emissora oficial para a temporada <b>${ctx.active_season}</b> (Calculado com base no desempenho de ${ctx.prev_season}):
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 0.55rem;">
+          ${data.tv_rights.offers.map(o => `
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.04); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+              <div>
+                <div style="font-weight: 800; font-size: 0.86rem; color: #f8fafc;">📺 ${escapeHtml(o.broadcaster_name)}</div>
+                <div style="font-size: 0.74rem; color: #34d399; font-weight: 700;">Cota À Vista: +${formatCurrency(o.total_quota)}</div>
+              </div>
+              <button type="button" class="btn-primary btn-xs" onclick="signTvRightsOffer('${o.broadcaster_id}')" style="background: #38bdf8; border: none; color: #0f172a; font-weight: 800; padding: 6px 10px; cursor: pointer;">
+                Assinar TV
+              </button>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+  }
+
+  // 5. Renderizar Premiações Oficiais de Competições Conquistadas
+  const prizesBox = document.getElementById("finClaimablePrizesBox");
+  if (prizesBox) {
+    const prizes = data.claimable_prizes || [];
+    if (prizes.length === 0) {
+      prizesBox.innerHTML = `<span class="empty-hint">Nenhuma premiação pendente no momento.</span>`;
+    } else {
+      prizesBox.innerHTML = `<div style="display: flex; flex-direction: column; gap: 0.55rem;">` + prizes.map(p => `
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.04); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid ${p.already_claimed ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.35)'};">
+          <div>
+            <div style="font-weight: 700; font-size: 0.84rem; color: #f8fafc;">🏆 ${escapeHtml(p.title)}</div>
+            <div style="font-size: 0.75rem; color: #fbbf24; font-weight: 800;">Premiação Oficial: +${formatCurrency(p.amount)}</div>
+          </div>
+          ${p.already_claimed ? `
+            <span class="badge-tag green" style="font-size: 0.7rem;">CREDITADO ✅</span>
+          ` : (p.is_current_active_season ? `
+            <span class="badge-tag gold" style="font-size: 0.68rem;" title="Conforme governança, premiações da temporada em andamento acumulam para liberação na virada da próxima temporada">🔒 ACUMULADO P/ ${parseInt(p.season_year || 2030) + 1}</span>
+          ` : `
+            <button type="button" class="btn-primary btn-xs" onclick="claimCompetitionPrize('${p.reference_key}')" style="background: #10b981; border: none; color: #0f172a; font-weight: 800; padding: 6px 10px; cursor: pointer;">
+              Injetar no Caixa
+            </button>
+          `)}
+        </div>
+      `).join("") + `</div>`;
+    }
+  }
+
+  // 6. Renderizar Tabela de Memória Histórica Contínua (2026..2030 sem zerar dados passados)
+  const tlBody = document.getElementById("finHistoricalTimelineBody");
+  if (tlBody && ctx.historical_timeline) {
+    tlBody.innerHTML = ctx.historical_timeline.map(t => `
+      <tr style="${t.is_current ? 'background: rgba(245, 158, 11, 0.08); font-weight: 700;' : ''}">
+        <td><span class="badge-tag ${t.is_current ? 'gold' : 'blue'}">${t.season_year} ${t.is_current ? '(Atual)' : ''}</span></td>
+        <td><b>${escapeHtml(t.division)}</b></td>
+        <td>${t.trophies && t.trophies.length > 0 ? t.trophies.map(tr => `<span class="badge-tag gold" style="margin-right:4px; font-size:0.68rem;">🏆 ${escapeHtml(tr)}</span>`).join("") : '<span style="color:#64748b; font-size:0.78rem;">Sem títulos</span>'}</td>
+        <td class="text-right">${formatCurrency(t.club_valuation)}</td>
+        <td class="text-right text-success">${formatCurrency(t.transfer_sales)}</td>
+        <td class="text-right text-danger">${formatCurrency(t.transfer_spend)}</td>
+        <td class="text-right text-gold">${formatCurrency(t.total_revenue)}</td>
+        <td class="text-right ${t.net_profit >= 0 ? 'text-success' : 'text-danger'}">${formatCurrency(t.net_profit)}</td>
+      </tr>
+    `).join("");
+  }
+
+  // 7. Renderizar Livro-Razão da Diretoria
+  const ledgerBox = document.getElementById("finBoardLedgerList");
+  if (ledgerBox) {
+    const ledger = data.ledger || [];
+    if (ledger.length === 0) {
+      ledgerBox.innerHTML = `<span class="empty-hint">Nenhum aporte registrado ainda no Livro-Razão. Assine seus patrocínios ou cota de TV acima para gerar o primeiro script!</span>`;
+    } else {
+      ledgerBox.innerHTML = `<div style="display: flex; flex-direction: column; gap: 0.5rem;">` + ledger.map(ev => `
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.03); padding: 0.65rem 0.9rem; border-radius: 8px; border-left: 3px solid #10b981;">
+          <div>
+            <div style="font-weight: 700; font-size: 0.85rem; color: #f8fafc;">${escapeHtml(ev.title)} <span class="badge-tag blue" style="font-size: 0.66rem; margin-left: 6px;">${ev.season_year} • ${ev.in_game_date || ''}</span></div>
+            <div style="font-size: 0.76rem; color: #94a3b8;">${escapeHtml(ev.description || '')}</div>
+          </div>
+          <div style="text-align: right; flex-shrink: 0;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: #34d399;">+${formatCurrency(ev.amount)}</div>
+            <div style="font-size: 0.68rem; color: #38bdf8;">F9: APLICAR_VERBA_DIRETORIA.lua</div>
+          </div>
+        </div>
+      `).join("") + `</div>`;
+    }
+  }
+
+  initLucideIcons();
+}
+
+// --- MODAL 1: REUNIÃO EXECUTIVA DE PATROCÍNIOS, TV & MESA DE RESCISÃO ---
+async function openSponsorshipMeetingModal(checkCalendar = true, initialTab = "MASTER", allowNegotiation = false) {
+  const data = await loadSponsorshipDashboardData(allowNegotiation);
+  if (!data || !data.context) return;
+  const ctx = data.context;
+
+  // Se o usuário clicou no botão de reunião no Painel do Momento e a janela estiver fechada, avisa com elegância mas permite ver a mesa!
+  if (checkCalendar && !ctx.window_open) {
+    showToast(`🏛️ Conselho Deliberativo (${ctx.in_game_date}): Janela ordinária fechada. Exibindo contratos vigentes e premiações.`, "warning");
+  }
+
+  const modal = document.getElementById("modalSponsorshipMeeting");
+  if (!modal) return;
+
+  document.getElementById("smModalTierTag").textContent = `${ctx.tier_label} (${ctx.exposure_multiplier}x)`;
+  document.getElementById("smModalWindowTag").textContent = ctx.window_label;
+  
+  const greetBox = document.getElementById("smBoardGreetingBox");
+  if (greetBox) {
+    greetBox.innerHTML = `
+      <div style="display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.3); padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
+          <img src="/uploads/manager_carreira_ativa.png" onerror="this.src='/assets/avatars/sigalapelotanews.png'" style="width: 44px; height: 44px; border-radius: 8px; object-fit: cover; border: 1px solid #facc15;" alt="Beto Junior">
+          <div>
+            <div style="font-size: 0.75rem; color: #facc15; font-weight: 800; text-transform: uppercase;">Treinador Presente</div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: #fff;">Beto Junior</div>
+          </div>
+        </div>
+        <div style="flex: 1; min-width: 280px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+            <span style="font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${ctx.window_open ? '#34d399' : '#f59e0b'};">
+              ${ctx.window_open ? '🏛️ REUNIÃO MAGNA ABERTA • DELIBERAÇÃO COMERCIAL' : '🔒 SESSÃO ORDINÁRIA • CONTRATOS BLINDADOS'}
+            </span>
+            <span style="font-size: 0.7rem; color: #94a3b8; font-family: monospace;">Data do Save: ${ctx.in_game_date}</span>
+          </div>
+          <div style="font-size: 0.88rem; line-height: 1.55; color: #f1f5f9;">
+            ${data.board_greeting}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  currentSponsorshipModalTab = initialTab;
+  switchSponsorshipModalSlot(initialTab);
+  modal.classList.add("active");
+  initLucideIcons();
+}
+
+function closeSponsorshipMeetingModal() {
+  const modal = document.getElementById("modalSponsorshipMeeting");
+  if (modal) modal.classList.remove("active");
+}
+
+function switchSponsorshipModalSlot(slotKey) {
+  currentSponsorshipModalTab = slotKey;
+  ["Master", "Sleeve", "Shorts", "Tv"].forEach(t => {
+    const btn = document.getElementById(`btnSmTab${t}`);
+    if (btn) {
+      const isAct = t.toUpperCase() === slotKey;
+      btn.style.background = isAct ? "linear-gradient(135deg, #f59e0b, #d97706)" : "";
+      btn.style.color = isAct ? "#0f172a" : "";
+    }
+  });
+
+  const bodyEl = document.getElementById("smModalDynamicBody");
+  if (!bodyEl || !cachedSponsorshipDashboard) return;
+
+  if (slotKey === "TV") {
+    const tv = cachedSponsorshipDashboard.tv_rights;
+    const prizes = cachedSponsorshipDashboard.claimable_prizes || [];
+    bodyEl.innerHTML = `
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem;">
+        <div class="glass-card" style="background: rgba(15,23,42,0.7);">
+          <h4 style="margin-top:0; color:#38bdf8;">📺 Propostas Oficiais de Direitos de Transmissão (${cachedSponsorshipDashboard.context.active_season})</h4>
+          ${tv.signed ? `
+            <div style="padding:1rem; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px;">
+              <strong style="color:#34d399;">✅ Contrato Assinado: ${escapeHtml(tv.contract.broadcaster_name)}</strong>
+              <p style="font-size:0.84rem; color:#cbd5e1; margin:6px 0 0 0;">Cota Anual Creditada: <b>${formatCurrency(tv.contract.total_quota)}</b></p>
+            </div>
+          ` : tv.offers.map(o => `
+            <div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:0.9rem; margin-bottom:0.75rem;">
+              <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="color:#f8fafc; font-size:0.96rem;">${escapeHtml(o.broadcaster_name)}</strong>
+                <span class="badge-tag blue" style="font-size:0.68rem;">${escapeHtml(o.badge)}</span>
+              </div>
+              <p style="font-size:0.78rem; color:#94a3b8; margin:6px 0;">${escapeHtml(o.description)}</p>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                <span style="color:#34d399; font-weight:800; font-size:1rem;">+${formatCurrency(o.total_quota)} à vista</span>
+                <button type="button" class="btn-primary btn-sm" onclick="signTvRightsOffer('${o.broadcaster_id}')" style="background:#38bdf8; border:none; color:#0f172a; font-weight:800; cursor:pointer;">
+                  Assinar Cota de TV
+                </button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="glass-card" style="background: rgba(15,23,42,0.7);">
+          <h4 style="margin-top:0; color:#34d399;">🏆 Repasse de Premiações Esportivas (CBF / CONMEBOL)</h4>
+          ${prizes.map(p => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); padding:0.75rem; border-radius:8px; margin-bottom:0.6rem;">
+              <div>
+                <div style="font-weight:700; font-size:0.86rem; color:#f8fafc;">${escapeHtml(p.title)}</div>
+                <div style="color:#fbbf24; font-weight:800; font-size:0.82rem;">+${formatCurrency(p.amount)}</div>
+              </div>
+              ${p.already_claimed ? `<span class="badge-tag green">CREDITADO ✅</span>` : (p.is_current_active_season ? `
+                <span class="badge-tag gold" style="font-size:0.68rem;" title="Premiações da temporada em andamento são calculadas e liberadas na virada da temporada seguinte">🔒 ACUMULADO P/ ${parseInt(p.season_year || 2030) + 1}</span>
+              ` : `
+                <button type="button" class="btn-primary btn-xs" onclick="claimCompetitionPrize('${p.reference_key}')" style="background:#10b981; border:none; color:#0f172a; font-weight:800; cursor:pointer;">
+                  Resgatar Agora
+                </button>
+              `)}
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+    initLucideIcons();
+    return;
+  }
+
+  const slotObj = cachedSponsorshipDashboard.slots[slotKey];
+  if (!slotObj) return;
+  const activeDeal = slotObj.active_contract;
+  const proposals = slotObj.proposals || [];
+
+  // Se há contrato ativo e o slot está blindado (fora de janela ou não autorizado)
+  if (activeDeal && (slotObj.is_contract_locked || proposals.length === 0)) {
+    bodyEl.innerHTML = `
+      <div class="glass-card" style="padding: 1.5rem; background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 12px; margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.15rem; flex-wrap: wrap; gap: 0.75rem;">
+          <span class="badge-tag green" style="font-size: 0.8rem; font-weight: 800; display: flex; align-items: center; gap: 5px;">
+            <i data-lucide="shield-check" style="width: 14px; height: 14px;"></i> CONTRATO ATIVO E BLINDADO
+          </span>
+          <span class="badge-tag blue" style="font-size: 0.8rem; font-weight: 700;">
+            Vigência Contratual: ${activeDeal.start_season}–${activeDeal.end_season}
+          </span>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 1.25rem; background: rgba(255,255,255,0.04); padding: 1.1rem 1.25rem; border-radius: 10px; margin-bottom: 1.25rem; border: 1px solid rgba(255,255,255,0.08);">
+          <div style="width: 90px; height: 65px; background: #ffffff; border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(0,0,0,0.35);">
+            <img src="${activeDeal.logo_url || '/assets/sponsors/default.png'}" alt="${escapeHtml(activeDeal.brand_name)}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+          </div>
+          <div>
+            <h3 style="margin: 0; font-size: 1.4rem; color: #f8fafc; font-weight: 800;">${escapeHtml(activeDeal.brand_name)}</h3>
+            <span style="font-size: 0.85rem; color: #38bdf8; font-weight: 700;">Espaço Oficial: ${escapeHtml(slotObj.slot_name)}</span>
+            <p style="margin: 4px 0 0 0; font-size: 0.8rem; color: #94a3b8; font-style: italic;">"${escapeHtml(activeDeal.slogan || 'Patrocinador Oficial do Clube')}"</p>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; background: rgba(255,255,255,0.03); padding: 1.1rem; border-radius: 10px; margin-bottom: 1.25rem;">
+          <div>
+            <span style="color: #94a3b8; font-size: 0.76rem; display: block; font-weight: 600; text-transform: uppercase;">Valor Total Anual:</span>
+            <strong style="color: #f8fafc; font-size: 1.15rem;">${formatCurrency(activeDeal.annual_value)} / ano</strong>
+          </div>
+          <div>
+            <span style="color: #94a3b8; font-size: 0.76rem; display: block; font-weight: 600; text-transform: uppercase;">Entrada À Vista (Paga):</span>
+            <strong style="color: #34d399; font-size: 1.15rem;">+${formatCurrency(activeDeal.upfront_paid)}</strong>
+          </div>
+          <div>
+            <span style="color: #94a3b8; font-size: 0.76rem; display: block; font-weight: 600; text-transform: uppercase;">2ª Parcela (Julho / Metas):</span>
+            <strong style="color: ${activeDeal.midseason_paid ? '#34d399' : '#fbbf24'}; font-size: 1.15rem;">
+              ${activeDeal.midseason_paid ? 'Creditada ✅' : formatCurrency(activeDeal.midseason_bonus)}
+            </strong>
+          </div>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+          ${slotObj.can_claim_midseason ? `
+            <button type="button" class="btn-primary" onclick="triggerSponsorInstallment('${activeDeal.id}', 'MIDSEASON')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 0.6rem 1.2rem;">
+              <i data-lucide="dollar-sign"></i> Liberar 2ª Parcela de Julho (+${formatCurrency(activeDeal.midseason_bonus)})
+            </button>
+          ` : (activeDeal.midseason_paid ? `
+            <span class="badge-tag green" style="padding: 6px 12px; font-size: 0.78rem;">
+              ✅ 2ª Parcela Semestral Creditada
+            </span>
+          ` : `
+            <span class="badge-tag blue" style="padding: 6px 12px; font-size: 0.78rem;" title="Data do save: ${cachedSponsorshipDashboard.context.in_game_date}">
+              🔒 2ª Parcela Bloqueada (Prevista para Julho/${cachedSponsorshipDashboard.context.active_season})
+            </span>
+          `)}
+
+          ${slotObj.can_recall_january ? `
+            <button type="button" class="btn-primary" onclick="triggerSponsorInstallment('${activeDeal.id}', 'RECALL_JAN')" style="background: linear-gradient(135deg, #38bdf8, #0284c7); border: none; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; padding: 0.6rem 1.2rem;">
+              <i data-lucide="refresh-cw"></i> Resgatar Aporte da Temporada (+${formatCurrency(activeDeal.upfront_paid)})
+            </button>
+          ` : ''}
+
+          ${cachedSponsorshipDashboard.context.window_open ? `
+            <button type="button" class="btn-secondary" onclick="openSponsorshipMeetingModal(false, '${slotKey}', true)" style="border: 1px solid rgba(245, 158, 11, 0.5); color: #fbbf24; font-size: 0.8rem; padding: 6px 14px; cursor: pointer;">
+              ⚠️ Abrir Mesa de Rescisão &amp; Concorrentes (Janela Oficial Aberta)
+            </button>
+          ` : `
+            <div style="font-size: 0.82rem; color: #94a3b8; display: flex; align-items: center; gap: 8px; margin-left: auto;">
+              <i data-lucide="shield-check" style="color: #34d399; width: 16px; height: 16px;"></i>
+              <span>Contrato blindado • Propostas concorrentes bloqueadas fora das janelas de Julho e Dezembro</span>
+            </div>
+          `}
+        </div>
+      </div>
+    `;
+    initLucideIcons();
+    return;
+  }
+
+  let activeBannerHtml = "";
+  if (activeDeal) {
+    const termFee = proposals[0] ? proposals[0].termination_fee : (activeDeal.annual_value * 0.4);
+    activeBannerHtml = `
+      <div style="margin-bottom: 1rem; padding: 0.9rem 1.1rem; border-radius: 10px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.35); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <strong style="color: #f87171; font-size: 0.9rem;">⚠️ MESA DE RESCISÃO CONTRATUAL ABERTA (${escapeHtml(slotObj.slot_name)})</strong>
+          <p style="margin: 3px 0 0 0; font-size: 0.8rem; color: #cbd5e1;">
+            Contrato vigente com <b>${escapeHtml(activeDeal.brand_name)}</b> (${activeDeal.start_season}–${activeDeal.end_season}). Multa rescisória de quebra (40%): <b style="color: #fbbf24;">${formatCurrency(termFee)}</b>.
+            Você pode escolher abaixo entre <b>o novo patrocinador pagar 100% da multa</b> (contrato de 2 anos + meta rígida) ou <b>o clube bancar a multa</b>.
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  bodyEl.innerHTML = activeBannerHtml + `
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1rem;">
+      ${proposals.map(p => `
+        <div class="glass-card" style="padding: 1.1rem; background: rgba(15, 23, 42, 0.82); border: 1px solid rgba(255,255,255,0.12); display: flex; flex-direction: column; justify-content: space-between; gap: 0.85rem;">
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.65rem;">
+              <span class="badge-tag gold" style="font-size: 0.68rem;">${escapeHtml(p.profile_tag)}</span>
+              <span class="badge-tag blue" style="font-size: 0.68rem;">${p.duration_years} Ano(s)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.85rem; background: rgba(255,255,255,0.04); padding: 0.75rem; border-radius: 10px; margin-bottom: 0.75rem;">
+              <div style="width: 72px; height: 54px; background: #ffffff; border-radius: 8px; padding: 6px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <img src="${p.logo_url}" alt="${escapeHtml(p.brand_name)}" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+              </div>
+              <div>
+                <h4 style="margin: 0; font-size: 1.05rem; color: #f8fafc;">${escapeHtml(p.brand_name)}</h4>
+                <span style="font-size: 0.72rem; color: #38bdf8; font-weight: 700;">Segmento: ${escapeHtml(p.brand_segment)}</span>
+                <p style="margin: 2px 0 0 0; font-size: 0.74rem; color: #94a3b8; font-style: italic;">"${escapeHtml(p.slogan)}"</p>
+              </div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 0.7rem; border-radius: 8px; margin-bottom: 0.65rem; font-size: 0.82rem;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="color: #94a3b8;">Valor Total Anual:</span>
+                <strong style="color: #f8fafc; font-size: 0.96rem;">${formatCurrency(p.annual_value)} / ano</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span style="color: #94a3b8;">💵 Entrada À Vista (${p.upfront_pct}%):</span>
+                <strong style="color: #34d399;">+${formatCurrency(p.upfront_amount)}</strong>
+              </div>
+              <div style="display: flex; justify-content: space-between;">
+                <span style="color: #94a3b8;">🎯 2ª Parcela (Julho / Metas):</span>
+                <strong style="color: #fbbf24;">+${formatCurrency(p.midseason_bonus_amount)}</strong>
+              </div>
+            </div>
+
+            <div style="font-size: 0.78rem; color: #cbd5e1; margin-bottom: 0.5rem;">
+              🎯 <b>Meta Padrão:</b> ${escapeHtml(p.goal_description)}
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.45rem;">
+            ${activeDeal && p.termination_fee > 0 ? `
+              <button type="button" class="btn-primary btn-sm" onclick="signSponsorProposal('${slotKey}', '${p.brand_id}', 'SPONSOR_PAYS')" style="background: linear-gradient(135deg, #10b981, #059669); border: none; color: #0f172a; font-weight: 800; width: 100%; cursor: pointer;">
+                🤝 ${escapeHtml(p.brand_name)} Paga 100% da Multa (+${formatCurrency(p.upfront_amount)} Limpos • 2 Anos)
+              </button>
+              <button type="button" class="btn-secondary btn-sm" onclick="signSponsorProposal('${slotKey}', '${p.brand_id}', 'CLUB_PAYS')" style="width: 100%; cursor: pointer; font-size: 0.76rem;">
+                💼 Clube Paga a Multa (Recebe Líquido +${formatCurrency(Math.max(0, p.upfront_amount - p.termination_fee))})
+              </button>
+            ` : `
+              <button type="button" class="btn-primary btn-sm" onclick="signSponsorProposal('${slotKey}', '${p.brand_id}', 'NONE')" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; width: 100%; cursor: pointer;">
+                ✍️ Assinar Contrato (+${formatCurrency(p.upfront_amount)} À Vista no F9)
+              </button>
+            `}
+          </div>
+        </div>
+      `).join("")}
+    </div>
+  `;
+  initLucideIcons();
+}
+
+async function signSponsorProposal(slotType, brandId, buyoutMode) {
+  try {
+    const res = await fetch(`${API_BASE}/sponsorships/sign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        save_id: currentSaveId,
+        slot_type: slotType,
+        brand_id: brandId,
+        buyout_mode: buyoutMode
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      showToast(`🏆 ${data.message}`, "success");
+      if (data.lua_code) logLuaScript(data.lua_code);
+      await loadSponsorshipDashboardData();
+      await loadFinancesData();
+      switchSponsorshipModalSlot(slotType);
+    } else {
+      showToast(data.message || "Erro ao assinar patrocínio", "error");
+    }
+  } catch (err) {
+    console.error("Erro ao assinar patrocínio:", err);
+    showToast("Erro de comunicação com o servidor", "error");
+  }
+}
+
+async function triggerSponsorInstallment(sponsorshipId, actionType) {
+  try {
+    const res = await fetch(`${API_BASE}/sponsorships/trigger_installment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        save_id: currentSaveId,
+        sponsorship_id: sponsorshipId,
+        action_type: actionType
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      showToast(`💰 ${data.message}`, "success");
+      if (data.lua_code) logLuaScript(data.lua_code);
+      await loadSponsorshipDashboardData();
+      await loadFinancesData();
+    } else {
+      showToast(data.message || "Não foi possível liberar parcela", "warning");
+    }
+  } catch (err) {
+    console.error("Erro ao liberar parcela:", err);
+  }
+}
+
+async function signTvRightsOffer(broadcasterId) {
+  try {
+    const res = await fetch(`${API_BASE}/sponsorships/sign_tv`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        save_id: currentSaveId,
+        broadcaster_id: broadcasterId
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      showToast(`📺 ${data.message}`, "success");
+      if (data.lua_code) logLuaScript(data.lua_code);
+      await loadSponsorshipDashboardData();
+      await loadFinancesData();
+      if (currentSponsorshipModalTab === "TV") switchSponsorshipModalSlot("TV");
+    } else {
+      showToast(data.message || "Erro ao assinar cota de TV", "warning");
+    }
+  } catch (err) {
+    console.error("Erro ao assinar TV:", err);
+  }
+}
+
+async function claimCompetitionPrize(referenceKey) {
+  try {
+    const res = await fetch(`${API_BASE}/sponsorships/claim_prize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        save_id: currentSaveId,
+        reference_key: referenceKey
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      showToast(`🏆 ${data.message}`, "success");
+      if (data.lua_code) logLuaScript(data.lua_code);
+      await loadSponsorshipDashboardData();
+      await loadFinancesData();
+      if (currentSponsorshipModalTab === "TV") switchSponsorshipModalSlot("TV");
+    } else {
+      showToast(data.message || "Erro ao resgatar premiação", "warning");
+    }
+  } catch (err) {
+    console.error("Erro ao resgatar premiação:", err);
+  }
+}
+
+// --- MODAL 2: SOLICITAÇÃO EXTRAORDINÁRIA DE VERBA À DIRETORIA ---
+async function openExtraFundsRequestModal() {
+  const data = await loadSponsorshipDashboardData();
+  if (!data || !data.context) return;
+  const ef = data.extra_funds;
+  const ctx = data.context;
+
+  const modal = document.getElementById("modalExtraFundsRequest");
+  if (!modal) return;
+
+  const ctxBox = document.getElementById("efBoardContextBox");
+  if (ctxBox) {
+    ctxBox.innerHTML = `
+      <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+        <span>👔 <b>Nota Atual do Manager:</b> <span class="badge-tag gold">${ef.manager_grade} (${ef.win_rate}% aprov.)</span></span>
+        <span>🏛️ <b>Teto Restante no Ano (${ctx.active_season}):</b> <strong style="color: #34d399;">${formatCurrency(ef.remaining_ceiling)}</strong></span>
+      </div>
+      <p style="margin: 6px 0 0 0; color: #94a3b8; font-size: 0.79rem;">
+        A Diretoria avalia seu histórico contínuo. Pedidos aprovados injetam verba imediata via Live Editor, mas <b>elevam compulsoriamente a meta esportiva da temporada</b>.
+      </p>
+    `;
+  }
+
+  const inputAmt = document.getElementById("efInputAmount");
+  if (inputAmt) {
+    inputAmt.max = ef.remaining_ceiling > 0 ? ef.remaining_ceiling : 1000000;
+    inputAmt.value = Math.min(1000000, ef.remaining_ceiling || 500000);
+  }
+  const hint = document.getElementById("efCeilingHint");
+  if (hint) {
+    hint.textContent = `Limite máximo prudencial disponível para aprovação hoje: ${formatCurrency(ef.remaining_ceiling)} (de um teto anual de ${formatCurrency(ef.annual_ceiling)}).`;
+  }
+
+  const msgBox = document.getElementById("efResultMessageBox");
+  if (msgBox) msgBox.style.display = "none";
+
+  modal.classList.add("active");
+  initLucideIcons();
+}
+
+function closeExtraFundsRequestModal() {
+  const modal = document.getElementById("modalExtraFundsRequest");
+  if (modal) modal.classList.remove("active");
+}
+
+async function submitExtraFundsRequest(event) {
+  if (event) event.preventDefault();
+  const amt = parseFloat(document.getElementById("efInputAmount").value) || 0;
+  const reason = document.getElementById("efInputReason").value;
+  const newGoal = document.getElementById("efInputNewGoal").value;
+  const msgBox = document.getElementById("efResultMessageBox");
+
+  try {
+    const res = await fetch(`${API_BASE}/sponsorships/request_extra_funds`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        save_id: currentSaveId,
+        amount: amt,
+        reason: reason,
+        new_goal: newGoal
+      })
+    });
+    const data = await res.json();
+    if (msgBox) {
+      msgBox.style.display = "block";
+      const isOk = data.status === "approved";
+      msgBox.style.background = isOk ? "rgba(16, 185, 129, 0.14)" : "rgba(239, 68, 68, 0.14)";
+      msgBox.style.border = `1px solid ${isOk ? '#10b981' : '#ef4444'}`;
+      msgBox.style.color = "#f8fafc";
+      msgBox.innerHTML = `<strong>${escapeHtml(data.board_verdict || '')}</strong><br>${escapeHtml(data.message || '')}`;
+    }
+    if (data.status === "approved") {
+      showToast(`💰 ${data.message}`, "success");
+      if (data.lua_code) logLuaScript(data.lua_code);
+      await loadSponsorshipDashboardData();
+      await loadFinancesData();
+    } else {
+      showToast(data.message || "Pedido negado pela Diretoria", "warning");
+    }
+  } catch (err) {
+    console.error("Erro na solicitação de verba:", err);
+    showToast("Erro ao comunicar com o Conselho", "error");
+  }
+}
+
+window.openSponsorshipMeetingModal = openSponsorshipMeetingModal;
+window.closeSponsorshipMeetingModal = closeSponsorshipMeetingModal;
+window.switchSponsorshipModalSlot = switchSponsorshipModalSlot;
+window.signSponsorProposal = signSponsorProposal;
+window.triggerSponsorInstallment = triggerSponsorInstallment;
+window.signTvRightsOffer = signTvRightsOffer;
+window.claimCompetitionPrize = claimCompetitionPrize;
+window.openExtraFundsRequestModal = openExtraFundsRequestModal;
+window.closeExtraFundsRequestModal = closeExtraFundsRequestModal;
+window.submitExtraFundsRequest = submitExtraFundsRequest;
+
+// --- CENTRAL DE SCRIPT LUA & LIVE EDITOR F9 (INSTRUÇÕES E CÓPIA 1 CLIQUE) ---
+function logLuaScript(code) {
+  const el = document.getElementById("luaTerminalOutput");
+  if (el) el.textContent = code;
+  const section = document.getElementById("scriptHubSection");
+  if (section) section.scrollIntoView({ behavior: 'smooth' });
+}
+
+function copyLuaScriptToClipboard() {
+  const el = document.getElementById("luaTerminalOutput");
+  const code = el ? el.textContent : "";
+  if (!code) return;
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(code).then(() => showCopiedFeedback()).catch(() => fallbackCopy(code));
+  } else {
+    fallbackCopy(code);
+  }
+}
+
+function fallbackCopy(code) {
+  const textArea = document.createElement("textarea");
+  textArea.value = code;
+  textArea.style.position = "fixed";
+  textArea.style.left = "-999999px";
+  document.body.appendChild(textArea);
+  textArea.focus();
+  textArea.select();
+  try {
+    document.execCommand('copy');
+    showCopiedFeedback();
+  } catch (err) {}
+  document.body.removeChild(textArea);
+}
+
+function showCopiedFeedback() {
+  const btn = document.getElementById('btnCopyScript');
+  const txt = document.getElementById('btnCopyText');
+  if (btn) btn.classList.add('copied');
+  if (txt) txt.textContent = 'Copiado para o Clipboard!';
+  if (window.showToast) window.showToast("Script Lua copiado! Cole no F9 do Live Editor.", "success");
+  setTimeout(() => {
+    if (btn) btn.classList.remove('copied');
+    if (txt) txt.textContent = 'Copiar Script Lua';
+  }, 2500);
+}
+
+function downloadLuaScriptFile() {
+  const el = document.getElementById("luaTerminalOutput");
+  const code = el ? el.textContent : "";
+  if (!code) return;
+  const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'APLICAR_VERBA_DIRETORIA.lua';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if (window.showToast) window.showToast("Arquivo APLICAR_VERBA_DIRETORIA.lua baixado!", "success");
+}
+
+window.copyLuaScriptToClipboard = copyLuaScriptToClipboard;
+window.downloadLuaScriptFile = downloadLuaScriptFile;
+window.logLuaScript = logLuaScript;
+
+window.copyLatestBoardLuaScript = async function() {
+  const btnText = document.getElementById("btnCopyLatestLuaText");
+  try {
+    const res = await fetch(`${API_BASE}/sponsorships/latest_lua_script`);
+    const data = await res.json();
+    const luaCode = data.lua_code || (document.getElementById("luaTerminalOutput") ? document.getElementById("luaTerminalOutput").textContent : "");
+    if (!luaCode) {
+      showToast("Nenhum script Lua gerado ainda.", "warning");
+      return;
+    }
+    await navigator.clipboard.writeText(luaCode);
+    if (btnText) btnText.textContent = "Copiado para o F9! ✅";
+    showToast("📋 Script APLICAR_VERBA_DIRETORIA.lua copiado com sucesso! Abra o Live Editor (F9) no FC 26 e cole no terminal Lua.", "success");
+    setTimeout(() => {
+      if (btnText) btnText.textContent = "Copiar Script da Verba (F9)";
+    }, 3000);
+  } catch (err) {
+    console.error("Erro ao copiar script Lua:", err);
+    showToast("Falha ao copiar script Lua", "error");
+  }
+};
+
+window.downloadLatestBoardLuaScript = async function() {
+  try {
+    const res = await fetch(`${API_BASE}/sponsorships/latest_lua_script`);
+    const data = await res.json();
+    const luaCode = data.lua_code || (document.getElementById("luaTerminalOutput") ? document.getElementById("luaTerminalOutput").textContent : "");
+    if (!luaCode) {
+      showToast("Nenhum script Lua para baixar.", "warning");
+      return;
+    }
+    const blob = new Blob([luaCode], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'APLICAR_VERBA_DIRETORIA.lua';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("💾 Arquivo APLICAR_VERBA_DIRETORIA.lua baixado com sucesso!", "success");
+  } catch (err) {
+    console.error("Erro ao baixar script Lua:", err);
+    showToast("Falha ao baixar script Lua", "error");
+  }
+};
+
+
+
 

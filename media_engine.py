@@ -50,6 +50,131 @@ def clean_json_response(raw_text):
         raw_text = raw_text[:-3]
     return raw_text.strip()
 
+def get_career_media_context(save_id="carreira_ativa"):
+    """Extrai contexto real profundo da carreira para alimentar as matérias e posts da IA."""
+    try:
+        import database
+        conn = database.get_db()
+        cur = conn.cursor()
+        
+        # 1. Info básica do clube e técnico
+        cur.execute("SELECT current_team_id, current_team_name, manager_name FROM saves WHERE id = ?", (save_id,))
+        s_row = cur.fetchone()
+        team_id = s_row["current_team_id"] if s_row else 112810
+        team_name = s_row["current_team_name"] if s_row else "Madureira"
+        manager_name = s_row["manager_name"] if s_row else "Beto Junior"
+        
+        # 2. Identificar temporada ativa (2030)
+        cur.execute("SELECT MAX(season_year) as max_year FROM matches WHERE save_id = ?", (save_id,))
+        max_y_row = cur.fetchone()
+        active_season = str(max_y_row["max_year"]) if (max_y_row and max_y_row["max_year"]) else "2030"
+
+        # 3. Tabela de classificação real da temporada ativa
+        cur.execute("""
+            SELECT team_id, team_name, points, played, wins, draws, losses, goals_for, goals_against, goal_diff, competition_name
+            FROM standings
+            WHERE save_id = ? AND (season_year = ? OR season_year = ?)
+            ORDER BY points DESC, goal_diff DESC LIMIT 10
+        """, (save_id, active_season, int(active_season) if active_season.isdigit() else 2030))
+        standings = [dict(r) for r in cur.fetchall()]
+        if not standings:
+            cur.execute("""
+                SELECT team_id, team_name, points, played, wins, draws, losses, goals_for, goals_against, goal_diff, competition_name
+                FROM standings WHERE save_id = ? ORDER BY season_year DESC, points DESC LIMIT 10
+            """, (save_id,))
+            standings = [dict(r) for r in cur.fetchall()]
+        
+        try:
+            import fcm_resolver
+            for s in standings:
+                s["crest_url"] = fcm_resolver.get_crest_image_path_or_url(s.get("team_id", 0))
+        except Exception:
+            pass
+        
+        # 4. Atletas mais decisivos e com melhor rendimento real na temporada
+        cur.execute("""
+            SELECT player_name as name, position, overall_rating, appearances, goals, assists, avg_rating, motms
+            FROM player_season_stats
+            WHERE save_id = ? AND season_year = ? AND team_id = ? AND competition_name = 'Geral'
+            ORDER BY (goals * 2 + assists + avg_rating * 2) DESC LIMIT 12
+        """, (save_id, active_season, team_id))
+        top_performers = [dict(r) for r in cur.fetchall()]
+        
+        # Elenco geral
+        cur.execute("""
+            SELECT name, position, overall_rating, age
+            FROM scout_live_players
+            WHERE save_id = ? AND (team_id = ? OR team_name LIKE ?)
+            ORDER BY overall_rating DESC
+        """, (save_id, team_id, f"%{team_name}%"))
+        squad = [dict(r) for r in cur.fetchall()]
+        if top_performers:
+            squad = top_performers + squad
+        
+        # 5. Partidas recentes do clube na temporada ativa
+        cur.execute("""
+            SELECT home_team_name, away_team_name, home_score, away_score, match_date, competition_name, home_team_id, away_team_id
+            FROM matches
+            WHERE save_id = ? AND (home_team_id = ? OR away_team_id = ?)
+            ORDER BY id DESC LIMIT 5
+        """, (save_id, team_id, team_id))
+        recent_matches = [dict(r) for r in cur.fetchall()]
+        
+        # 6. Próximos jogos agendados pendentes no calendário oficial
+        cur.execute("""
+            SELECT id, match_date, match_time, competition_name, opponent_name, opponent_id, mando, home_team_name, away_team_name, home_team_id, away_team_id
+            FROM calendar_fixtures
+            WHERE save_id = ? AND is_completed = 0
+            ORDER BY id ASC LIMIT 5
+        """, (save_id,))
+        upcoming_fixtures = [dict(r) for r in cur.fetchall()]
+        try:
+            import fcm_resolver
+            for fix in upcoming_fixtures:
+                opp_id = fix.get("opponent_id") or (fix.get("away_team_id") if fix.get("home_team_id") == team_id else fix.get("home_team_id"))
+                fix["opponent_crest"] = fcm_resolver.get_crest_image_path_or_url(opp_id)
+                fix["home_crest"] = fcm_resolver.get_crest_image_path_or_url(fix.get("home_team_id", 0))
+                fix["away_crest"] = fcm_resolver.get_crest_image_path_or_url(fix.get("away_team_id", 0))
+        except Exception:
+            pass
+        
+        # 7. Patrocinadores ativos
+        cur.execute("SELECT brand_name, slot_type, annual_value, logo_url FROM club_sponsorships WHERE save_id = ? AND status = 'ACTIVE'", (save_id,))
+        sponsors = [dict(r) for r in cur.fetchall()]
+        
+        conn.close()
+
+        # Encontra o Madureira na tabela atual de 2030
+        user_stand = next((s for s in standings if s.get("team_name") == team_name or "Madureira" in str(s.get("team_name", ""))), None)
+        if user_stand:
+            pos = user_stand.get("position", 1)
+            pts = user_stand.get("points", 29)
+            j = user_stand.get("played", 12)
+            v = user_stand.get("wins", 9)
+            e = user_stand.get("draws", 2)
+            d = user_stand.get("losses", 1)
+            pos_label = "Líder" if pos == 1 else f"{pos}º Lugar"
+            stand_desc = f"{pos_label} com {pts} pts em {j} jogos ({v}V, {e}E, {d}D)"
+        else:
+            stand_desc = "Líder do Brasileirão Série A 2030 (29 pts em 12 jogos)"
+
+        return {
+            "team_id": team_id,
+            "team_name": team_name,
+            "manager_name": manager_name,
+            "active_season": active_season,
+            "manager_title": f"Campeão Brasileiro e Carioca de 2029 • {stand_desc}",
+            "standings": standings,
+            "squad": squad,
+            "top_performers": top_performers,
+            "recent_matches": recent_matches,
+            "upcoming_fixtures": upcoming_fixtures,
+            "sponsors": sponsors
+        }
+    except Exception as e:
+        print(f"[MediaEngine] Erro ao carregar contexto de carreira: {e}")
+        return {}
+
 def get_latest_capture_file(capture_folder):
     """
     Busca na pasta de capturas o arquivo mais recente de vídeo ou imagem.
@@ -92,6 +217,45 @@ def get_latest_capture_file(capture_folder):
         "size_bytes": file_size,
         "mtime": latest_mtime
     }
+
+def detect_competition(notes, recent_matches=None, upcoming_fixtures=None, requested_comp=""):
+    """Identifica com máxima fidelidade qual competição está sendo abordada na notícia."""
+    req = (requested_comp or "").strip().lower()
+    n = (notes or "").lower()
+    
+    # Prioridade 1: Informado explicitamente no payload/requisição
+    if "copa do brasil" in req: return "Copa do Brasil 2030"
+    if "libertadores" in req: return "CONMEBOL Libertadores 2030"
+    if "carioca" in req or "cariocão" in req: return "Cariocão 2030"
+    if "supercopa" in req: return "Supercopa do Brasil 2030"
+    if "brasileir" in req or "série a" in req: return "Brasileirão Betano 2030"
+    if req: return requested_comp
+    
+    # Prioridade 2: Mencionado no relato/prompt do usuário
+    if "copa do brasil" in n: return "Copa do Brasil 2030"
+    if "libertadores" in n: return "CONMEBOL Libertadores 2030"
+    if "carioca" in n or "cariocão" in n: return "Cariocão 2030"
+    if "supercopa" in n: return "Supercopa do Brasil 2030"
+    if "sul-americana" in n or "sudamericana" in n: return "CONMEBOL Sudamericana 2030"
+    if "série d" in n: return "Brasileirão Série D 2030"
+    if "série b" in n: return "Brasileirão Série B 2030"
+    if "brasileir" in n or "série a" in n: return "Brasileirão Betano 2030"
+    
+    # Prioridade 3: Se houver adversário citado nos próximos jogos da copa
+    if upcoming_fixtures:
+        for uf in upcoming_fixtures:
+            opp = (uf.get("opponent_name") or "").lower()
+            if opp and opp in n:
+                comp = uf.get("competition_name") or ""
+                if comp: return f"{comp} 2030" if "20" not in comp else comp
+                
+    # Prioridade 4: Última partida jogada
+    if recent_matches:
+        last_comp = recent_matches[0].get("competition_name")
+        if last_comp:
+            return f"{last_comp} 2030" if "20" not in last_comp else last_comp
+            
+    return "Brasileirão Betano 2030"
 
 def parse_context_notes(notes, team_name, default_player="Roberto"):
     notes_lower = (notes or "").lower()
@@ -287,10 +451,24 @@ def get_mock_journalist_article(journalist, player_name, team_name, opponent, re
 
     return title, subtitle, body
 
-def generate_mock_analysis(media_type, player_name, team_name, career_type, journalist, notes="", post_author=""):
+def generate_mock_analysis(media_type, player_name, team_name, career_type, journalist, notes="", post_author="", competition=""):
+    c_ctx = get_career_media_context()
+    recent_m = c_ctx.get("recent_matches", [])
+    standings_m = c_ctx.get("standings", [])
+    upcoming_f = c_ctx.get("upcoming_fixtures", [])
+
+    detected_comp = detect_competition(notes, recent_m, upcoming_f, requested_comp=competition)
+
     opponent, result, rating, goals, assists = parse_context_notes(notes, team_name, player_name)
+    if opponent in ["Rival", "Adversário"] and recent_m:
+        last_m = recent_m[0]
+        opponent = last_m.get("away_team_name") if last_m.get("home_team_name") == team_name else last_m.get("home_team_name")
+        u_sc = last_m.get("home_score") if last_m.get("home_team_name") == team_name else last_m.get("away_score")
+        o_sc = last_m.get("away_score") if last_m.get("home_team_name") == team_name else last_m.get("home_score")
+        if u_sc is not None and o_sc is not None:
+            result = "win" if u_sc > o_sc else ("draw" if u_sc == o_sc else "loss")
     
-    summary = f"Análise automatizada de partida: {team_name} enfrentou o {opponent} no modo carreira de {career_type}."
+    summary = f"Análise oficial da rodada: {team_name} de {player_name} no cenário de {career_type} pela {detected_comp} contra o {opponent}."
     
     p_keys = list(PERSONAS.keys())
     target_author = (post_author or "").strip()
@@ -319,6 +497,21 @@ def generate_mock_analysis(media_type, player_name, team_name, career_type, jour
         journalist, player_name, team_name, opponent, result, rating, goals, assists, career_type, notes
     )
 
+    user_stand = next((s for s in standings_m if s.get("team_name") == team_name or "Madureira" in str(s.get("team_name", ""))), None)
+    if user_stand:
+        pos = user_stand.get("position", 1)
+        pts = user_stand.get("points", 29)
+        j = user_stand.get("played", 12)
+        v = user_stand.get("wins", 9)
+        e = user_stand.get("draws", 2)
+        d = user_stand.get("losses", 1)
+        pos_str = "Líder isolado" if pos == 1 else f"{pos}º colocado"
+        pts_str = f"{pos_str} com {pts} pontos em {j} jogos ({v}V, {e}E, {d}D)"
+    else:
+        pts_str = "Líder com 29 pontos em 12 jogos (9V, 2E, 1D)"
+
+    sidebar_desc = f"O {team_name} de {player_name} vive grande momento e figura como {pts_str} no campeonato nacional. A comissão técnica monitora de perto as peças do elenco para a sequência decisiva."
+
     return {
         "opponent": opponent,
         "result": result,
@@ -333,8 +526,8 @@ def generate_mock_analysis(media_type, player_name, team_name, career_type, jour
                 "handle": author["handle"],
                 "avatar": author["avatar"],
                 "body": post_body,
-                "likes": random.randint(12000, 45000),
-                "reposts": random.randint(1500, 7800),
+                "likes": random.randint(18000, 52000),
+                "reposts": random.randint(2200, 9400),
                 "mediaCategory": "victory" if result == 'win' else "defeat",
                 "comments": [
                     {
@@ -360,12 +553,23 @@ def generate_mock_analysis(media_type, player_name, team_name, career_type, jour
         ],
         "newspaper": {
             "title": news_title,
+            "headline": news_title,
             "subtitle": news_subtitle,
+            "competition": detected_comp,
+            "caption": f"{team_name} em campo • Cobertura Especial | {detected_comp}",
+            "lead": news_body.split("\n\n")[0] if "\n\n" in news_body else news_body,
+            "analysis_paragraph_1": news_body.split("\n\n")[1] if len(news_body.split("\n\n")) > 1 else "A postura da equipe e a leitura tática do treinador foram determinantes para o desenrolar das ações.",
+            "quote": f"Estamos trabalhando jogo a jogo, com pés no chão, para manter o {team_name} competindo no topo.",
+            "analysis_paragraph_2": news_body.split("\n\n")[2] if len(news_body.split("\n\n")) > 2 else f"O elenco do {team_name} agora volta o foco total para o próximo desafio na tabela.",
+            "sidebar_title": "Cenário da Temporada",
+            "sidebar_info": sidebar_desc,
+            "standings_snippet": standings_m[:5],
+            "next_fixture": upcoming_f[0] if upcoming_f else None,
             "body": news_body
         }
     }
 
-def build_multimodal_prompt(player_name, team_name, career_type, journalist, media_type, notes, post_author=""):
+def build_multimodal_prompt(player_name, team_name, career_type, journalist, media_type, notes, post_author="", competition=""):
     p_keys = list(PERSONAS.keys())
     target_author = (post_author or "").strip()
     matched_name = None
@@ -392,18 +596,41 @@ def build_multimodal_prompt(player_name, team_name, career_type, journalist, med
         comm_names_str = sampled_names_str
         author_instruction = f"A postagem e os comentários devem usar exclusivamente as personalidades sorteadas: {sampled_names_str}."
 
+    # Carregar contexto real profundo do save ativo
+    c_ctx = get_career_media_context()
+    standings_list = c_ctx.get("standings", [])
+    standings_str = ", ".join([f"{s.get('team_name')} ({i+1}º, {s.get('points')} pts)" for i, s in enumerate(standings_list)]) if standings_list else "Madureira Líder com 29 pts em 12 jogos"
+    squad_list = c_ctx.get("squad", [])
+    squad_str = ", ".join([f"{p.get('name')} ({p.get('position')} OVR {p.get('overall_rating')})" for p in squad_list[:14]]) if squad_list else "Elenco completo do Madureira"
+    recent_m_list = c_ctx.get("recent_matches", [])
+    recent_str = ", ".join([f"{m.get('home_team_name')} {m.get('home_score')} x {m.get('away_score')} {m.get('away_team_name')} ({m.get('competition_name')})" for m in recent_m_list[:4]]) if recent_m_list else "Vitórias expressivas no ano"
+    upcoming_f_list = c_ctx.get("upcoming_fixtures", [])
+    upcoming_str = ", ".join([f"{f.get('match_date')} - {f.get('competition_name')}: {f.get('home_team_name')} x {f.get('away_team_name')} ({f.get('mando')})" for f in upcoming_f_list[:3]]) if upcoming_f_list else "Confrontos eliminatórios programados"
+
+    detected_comp = detect_competition(notes, recent_m_list, upcoming_f_list, requested_comp=competition)
+
     prompt = f"""
-    Você é o motor de inteligência e análise esportiva de 'Imersão Modo Carreira - EA SPORTS FC'.
-    O usuário está jogando um Modo Carreira como {career_type} (Técnico/Jogador: {player_name}, Clube: {team_name}).
+    Você é o motor de inteligência e análise esportiva de 'Imersão Modo Carreira - EA SPORTS FC' e do portal 'ge / Siga La Pelota TV'.
+    O usuário está jogando como {career_type} (Técnico: {player_name}, Clube: {team_name} — Temporada 2030).
     
-    RELATO OFICIAL DO USUÁRIO SOBRE A PARTIDA:
+    BASE DE DADOS REAIS CARREGADA NO APP:
+    - Clube: {team_name} | Técnico: {player_name}
+    - Competição Oficial Deste Evento / Matéria: {detected_comp}
+    - Classificação da Liga Nacional: {standings_str}
+    - Principais Jogadores do Elenco: {squad_str}
+    - Jogos e Resultados Recentes: {recent_str}
+    - Próximos Confrontos no Calendário: {upcoming_str}
+    
+    RELATO OFICIAL / CONTEXTO INFORMADO PELO USUÁRIO:
     "{notes}"
     
-    REGRA MANDATÓRIA DE FIDELIDADE TOTAL AO CONTEXTO:
-    1. O post principal no X (Twitter), todas as respostas/comentários e a matéria do jornal DEVEM girar EXCLUSIVAMENTE em torno dos fatos descritos pelo usuário acima.
-    2. Mencione explicitamente os lances, minutos, gols, jogadores, polêmicas de arbitragem, defesas ou qualquer evento narrado no relato!
-    3. NUNCA invente vitória se o usuário relatou empate ou derrota, e NUNCA invente derrota se o usuário relatou vitória!
-    4. REGRA OBRIGATÓRIA DE NOMES: O clube é SEMPRE '{team_name}' e o técnico é SEMPRE '{player_name}'. É PROIBIDO usar termos genéricos como "meu clube", "o clube", "o time", "o treinador" ou "o técnico" de forma vaga. Sempre cite nominalmente o time como '{team_name}' (ex: "o {team_name}", "o {team_name} de {player_name}") e o técnico como '{player_name}' tanto no post principal, quanto em cada um dos comentários, na manchete e na matéria do jornal!
+    DIRETRIZES JORNALÍSTICAS OBRIGATÓRIAS (FIDELIDADE TOTAL AO APP):
+    1. COMPETIÇÃO DA MATÉRIA: O chapéu/categoria e a manchete DEVEM tratar rigorosamente da competição '{detected_comp}'. NUNCA confunda ou troque o torneio (se a pauta for Copa do Brasil, a matéria é sobre Copa do Brasil)!
+    2. Se for Pós-Jogo: Prenda-se estritamente aos fatos informados (placar, gols, lances). NUNCA invente pênaltis não marcados ou fatos não relatados!
+    3. Se for Pré-Jogo / Aquecimento: Analise o confronto de ida/volta ou a briga por classificação, o momento do {team_name} contra o rival e a expectativa da torcida.
+    4. Se for Lesão / Departamento Médico: Cite a importância do atleta machucado e analise nominalmente quem é o reserva imediato no elenco do {team_name} (veja a lista do elenco acima para sugerir o substituto da mesma posição).
+    5. Se for Coletiva de Imprensa / Entrevista: Destaque as declarações e a postura firme do técnico {player_name}.
+    6. REGRA DE NOMES: O clube é SEMPRE '{team_name}' e o técnico é SEMPRE '{player_name}'.
     
     {author_instruction}
     
@@ -414,35 +641,40 @@ def build_multimodal_prompt(player_name, team_name, career_type, journalist, med
       "rating": 8.0,
       "goals": 0,
       "assists": 0,
-      "summary": "Resumo analítico rápido da rodada totalmente fiel ao relato",
+      "summary": "Resumo analítico rápido da pauta totalmente fiel aos dados e ao relato",
       "feed": [
         {{
           "author": {author_field_rule if matched_name else f'"{author_field_rule}"'},
-          "body": "Texto contundente no estilo característico e com os bordões da personalidade, focado diretamente nos acontecimentos narrados pelo usuário (o placar, os gols, os erros ou a polêmica citada).",
+          "body": "Texto contundente no estilo característico e com os bordões da personalidade, focado diretamente no momento narrado (o jogo, a lesão, a coletiva ou a briga na tabela).",
           "likes": 22400,
           "reposts": 3100,
           "comments": [
             {{
               "name": "Nome de outra personalidade da lista ({comm_names_str})",
-              "text": "Comentário autêntico reagindo diretamente ao mesmo fato narrado"
+              "text": "Comentário autêntico reagindo diretamente ao mesmo fato"
             }},
             {{
               "name": "Nome de mais outra personalidade da lista ({comm_names_str})",
-              "text": "Outro comentário curto e marcante reagindo ao lance/jogo"
+              "text": "Outro comentário curto e marcante reagindo à situação"
             }},
             {{
               "name": "Nome de uma terceira personalidade da lista ({comm_names_str})",
-              "text": "Terceiro comentário complementar sobre a repercussão"
+              "text": "Terceiro comentário complementar sobre a repercussão no campeonato"
             }}
           ]
         }}
       ],
       "newspaper": {{
-        "headline": "Manchete impactante para a capa do jornal 'Siga La Pelota' pelo jornalista selecionado ({journalist}) fiel aos fatos narrados",
-        "subtitle": "Subtítulo detalhando o resultado e o clima da partida",
-        "lead": "Primeiro parágrafo jornalístico relatando a partida e o que aconteceu em campo",
-        "analysis_paragraph_1": "Parágrafo de análise tática e da postura do {team_name} de {player_name}",
-        "analysis_paragraph_2": "Parágrafo final com as repercussões e próximos passos da equipe"
+        "headline": "Manchete impactante estilo Portal GE pelo jornalista selecionado ({journalist}) fiel aos dados e fatos relatados",
+        "subtitle": "Linha fina (subtítulo) detalhando o resultado, a lesão ou a expectativa da rodada",
+        "competition": "{detected_comp}",
+        "caption": "Legenda curta para o player de vídeo/imagem em 16:9 (ex: '{team_name} em campo | Cobertura Especial | {detected_comp}')",
+        "lead": "Primeiro parágrafo jornalístico apresentando a notícia com força e elegância",
+        "analysis_paragraph_1": "Segundo parágrafo detalhando o lance, a escalação, os números reais ou o boletim médico do atleta",
+        "quote": "Aspas marcantes e autênticas do técnico {player_name} sobre a situação",
+        "analysis_paragraph_2": "Terceiro parágrafo abordando o impacto na tabela ou os próximos desafios do {team_name}",
+        "sidebar_title": "Cenário da Temporada",
+        "sidebar_info": "Texto informativo do Box Lateral contextualizando o momento do time na competição"
       }}
     }}
     """
@@ -463,13 +695,21 @@ def analyze_media_with_ai(req_data, base_dir, env_api_key=""):
     post_author = req_data.get('postAuthor') or req_data.get('persona') or ''
     notes = req_data.get('notes') or req_data.get('prompt') or req_data.get('context') or ''
     user_api_key = str(req_data.get('userApiKey', '')).strip()
+    req_comp = req_data.get('competition') or req_data.get('comp_name') or ''
+
+    # Identificar competição
+    c_ctx = get_career_media_context()
+    recent_m = c_ctx.get("recent_matches", [])
+    upcoming_f = c_ctx.get("upcoming_fixtures", [])
+    standings_m = c_ctx.get("standings", [])
+    detected_comp = detect_competition(notes, recent_m, upcoming_f, requested_comp=req_comp)
 
     active_key = user_api_key if user_api_key else env_api_key
     
     # Se não tiver chave válida, usa o fallback inteligente
     if not active_key or len(active_key) < 15:
         print("[MediaEngine] Chave do Gemini indisponível ou vazia. Usando modo simulação enriquecido.")
-        mock_res = generate_mock_analysis(media_type, player_name, team_name, career_type, journalist, notes, post_author)
+        mock_res = generate_mock_analysis(media_type, player_name, team_name, career_type, journalist, notes, post_author, competition=detected_comp)
         mock_res["source"] = "mock"
         mock_res["api_error"] = "Chave Gemini não configurada. Usando gerador inteligente local."
         return mock_res
@@ -482,7 +722,7 @@ def analyze_media_with_ai(req_data, base_dir, env_api_key=""):
             elif not media_data.startswith(('/api/', 'http://', 'https://', 'blob:', '/uploads/')) and len(media_data) > 100:
                 media_data_pure = media_data
 
-        prompt = build_multimodal_prompt(player_name, team_name, career_type, journalist, media_type, notes, post_author)
+        prompt = build_multimodal_prompt(player_name, team_name, career_type, journalist, media_type, notes, post_author, competition=detected_comp)
         parts = [{"text": prompt}]
         if media_data_pure:
             parts.append({
@@ -592,6 +832,11 @@ def analyze_media_with_ai(req_data, base_dir, env_api_key=""):
                     np['analysis_paragraph_2'] = parts[2]
             if not np.get('journalist'):
                 np['journalist'] = journalist
+            
+            # Ancorar estritamente a competição identificada
+            np['competition'] = detected_comp
+            np['standings_snippet'] = standings_m[:5]
+            np['next_fixture'] = upcoming_f[0] if upcoming_f else None
             structured_data['newspaper'] = np
 
         structured_data["source"] = "gemini"
@@ -600,7 +845,7 @@ def analyze_media_with_ai(req_data, base_dir, env_api_key=""):
 
     except Exception as e:
         print(f"[MediaEngine] Erro na IA: {e}. Alternando para gerador inteligente local.")
-        mock_res = generate_mock_analysis(media_type, player_name, team_name, career_type, journalist, notes, post_author)
+        mock_res = generate_mock_analysis(media_type, player_name, team_name, career_type, journalist, notes, post_author, competition=detected_comp)
         mock_res["source"] = "mock"
         mock_res["api_error"] = str(e)
         return mock_res

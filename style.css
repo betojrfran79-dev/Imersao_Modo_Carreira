@@ -11198,3 +11198,127 @@ body {
   white-space: pre-wrap;
   word-break: break-all;
 }
+
+/* ========================================================================= */
+/* MODAL DE DIÁLOGO DA SALA DE REUNIÃO DA DIRETORIA (CONVERSA INTERATIVA)    */
+/* ========================================================================= */
+.boardroom-modal {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(8px);
+  display: none; align-items: center; justify-content: center;
+  z-index: 9999; padding: 20px;
+}
+.boardroom-modal.active { display: flex; }
+
+.bm-window {
+  background: #0b0f17; border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 20px; width: 100%; max-width: 860px;
+  height: 88vh; max-height: 780px; display: flex; flex-direction: column;
+  overflow: hidden; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+  animation: modalPop 0.3s ease;
+}
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.bm-header {
+  background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 16px 22px; display: flex; justify-content: space-between; align-items: center;
+}
+.bm-header-title {
+  font-size: 1.1rem; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 10px;
+}
+.bm-close {
+  background: transparent; border: none; color: #94a3b8;
+  cursor: pointer; font-size: 1.5rem; padding: 4px; display: flex; line-height: 1;
+}
+.bm-close:hover { color: #fff; }
+
+.dialogue-stream {
+  flex: 1; overflow-y: auto; padding: 22px; display: flex;
+  flex-direction: column; gap: 16px;
+  background-image: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.04) 0%, transparent 80%);
+}
+
+.dialogue-bubble {
+  display: flex; gap: 12px; max-width: 88%;
+  animation: fadeInBubble 0.25s ease;
+}
+@keyframes fadeInBubble {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dialogue-bubble.president { align-self: flex-start; }
+.dialogue-bubble.manager { align-self: flex-end; flex-direction: row-reverse; }
+
+.speaker-avatar {
+  width: 42px; height: 42px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 1.05rem; flex-shrink: 0;
+  overflow: hidden;
+}
+.president .speaker-avatar {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.3), rgba(245, 158, 11, 0.1));
+  color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.manager .speaker-avatar {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(59, 130, 246, 0.1));
+  color: #38bdf8; border: 1px solid rgba(59, 130, 246, 0.4);
+}
+
+.bubble-content {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px; padding: 12px 16px;
+}
+.president .bubble-content { border-top-left-radius: 4px; }
+.manager .bubble-content {
+  border-top-right-radius: 4px; background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.speaker-name {
+  font-size: 0.72rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 4px; display: flex;
+  justify-content: space-between; align-items: center; gap: 8px;
+}
+.president .speaker-name { color: #fbbf24; }
+.manager .speaker-name { color: #60a5fa; }
+.speech-text { font-size: 0.88rem; line-height: 1.5; color: #e2e8f0; }
+
+.chat-sponsor-card {
+  background: #080b11; border: 1px solid rgba(245, 158, 11, 0.4);
+  border-radius: 12px; padding: 12px; margin-top: 10px;
+  display: flex; align-items: center; gap: 14px;
+}
+.csc-logo {
+  width: 80px; height: 46px; object-fit: contain;
+  background: #ffffff; padding: 4px; border-radius: 8px;
+}
+.csc-info h5 { margin: 0; font-size: 0.95rem; font-weight: 800; color: #fff; }
+.csc-info p { margin: 2px 0 0 0; font-size: 0.78rem; color: #94a3b8; }
+
+.dialogue-choice-bar {
+  background: rgba(0, 0, 0, 0.55); border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 16px 22px; display: flex; flex-direction: column; gap: 10px;
+}
+.dcb-title {
+  font-size: 0.75rem; font-weight: 800; color: #fbbf24;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.choices-list { display: flex; flex-direction: column; gap: 8px; }
+.choice-btn {
+  background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px; padding: 10px 14px; color: #fff; font-size: 0.85rem;
+  font-weight: 600; text-align: left; cursor: pointer; transition: all 0.2s ease;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+}
+.choice-btn:hover {
+  background: rgba(245, 158, 11, 0.12); border-color: #fbbf24;
+}
+.tag-action {
+  font-size: 0.7rem; font-weight: 800; background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24; padding: 3px 8px; border-radius: 6px; flex-shrink: 0;
+}
+

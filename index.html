@@ -19,7 +19,7 @@
   <link rel="shortcut icon" type="image/x-icon" href="/siga_logo.ico">
   
   <!-- Main CSS -->
-  <link rel="stylesheet" href="style.css?v=6.2">
+  <link rel="stylesheet" href="style.css?v=6.3">
 
   <!-- html2canvas CDN (Exportação de cards e capas de jornais em imagem PNG) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -528,8 +528,8 @@
             </div>
           </div>
           <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center;">
-            <button type="button" class="btn-primary" onclick="openSponsorshipMeetingModal(true)" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; padding: 0.6rem 1.05rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-              <i data-lucide="briefcase"></i> Reunião de Patrocínios &amp; TV
+            <button type="button" class="btn-primary" onclick="openSponsorshipMeetingModal(true)" title="Consulta em tempo real a data do save no calendário e abre a Sala da Diretoria (Sessão Fechada ou Deliberação Aberta)" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; padding: 0.6rem 1.05rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+              <i data-lucide="building-2"></i> Sala de Reunião da Diretoria (Patrocínios &amp; Metas)
             </button>
             <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.12); color: #34d399; font-weight: 700; padding: 0.6rem 1rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
               <i data-lucide="coins"></i> Solicitar Mais Verba à Diretoria
@@ -823,8 +823,8 @@
             </div>
             <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
               <span id="bmGeneratedAt" style="font-size: 0.78rem; color: var(--text-dim);">—</span>
-              <button type="button" class="btn-secondary" onclick="openSponsorshipMeetingModal(true)" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24;">
-                <i data-lucide="briefcase"></i> Patrocínios &amp; TV
+              <button type="button" class="btn-secondary" onclick="openSponsorshipMeetingModal(true)" title="Consulta em tempo real a data do save e abre a Sala da Diretoria" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24;">
+                <i data-lucide="building-2"></i> Sala da Diretoria (Patrocínios)
               </button>
               <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); color: #34d399;">
                 <i data-lucide="coins"></i> Pedir Mais Verba
@@ -1880,8 +1880,8 @@
               </p>
             </div>
             <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
-              <button type="button" class="btn-primary" onclick="openSponsorshipMeetingModal(true)" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; cursor: pointer;">
-                <i data-lucide="briefcase"></i> Abrir Reunião de Patrocínios &amp; TV
+              <button type="button" class="btn-primary" onclick="openSponsorshipMeetingModal(true)" title="Consulta em tempo real a data do save e abre a Sala da Diretoria" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                <i data-lucide="building-2"></i> Sala de Reunião da Diretoria (Patrocínios &amp; Metas)
               </button>
               <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.12); color: #34d399; font-weight: 700; cursor: pointer;">
                 <i data-lucide="coins"></i> Solicitar Mais Verba à Diretoria
@@ -1897,6 +1897,7 @@
               </h4>
               <span style="font-size: 0.78rem; color: #94a3b8;">Ciclo: 55%-60% à vista em Janeiro • 40%-45% em Julho (Metas) • Recall Anual (+30% a +45%) no 2º Ano</span>
             </div>
+            <div id="finMidseasonSummaryBanner"></div>
             <div id="finSponsorshipSlotsGrid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem;">
               <!-- Renderizado via JS -->
             </div>
@@ -1916,8 +1917,8 @@
 
             <div class="glass-card" style="background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(16, 185, 129, 0.25);">
               <div class="card-header">
-                <div class="ch-title" style="color: #34d399;"><i data-lucide="trophy"></i> Premiações Oficiais de Competições (CBF / CONMEBOL)</div>
-                <span class="badge-tag green">Proteção Anti-Reset EA</span>
+                <div class="ch-title" style="color: #34d399;"><i data-lucide="trophy"></i> Premiações Esportivas Oficiais (CBF / CONMEBOL)</div>
+                <span class="badge-tag gold">Retido p/ Orçamento 2031</span>
               </div>
               <div id="finClaimablePrizesBox" style="padding-top: 0.5rem; max-height: 280px; overflow-y: auto;">
                 <!-- Renderizado via JS -->
@@ -4657,7 +4658,7 @@
   <!-- Categorias de Base & Transição Module -->
   <script src="youth_academy.js?v=2.1"></script>
   <!-- Main JavaScript Application -->
-  <script src="app.js?v=6.2"></script>
+  <script src="app.js?v=6.5"></script>
 
   <!-- Modal: Registrar Prêmio Individual -->
   <div class="modal-overlay" id="modalAddPlayerAward" style="display: none;">
@@ -4805,6 +4806,34 @@
     <div class="modal-card" style="max-width: 560px; width: 94%;">
       <button class="modal-close-btn" type="button" onclick="closeBoardPlayerAdviceModal()">&times;</button>
       <div id="bmPlayerAdviceBody"></div>
+    </div>
+  </div>
+
+  <!-- ====================================================================== -->
+  <!-- MODAL DE DIÁLOGO IMERSIVO DA SALA DE REUNIÃO (CONVERSA COM A DIRETORIA)-->
+  <!-- ====================================================================== -->
+  <div class="boardroom-modal" id="boardroomDialogueModal">
+    <div class="bm-window">
+      <div class="bm-header">
+        <div class="bm-header-title" id="bmDialogueTitle">
+          <i data-lucide="building-2" style="color: #fbbf24;"></i>
+          <span>Sala de Reunião da Diretoria</span>
+        </div>
+        <button class="bm-close" type="button" onclick="closeBoardroomDialogueModal()">&times;</button>
+      </div>
+
+      <!-- Fluxo de Mensagens em Formato Conversa Real -->
+      <div class="dialogue-stream" id="dialogueStream">
+        <!-- Injetado dinamicamente via JS -->
+      </div>
+
+      <!-- Barra de Decisão / Opções de Fala do Treinador -->
+      <div class="dialogue-choice-bar" id="dialogueChoiceBar">
+        <div class="dcb-title">Sua Resposta como Treinador:</div>
+        <div class="choices-list" id="choicesList">
+          <!-- Botões de fala inseridos dinamicamente -->
+        </div>
+      </div>
     </div>
   </div>
 

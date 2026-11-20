@@ -728,24 +728,22 @@ SERIE_A_PRIZE_TABLE = {
 
 def calculate_claimable_prizes(save_id="carreira_ativa"):
     """
-    Calcula as premiações reais conquistadas pelo clube nas competições da temporada anterior e atual
-    que ainda não foram resgatadas/injetadas no orçamento (protegendo contra o reset de Dezembro da EA).
+    Calcula as premiações esportivas conquistadas pelo clube na temporada atual (2030).
+    Conforme a governança do clube solicitada pelo usuário:
+      - As premiações da temporada anterior (2029) foram desconsideradas pois já entraram no orçamento inicial gerado pelo game no início de 2030.
+      - As premiações da temporada atual (2030) são mantidas em tracking/somadas internamente para compor o orçamento inicial da temporada 2031 (sem opção de injeção imediata no jogo).
     """
     ensure_sponsorship_tables()
     ctx = evaluate_club_historical_context(save_id)
     conn = get_db()
     cur = conn.cursor()
 
-    cur.execute("SELECT reference_key, status FROM board_financial_events WHERE save_id = ?", (save_id,))
-    claimed_keys = {r["reference_key"]: r["status"] for r in cur.fetchall()}
-
-    # Avaliar competições concluídas na temporada anterior e na temporada atual
-    target_seasons = [ctx["prev_season"], ctx["active_season"]]
+    # Avaliar EXCLUSIVAMENTE competições da temporada ativa (2030)
     cur.execute("""
         SELECT * FROM season_competitions
-        WHERE save_id = ? AND season_year IN (?, ?)
-        ORDER BY season_year DESC, id ASC
-    """, (save_id, ctx["prev_season"], ctx["active_season"]))
+        WHERE save_id = ? AND season_year = ?
+        ORDER BY id ASC
+    """, (save_id, ctx["active_season"]))
     comps = [dict(r) for r in cur.fetchall()]
     conn.close()
 
@@ -759,7 +757,7 @@ def calculate_claimable_prizes(save_id="carreira_ativa"):
         fp_low = f_pos.lower()
         wins = int(c.get("wins") or 0)
 
-        # Só gera premiação final para torneios já concluídos/campeões/eliminados (ou fase de grupos garantida)
+        # Só gera premiação final para torneios já concluídos/campeões/eliminados
         is_champ = (status == "CAMPEÃO" or ("campeão" in fp_low and "vice" not in fp_low and status != "EM_DISPUTA"))
         is_vice = ("vice" in fp_low and status != "EM_DISPUTA")
 
@@ -836,18 +834,17 @@ def calculate_claimable_prizes(save_id="carreira_ativa"):
 
         if prize_val > 0:
             ref_key = f"PRIZE_{s_yr}_{c_name.upper().replace(' ', '_')}"
-            # Premiações da temporada ativa (em andamento) são acumuladas para liberação apenas na temporada seguinte
-            is_current_active_season = (str(s_yr) == str(ctx["active_season"]))
-            
+            next_season = int(s_yr) + 1
             prizes.append({
                 "reference_key": ref_key,
                 "season_year": s_yr,
                 "competition_name": c_name,
                 "title": reason_label,
                 "amount": prize_val,
-                "is_current_active_season": is_current_active_season,
-                "already_claimed": (ref_key in claimed_keys),
-                "status": claimed_keys.get(ref_key, ("ACUMULADO_PARA_PROXIMA_TEMPORADA" if is_current_active_season else "AVAILABLE"))
+                "is_current_active_season": True,
+                "already_claimed": False,
+                "status": f"ACUMULADO_PARA_{next_season}",
+                "rollover_season": next_season
             })
 
     return prizes
@@ -1292,47 +1289,13 @@ def sign_tv_rights_contract(save_id, broadcaster_id):
 
 def claim_tournament_prize(save_id, reference_key):
     """
-    Resgata e injeta no save uma premiação oficial de campeonato conquistada pelo clube.
-    Premiações da temporada corrente ficam retidas e só podem ser liberadas na virada para a temporada seguinte.
+    Bloqueio de injeção imediata de premiações de campeonato:
+    Conforme a governança do clube solicitada pelo usuário, as premiações esportivas de 2030
+    são retidas e somadas internamente para compor o orçamento inicial da temporada 2031 (sem injeção avulsa durante o ano).
     """
-    prizes = calculate_claimable_prizes(save_id)
-    target = next((p for p in prizes if p["reference_key"] == reference_key), None)
-    if not target:
-        return {"status": "error", "message": "Premiação não encontrada."}
-    if target.get("is_current_active_season"):
-        return {
-            "status": "error",
-            "message": f"Premiação retida! Conforme as regras da governança, a premiação de {target['title']} fica acumulada e só é liberada pela Diretoria na Reunião Magna de virada para a próxima temporada!"
-        }
-    if target["already_claimed"]:
-        return {"status": "error", "message": "Esta premiação esportiva já foi resgatada e creditada no Livro-Razão!"}
-
-    ctx = evaluate_club_historical_context(save_id)
-    amount = float(target["amount"])
-    ev_title = f"Premiação Esportiva Oficial: {target['title']}"
-    ev_desc = f"Repasse oficial de premiação referente à campanha em {target['competition_name']} ({target['season_year']})."
-
-    script_file, _, lua_code = deploy_lua_budget_script(save_id, amount, ev_title, reference_key)
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        INSERT INTO board_financial_events (
-            save_id, season_year, in_game_date, event_type, reference_key,
-            title, description, amount, status, script_path
-        ) VALUES (?, ?, ?, 'TOURNAMENT_PRIZE', ?, ?, ?, ?, 'SCRIPT_READY', ?)
-    """, (save_id, ctx["active_season"], ctx["in_game_date"], reference_key, ev_title, ev_desc, amount, script_file))
-    conn.commit()
-    conn.close()
-
-    _credit_budget_in_db(save_id, ctx["active_season"], amount, category="PRIZE")
-
     return {
-        "status": "success",
-        "message": f"Premiação '{target['title']}' ($ {amount:,.0f}) resgatada! Script APLICAR_VERBA_DIRETORIA.lua atualizado para o F9.",
-        "amount_injected": amount,
-        "script_path": script_file,
-        "lua_code": lua_code
+        "status": "error",
+        "message": "Premiação retida pela governança! Conforme as diretrizes da Diretoria, todas as premiações conquistadas em 2030 são somadas internamente para compor o orçamento inicial da temporada 2031 (sem injeção avulsa durante o ano)."
     }
 
 
@@ -1505,6 +1468,22 @@ def get_full_sponsorship_dashboard(save_id="carreira_ativa", allow_negotiation=F
     ceiling = float(ctx["tier_config"]["extra_ceiling"]) * (1.35 if ctx["is_defending_serie_a_champ"] else 1.0)
     remaining_ceiling = max(0.0, ceiling - extra_used)
 
+    # Verbas restantes de Meio de Ano (Julho/2030) - 2ª Parcela Semestral dos Patrocínios Ativos
+    midseason_slots_pending = []
+    total_midseason_pending = 0.0
+    for d in active_deals:
+        if d.get("status") == "ACTIVE" and int(d.get("midseason_paid") or 0) == 0:
+            amt = float(d.get("midseason_bonus_amount") or 0.0)
+            total_midseason_pending += amt
+            midseason_slots_pending.append({
+                "slot_type": d["slot_type"],
+                "slot_name": SLOT_SHARES.get(d["slot_type"], {}).get("name", d["slot_type"]),
+                "brand_name": d["brand_name"],
+                "amount": amt
+            })
+
+    total_prizes_accumulated_2031 = sum(float(p["amount"]) for p in prizes)
+
     # Fala contextual da Diretoria baseada no calendário e no histórico contínuo
     prev_titles_str = ", ".join(ctx["prev_season_titles"]) if ctx["prev_season_titles"] else f"a campanha de {ctx['prev_season']} ({ctx['prev_season_league_pos']})"
     if ctx["window_state"] == "INICIO_TEMPORADA":
@@ -1518,14 +1497,14 @@ def get_full_sponsorship_dashboard(save_id="carreira_ativa", allow_negotiation=F
         board_greeting = (
             f"\"Professor, convocamos a Reunião Semestral de Inverno ({ctx['in_game_date']}). "
             f"Analisamos como as coisas estão se encaminhando na temporada {ctx['active_season']}: "
-            f"os patrocinadores atuais estão prontos para liberar os 40%-45% restantes das metas semestrais, "
-            f"e o mercado trouxe novas propostas caso queira negociar uma troca com cobertura de multa rescisória.\""
+            f"os patrocinadores atuais estão prontos para liberar a 2ª parcela semestral de $ {total_midseason_pending:,.0f} mediante avaliação das metas.\""
         )
     else:
         board_greeting = (
             f"\"O Conselho Deliberativo informa que a janela ordinária de deliberações comerciais encontra-se encerrada na data atual ({ctx['in_game_date']}). "
-            f"As reuniões ordinárias de patrocínio e TV ocorrem em Janeiro/Fevereiro (Abertura) e Julho/Agosto (Meio de Temporada). "
-            f"Você pode consultar os contratos vigentes, resgatar premiações de torneios encerrados ou utilizar a Solicitação Extraordinária de Verba em caso de urgência.\""
+            f"As verbas de início de ano (1ª parcela e TV) já foram integradas no orçamento pelo jogo. "
+            f"O próximo aporte financeiro programado é a 2ª Parcela Semestral de Meio de Ano (prevista para 01/07/{ctx['active_season']} no valor total de $ {total_midseason_pending:,.0f}). "
+            f"As premiações esportivas conquistadas em {ctx['active_season']} estão sendo retidas e somadas internamente (Total: $ {total_prizes_accumulated_2031:,.0f}) para compor o orçamento inicial da temporada {int(ctx['active_season']) + 1}.\""
         )
 
     return {
@@ -1534,6 +1513,17 @@ def get_full_sponsorship_dashboard(save_id="carreira_ativa", allow_negotiation=F
         "slots": slots_data,
         "tv_rights": tv_status,
         "claimable_prizes": prizes,
+        "midseason_summary": {
+            "total_pending": total_midseason_pending,
+            "target_date": f"01/07/{ctx['active_season']}",
+            "is_unlocked": bool(ctx.get("month_num", 1) in (7, 8)),
+            "slots": midseason_slots_pending
+        },
+        "prizes_rollover_summary": {
+            "target_season": int(ctx["active_season"]) + 1,
+            "total_accumulated": total_prizes_accumulated_2031,
+            "items_count": len(prizes)
+        },
         "extra_funds": {
             "annual_ceiling": round(ceiling),
             "already_used": round(extra_used),

@@ -9591,6 +9591,35 @@ function renderSponsorshipDashboard(data) {
     fDesc.innerHTML = `<b>Fatores Históricos Contínuos:</b> ${ctx.exposure_reasons.map(r => escapeHtml(r)).join(" • ")}`;
   }
 
+  // 2.5 Banner de Verbas Restantes de Meio de Ano (Julho)
+  const midBanner = document.getElementById("finMidseasonSummaryBanner");
+  if (midBanner && data.midseason_summary) {
+    const ms = data.midseason_summary;
+    midBanner.innerHTML = `
+      <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.35); border-radius: 12px; padding: 0.9rem 1.15rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.85rem;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; color: #fbbf24; font-size: 1.25rem; flex-shrink: 0;">
+            ⏳
+          </div>
+          <div>
+            <div style="font-size: 0.74rem; color: #fbbf24; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">Orçamento 2030 • Verbas Restantes de Meio de Ano (Julho)</div>
+            <div style="font-size: 1.18rem; font-weight: 800; color: #f8fafc;">
+              +${formatCurrency(ms.total_pending)} <span style="font-size: 0.78rem; font-weight: 600; color: #94a3b8;">(Total da 2ª Parcela dos 3 Patrocínios Ativos)</span>
+            </div>
+            <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 2px;">
+              Valores de início de ano (1ª parcela e TV) já integrados pelo jogo. Liberação programada para <b>${ms.target_date}</b>.
+            </div>
+          </div>
+        </div>
+        <div>
+          <span class="badge-tag ${ms.is_unlocked ? 'green' : 'blue'}" style="font-size: 0.76rem; padding: 6px 12px;">
+            ${ms.is_unlocked ? '🔓 Janela Semestral Aberta' : '🔒 Prevista para 01/07/' + data.context.active_season}
+          </span>
+        </div>
+      </div>
+    `;
+  }
+
   // 3. Renderizar os 3 Slots Oficiais de Uniforme
   const slotsGrid = document.getElementById("finSponsorshipSlotsGrid");
   if (slotsGrid && data.slots) {
@@ -9731,31 +9760,45 @@ function renderSponsorshipDashboard(data) {
     }
   }
 
-  // 5. Renderizar Premiações Oficiais de Competições Conquistadas
+  // 5. Renderizar Premiações Oficiais de Competições Conquistadas (Retidas para 2031)
   const prizesBox = document.getElementById("finClaimablePrizesBox");
   if (prizesBox) {
     const prizes = data.claimable_prizes || [];
+    const rollSummary = data.prizes_rollover_summary || { total_accumulated: 0, target_season: 2031 };
+
+    let html = `
+      <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 0.7rem 0.9rem; margin-bottom: 0.75rem;">
+        <div>
+          <span style="font-size: 0.74rem; color: #fbbf24; font-weight: 800; text-transform: uppercase;">Total Acumulado para Orçamento de ${rollSummary.target_season}:</span>
+          <div style="font-size: 1.15rem; color: #34d399; font-weight: 800;">+${formatCurrency(rollSummary.total_accumulated)}</div>
+        </div>
+        <span class="badge-tag gold" style="font-size: 0.72rem; font-weight: 700;">🔒 Acúmulo Interno</span>
+      </div>
+    `;
+
     if (prizes.length === 0) {
-      prizesBox.innerHTML = `<span class="empty-hint">Nenhuma premiação pendente no momento.</span>`;
+      html += `<span class="empty-hint" style="display: block; text-align: center; padding: 1rem;">Nenhuma premiação de ${data.context.active_season} calculada até o momento.</span>`;
     } else {
-      prizesBox.innerHTML = `<div style="display: flex; flex-direction: column; gap: 0.55rem;">` + prizes.map(p => `
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.04); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid ${p.already_claimed ? 'rgba(16,185,129,0.25)' : 'rgba(245,158,11,0.35)'};">
+      html += `<div style="display: flex; flex-direction: column; gap: 0.55rem;">` + prizes.map(p => `
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; background: rgba(255,255,255,0.04); padding: 0.65rem 0.85rem; border-radius: 8px; border: 1px solid rgba(245,158,11,0.25);">
           <div>
             <div style="font-weight: 700; font-size: 0.84rem; color: #f8fafc;">🏆 ${escapeHtml(p.title)}</div>
             <div style="font-size: 0.75rem; color: #fbbf24; font-weight: 800;">Premiação Oficial: +${formatCurrency(p.amount)}</div>
           </div>
-          ${p.already_claimed ? `
-            <span class="badge-tag green" style="font-size: 0.7rem;">CREDITADO ✅</span>
-          ` : (p.is_current_active_season ? `
-            <span class="badge-tag gold" style="font-size: 0.68rem;" title="Conforme governança, premiações da temporada em andamento acumulam para liberação na virada da próxima temporada">🔒 ACUMULADO P/ ${parseInt(p.season_year || 2030) + 1}</span>
-          ` : `
-            <button type="button" class="btn-primary btn-xs" onclick="claimCompetitionPrize('${p.reference_key}')" style="background: #10b981; border: none; color: #0f172a; font-weight: 800; padding: 6px 10px; cursor: pointer;">
-              Injetar no Caixa
-            </button>
-          `)}
+          <span class="badge-tag gold" style="font-size: 0.7rem; font-weight: 700;" title="Somada internamente pela Diretoria para compor o orçamento inicial de ${rollSummary.target_season}">
+            🔒 ACUMULADO P/ ${rollSummary.target_season}
+          </span>
         </div>
       `).join("") + `</div>`;
     }
+
+    html += `
+      <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.65rem; line-height: 1.45; background: rgba(255,255,255,0.02); padding: 0.5rem 0.7rem; border-radius: 6px;">
+        ℹ️ <b>Governança de Premiações:</b> Conforme o regulamento da carreira, as premiações de ${data.context.active_season} são somadas internamente e incorporadas ao orçamento inicial oficial da temporada ${rollSummary.target_season}. Premiações de 2029 já foram absorvidas no início deste ano pelo jogo.
+      </div>
+    `;
+
+    prizesBox.innerHTML = html;
   }
 
   // 6. Renderizar Tabela de Memória Histórica Contínua (2026..2030 sem zerar dados passados)
@@ -9800,6 +9843,235 @@ function renderSponsorshipDashboard(data) {
   initLucideIcons();
 }
 
+// =========================================================================
+// SALA DE REUNIÃO DA DIRETORIA (DIÁLOGOS INTERATIVOS COM O CONSELHO)
+// =========================================================================
+function closeBoardroomDialogueModal() {
+  const modal = document.getElementById("boardroomDialogueModal");
+  if (modal) modal.classList.remove("active");
+}
+
+function addDialogueBubble(speakerRole, speakerName, speechHtml, avatarUrl = "") {
+  const stream = document.getElementById("dialogueStream");
+  if (!stream) return;
+  const bubble = document.createElement("div");
+  bubble.className = `dialogue-bubble ${speakerRole}`;
+
+  const defaultAvatar = speakerRole === "president" ? "D" : "T";
+  const avatarHtml = avatarUrl 
+    ? `<img src="${avatarUrl}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 12px;" onerror="this.outerHTML='${defaultAvatar}'">`
+    : defaultAvatar;
+
+  bubble.innerHTML = `
+    <div class="speaker-avatar">${avatarHtml}</div>
+    <div class="bubble-content">
+      <div class="speaker-name">
+        <span>${escapeHtml(speakerName)}</span>
+        <span style="font-size: 0.68rem; color: #94a3b8; font-weight: normal;">Agora</span>
+      </div>
+      <div class="speech-text">${speechHtml}</div>
+    </div>
+  `;
+  stream.appendChild(bubble);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+function setBoardroomChoices(choicesArray) {
+  const list = document.getElementById("choicesList");
+  if (!list) return;
+  list.innerHTML = "";
+  choicesArray.forEach(c => {
+    const btn = document.createElement("div");
+    btn.className = "choice-btn";
+    btn.innerHTML = `
+      <span>"${escapeHtml(c.text)}"</span>
+      ${c.tag ? `<span class="tag-action">${escapeHtml(c.tag)}</span>` : ""}
+    `;
+    btn.onclick = () => {
+      addDialogueBubble("manager", "Beto Junior (Treinador)", `"${escapeHtml(c.text)}"`, "/uploads/manager_carreira_ativa.png");
+      list.innerHTML = `<span style="font-size: 0.8rem; color: #94a3b8; font-style: italic;">Aguardando deliberação da Diretoria...</span>`;
+      c.action();
+    };
+    list.appendChild(btn);
+  });
+}
+
+async function openBoardroomDialogue(customType) {
+  const modal = document.getElementById("boardroomDialogueModal");
+  if (!modal) return;
+  
+  if (!cachedSponsorshipDashboard) {
+    await loadSponsorshipDashboardData();
+  }
+  const data = cachedSponsorshipDashboard;
+  if (!data || !data.context) return;
+  const ctx = data.context;
+
+  const stream = document.getElementById("dialogueStream");
+  if (stream) stream.innerHTML = "";
+  modal.classList.add("active");
+
+  const titleEl = document.getElementById("bmDialogueTitle");
+
+  if (ctx.window_state === "MEIO_TEMPORADA" || customType === "julho_review") {
+    if (titleEl) {
+      titleEl.innerHTML = `<i data-lucide="calendar-check" style="color: #fbbf24;"></i> Reunião Semestral (Julho) • Avaliação de Metas &amp; 2ª Parcela`;
+    }
+    startJulhoReviewDialogue(data);
+  } else if (customType === "buyout") {
+    if (titleEl) {
+      titleEl.innerHTML = `<i data-lucide="handshake" style="color: #fbbf24;"></i> Mesa de Rescisão &amp; Propostas Concorrentes`;
+    }
+    startBuyoutBoardDialogue(data);
+  } else {
+    // Fora de janela comercial (ex: Abril/2030)
+    if (titleEl) {
+      titleEl.innerHTML = `<i data-lucide="clock" style="color: #38bdf8;"></i> Conselho Deliberativo • Sessão Ordinária (${ctx.in_game_date})`;
+    }
+    startClosedSessionDialogue(data);
+  }
+  initLucideIcons();
+}
+
+function startClosedSessionDialogue(data) {
+  const ctx = data.context;
+  const midPending = data.midseason_summary?.total_pending || 10715000;
+  const prizes2031 = data.prizes_rollover_summary?.total_accumulated || 3100000;
+
+  addDialogueBubble("president", "Dr. Flávio Brandão (Presidente)", 
+    `Boa tarde, professor Beto Junior! Convocamos esta sessão ordinária para alinhar o cronograma da temporada. Na data atual de <b>${ctx.in_game_date}</b>, o mercado publicitário encontra-se <b>BLINDADO</b> conforme o estatuto do clube.`);
+
+  setTimeout(() => {
+    addDialogueBubble("president", "Eduardo Silveira (Diretor Comercial)", 
+      `Exatamente, treinador. Nossos três contratos vigentes (<b>Samsung</b> no máster, <b>Unimed</b> nas mangas e <b>Uber</b> no calção) estão em pleno cumprimento. 
+      <br><br>
+      📌 <b>Cronograma da Governança:</b>
+      <ul>
+        <li>A <b>2ª Parcela Semestral de Meio de Ano (+${formatCurrency(midPending)})</b> será liberada na Janela de Inverno, a partir de <b>01/07/${ctx.active_season}</b>, mediante avaliação do atingimento das metas esportivas.</li>
+        <li>As <b>Premiações Oficiais de 2030 (+${formatCurrency(prizes2031)})</b> estão retidas e acumuladas internamente para compor o orçamento inicial da virada de temporada (${parseInt(ctx.active_season)+1}).</li>
+        <li>Propostas de quebra de contrato de marcas concorrentes só são apreciadas na Janela de Julho.</li>
+      </ul>
+      Como você avalia o encaminhamento da equipe até aqui?`);
+
+    setBoardroomChoices([
+      {
+        text: "Perfeito, presidente. Vim apenas consultar o status das nossas contas e os prazos contratuais.",
+        tag: "Consultar Cronograma",
+        action: () => {
+          setTimeout(() => {
+            addDialogueBubble("president", "Dr. Flávio Brandão (Presidente)", 
+              `Tudo sob controle, professor. O clube está financeiramente saudável. Quando seu save chegar em <b>01/07/${ctx.active_season}</b>, volte a esta sala para avaliarmos as metas e liberarmos a 2ª parcela!`);
+            setBoardroomChoices([
+              { text: "Combinado, presidente. Vamos focar nos próximos jogos!", action: () => closeBoardroomDialogueModal() }
+            ]);
+          }, 450);
+        }
+      },
+      {
+        text: "Nosso foco está 100% no campo. Vamos manter os patrocinadores blindados e atingir todas as metas em Julho!",
+        tag: "Foco Total nas Competições",
+        action: () => {
+          setTimeout(() => {
+            addDialogueBubble("president", "Dr. Flávio Brandão (Presidente)", 
+              `Essa é a atitude de um comandante vitorioso! O Conselho confia no seu trabalho e estaremos com a 2ª parcela pronta no dia 01/07.`);
+            setBoardroomChoices([
+              { text: "Obrigado pela confiança. Até a reunião de Julho!", action: () => closeBoardroomDialogueModal() }
+            ]);
+          }, 450);
+        }
+      }
+    ]);
+  }, 500);
+}
+
+function startJulhoReviewDialogue(data) {
+  const ctx = data.context;
+  const midPending = data.midseason_summary?.total_pending || 10715000;
+
+  addDialogueBubble("president", "Dr. Flávio Brandão (Presidente)", 
+    `Boa tarde, professor Beto Junior! Chegamos oficialmente à <b>Janela Semestral de Inverno (${ctx.in_game_date})</b>! 
+    Convocamos esta Reunião Magna de Meio de Ano para avaliar o cumprimento das metas acordadas e deliberar os repasses contratuais.`);
+
+  setTimeout(() => {
+    addDialogueBubble("president", "Eduardo Silveira (Diretor Comercial)", 
+      `E o balanço é espetacular, professor! O desempenho esportivo nas competições de ${ctx.active_season} cumpriu com folga as metas mínimas contratuais.
+      <br><br>
+      Com isso, o Conselho deliberou a aprovação imediata da <b>2ª Parcela Semestral dos Patrocínios</b>:
+      <div class="chat-sponsor-card">
+        <img src="/assets/sponsors/samsung.png" class="csc-logo" onerror="this.src='/assets/sponsors/default.png'">
+        <div class="csc-info">
+          <h5>Samsung &bull; Unimed &bull; Uber (Tranche de Julho)</h5>
+          <p><b>+${formatCurrency(midPending)}</b> prontos para injeção orçamentária no FC 26!</p>
+          <p style="color: #10b981;">Status: Metas semestrais atingidas com louvor!</p>
+        </div>
+      </div>
+      Além disso, como o time está em destaque nacional, marcas concorrentes nos procuraram querendo pagar multas rescisórias para assumir o uniforme. Como deseja proceder?`);
+
+    setBoardroomChoices([
+      {
+        text: "Excelente! Liberem os valores da 2ª parcela no orçamento e vamos também ouvir as propostas concorrentes!",
+        tag: `Liberar +${formatCurrency(midPending)} & Mesa Aberta`,
+        action: async () => {
+          const slots = data.slots || {};
+          for (const sKey of ["MASTER", "SLEEVE", "SHORTS"]) {
+            const d = slots[sKey]?.active_contract;
+            if (d && !d.midseason_paid) {
+              await triggerSponsorInstallment(d.id, "MIDSEASON");
+            }
+          }
+          setTimeout(() => {
+            addDialogueBubble("president", "Dr. Flávio Brandão (Presidente)", 
+              `Aprovado por unanimidade! A 2ª parcela semestral de <b>+${formatCurrency(midPending)}</b> foi liberada no orçamento e o script do Live Editor (F9) foi atualizado! Agora a mesa está aberta para deliberarmos propostas concorrentes.`);
+            setBoardroomChoices([
+              {
+                text: "Vamos analisar as propostas de marcas concorrentes na Mesa de Rescisão.",
+                tag: "Ver Concorrentes",
+                action: () => {
+                  closeBoardroomDialogueModal();
+                  openSponsorshipMeetingModal(false, "MASTER", true);
+                }
+              },
+              {
+                text: "Perfeito, presidente. Vamos manter os contratos atuais sem quebras.",
+                tag: "Encerrar Reunião",
+                action: () => closeBoardroomDialogueModal()
+              }
+            ]);
+          }, 600);
+        }
+      },
+      {
+        text: "Autorizo a liberação da 2ª parcela semestral, mas não quero quebrar contratos. Manteremos os parceiros atuais até o fim!",
+        tag: `Apenas Liberar 2ª Parcela (+${formatCurrency(midPending)})`,
+        action: async () => {
+          const slots = data.slots || {};
+          for (const sKey of ["MASTER", "SLEEVE", "SHORTS"]) {
+            const d = slots[sKey]?.active_contract;
+            if (d && !d.midseason_paid) {
+              await triggerSponsorInstallment(d.id, "MIDSEASON");
+            }
+          }
+          setTimeout(() => {
+            addDialogueBubble("president", "Dr. Flávio Brandão (Presidente)", 
+              `Muito nobre da sua parte, treinador. A 2ª parcela de <b>+${formatCurrency(midPending)}</b> já está creditada para a janela de inverno e nossos parceiros continuam prestigiados e blindados.`);
+            setBoardroomChoices([
+              { text: "Obrigado, presidente. Vamos ao mercado de inverno!", action: () => closeBoardroomDialogueModal() }
+            ]);
+          }, 600);
+        }
+      },
+      {
+        text: "Prefiro aguardar mais algumas semanas antes de liberar essa verba.",
+        tag: "Postergar Liberação",
+        action: () => closeBoardroomDialogueModal()
+      }
+    ]);
+  }, 500);
+}
+
+window.openBoardroomDialogue = openBoardroomDialogue;
+window.closeBoardroomDialogueModal = closeBoardroomDialogueModal;
+
 // --- MODAL 1: REUNIÃO EXECUTIVA DE PATROCÍNIOS, TV & MESA DE RESCISÃO ---
 async function openSponsorshipMeetingModal(checkCalendar = true, initialTab = "MASTER", allowNegotiation = false) {
   const data = await loadSponsorshipDashboardData(allowNegotiation);
@@ -9831,12 +10103,21 @@ async function openSponsorshipMeetingModal(checkCalendar = true, initialTab = "M
         <div style="flex: 1; min-width: 280px;">
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
             <span style="font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: ${ctx.window_open ? '#34d399' : '#f59e0b'};">
-              ${ctx.window_open ? '🏛️ REUNIÃO MAGNA ABERTA • DELIBERAÇÃO COMERCIAL' : '🔒 SESSÃO ORDINÁRIA • CONTRATOS BLINDADOS'}
+              ${ctx.window_state === 'MEIO_TEMPORADA'
+                ? '🏛️ REUNIÃO SEMESTRAL DE MEIO DE ANO • DELIBERAÇÃO DE METAS & RESCISÃO'
+                : (ctx.window_open
+                    ? '🏛️ REUNIÃO MAGNA ABERTA • DELIBERAÇÃO COMERCIAL'
+                    : `🔒 SESSÃO ORDINÁRIA • CONSELHO FECHADO (Próxima Sessão: 01/07/${ctx.active_season})`)}
             </span>
             <span style="font-size: 0.7rem; color: #94a3b8; font-family: monospace;">Data do Save: ${ctx.in_game_date}</span>
           </div>
-          <div style="font-size: 0.88rem; line-height: 1.55; color: #f1f5f9;">
+          <div style="font-size: 0.88rem; line-height: 1.55; color: #f1f5f9; margin-bottom: 8px;">
             ${data.board_greeting}
+          </div>
+          <div>
+            <button type="button" class="btn-primary btn-xs" onclick="openBoardroomDialogue()" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px;">
+              <i data-lucide="messages-square" style="width: 14px; height: 14px;"></i> Abrir Diálogo Interativo com o Conselho
+            </button>
           </div>
         </div>
       </div>
@@ -9871,6 +10152,7 @@ function switchSponsorshipModalSlot(slotKey) {
   if (slotKey === "TV") {
     const tv = cachedSponsorshipDashboard.tv_rights;
     const prizes = cachedSponsorshipDashboard.claimable_prizes || [];
+    const rollSummary = cachedSponsorshipDashboard.prizes_rollover_summary || { total_accumulated: 0, target_season: 2031 };
     bodyEl.innerHTML = `
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem;">
         <div class="glass-card" style="background: rgba(15,23,42,0.7);">
@@ -9897,22 +10179,26 @@ function switchSponsorshipModalSlot(slotKey) {
           `).join("")}
         </div>
         <div class="glass-card" style="background: rgba(15,23,42,0.7);">
-          <h4 style="margin-top:0; color:#34d399;">🏆 Repasse de Premiações Esportivas (CBF / CONMEBOL)</h4>
-          ${prizes.map(p => `
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); padding:0.75rem; border-radius:8px; margin-bottom:0.6rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="margin:0; color:#34d399;">🏆 Premiações de Campeonatos (CBF / CONMEBOL)</h4>
+            <span class="badge-tag gold" style="font-size: 0.7rem;">Retido p/ ${rollSummary.target_season}</span>
+          </div>
+          <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 8px; padding: 0.65rem 0.85rem; margin-bottom: 0.75rem; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.76rem; color: #fbbf24; font-weight: 700;">Total Acumulado Internamente:</span>
+            <strong style="color: #34d399; font-size: 1.05rem;">+${formatCurrency(rollSummary.total_accumulated)}</strong>
+          </div>
+          ${prizes.length === 0 ? `<span class="empty-hint">Nenhuma premiação calculada para ${cachedSponsorshipDashboard.context.active_season}.</span>` : prizes.map(p => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.04); padding:0.75rem; border-radius:8px; margin-bottom:0.6rem; border: 1px solid rgba(245,158,11,0.25);">
               <div>
                 <div style="font-weight:700; font-size:0.86rem; color:#f8fafc;">${escapeHtml(p.title)}</div>
                 <div style="color:#fbbf24; font-weight:800; font-size:0.82rem;">+${formatCurrency(p.amount)}</div>
               </div>
-              ${p.already_claimed ? `<span class="badge-tag green">CREDITADO ✅</span>` : (p.is_current_active_season ? `
-                <span class="badge-tag gold" style="font-size:0.68rem;" title="Premiações da temporada em andamento são calculadas e liberadas na virada da temporada seguinte">🔒 ACUMULADO P/ ${parseInt(p.season_year || 2030) + 1}</span>
-              ` : `
-                <button type="button" class="btn-primary btn-xs" onclick="claimCompetitionPrize('${p.reference_key}')" style="background:#10b981; border:none; color:#0f172a; font-weight:800; cursor:pointer;">
-                  Resgatar Agora
-                </button>
-              `)}
+              <span class="badge-tag gold" style="font-size:0.68rem; font-weight: 700;" title="Somada internamente para compor o orçamento inicial da temporada seguinte">🔒 ACUMULADO P/ ${rollSummary.target_season}</span>
             </div>
           `).join("")}
+          <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 0.5rem; line-height: 1.4;">
+            As premiações conquistadas em ${cachedSponsorshipDashboard.context.active_season} não sofrem injeção avulsa; elas são somadas e farão parte do orçamento inicial da temporada ${rollSummary.target_season}.
+          </div>
         </div>
       </div>
     `;

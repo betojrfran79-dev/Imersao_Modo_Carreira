@@ -528,7 +528,7 @@
             </div>
           </div>
           <div style="display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center;">
-            <button type="button" class="btn-primary" onclick="openSponsorshipMeetingModal(true)" title="Consulta em tempo real a data do save no calendário e abre a Sala da Diretoria (Sessão Fechada ou Deliberação Aberta)" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; padding: 0.6rem 1.05rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+            <button type="button" class="btn-primary" onclick="openBoardroomDialogue()" title="Consulta em tempo real a data do save no calendário e abre a Sala da Diretoria (Sessão Fechada ou Deliberação Aberta)" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; padding: 0.6rem 1.05rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
               <i data-lucide="building-2"></i> Sala de Reunião da Diretoria (Patrocínios &amp; Metas)
             </button>
             <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.12); color: #34d399; font-weight: 700; padding: 0.6rem 1rem; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
@@ -823,7 +823,7 @@
             </div>
             <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
               <span id="bmGeneratedAt" style="font-size: 0.78rem; color: var(--text-dim);">—</span>
-              <button type="button" class="btn-secondary" onclick="openSponsorshipMeetingModal(true)" title="Consulta em tempo real a data do save e abre a Sala da Diretoria" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24;">
+              <button type="button" class="btn-secondary" onclick="openBoardroomDialogue()" title="Consulta em tempo real a data do save e abre a Sala da Diretoria" style="border-color: rgba(245, 158, 11, 0.5); color: #fbbf24;">
                 <i data-lucide="building-2"></i> Sala da Diretoria (Patrocínios)
               </button>
               <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); color: #34d399;">
@@ -1880,7 +1880,7 @@
               </p>
             </div>
             <div style="display: flex; gap: 0.65rem; flex-wrap: wrap;">
-              <button type="button" class="btn-primary" onclick="openSponsorshipMeetingModal(true)" title="Consulta em tempo real a data do save e abre a Sala da Diretoria" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+              <button type="button" class="btn-primary" onclick="openBoardroomDialogue()" title="Consulta em tempo real a data do save e abre a Sala da Diretoria" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; color: #0f172a; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
                 <i data-lucide="building-2"></i> Sala de Reunião da Diretoria (Patrocínios &amp; Metas)
               </button>
               <button type="button" class="btn-secondary" onclick="openExtraFundsRequestModal()" style="border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.12); color: #34d399; font-weight: 700; cursor: pointer;">
@@ -4658,7 +4658,7 @@
   <!-- Categorias de Base & Transição Module -->
   <script src="youth_academy.js?v=2.1"></script>
   <!-- Main JavaScript Application -->
-  <script src="app.js?v=6.5"></script>
+  <script src="app.js?v=6.7"></script>
 
   <!-- Modal: Registrar Prêmio Individual -->
   <div class="modal-overlay" id="modalAddPlayerAward" style="display: none;">

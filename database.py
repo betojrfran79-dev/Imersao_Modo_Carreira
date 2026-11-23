@@ -2581,12 +2581,126 @@ def sync_live_standings_from_json(save_id="carreira_ativa", season_year=None, js
     conn.close()
     return True
 
+def auto_sync_libertadores_group_standings(save_id="carreira_ativa", season_year=None):
+    """
+    Detecta automaticamente se a CONMEBOL Libertadores está em andamento (Fase de Grupos)
+    e computa a tabela de classificação oficial do grupo a partir das partidas reais.
+    """
+    conn = get_db()
+    cur = conn.cursor()
+
+    if not season_year:
+        cur.execute("SELECT MAX(season_year) FROM matches WHERE save_id = ?", (save_id,))
+        row = cur.fetchone()
+        season_year = row[0] if row and row[0] else "2030"
+
+    cur.execute("SELECT current_team_id FROM saves WHERE id = ?", (save_id,))
+    s_row = cur.fetchone()
+    user_team_id = s_row["current_team_id"] if s_row else 112810
+
+    # Buscar partidas da Libertadores nesta temporada
+    cur.execute("""
+        SELECT match_date, home_team_name, away_team_name, home_score, away_score, home_team_id, away_team_id
+        FROM matches
+        WHERE save_id = ? AND (season_year = ? OR match_date LIKE ?)
+          AND (competition_name LIKE '%Libertadores%' OR competition_name LIKE '%CONMEBOL%')
+        ORDER BY id ASC
+    """, (save_id, season_year, f"%{season_year}"))
+    m_rows = cur.fetchall()
+    if not m_rows:
+        conn.close()
+        return False
+
+    # Identificar clubes que pertencem ao grupo do usuário
+    opp_ids = set()
+    for m in m_rows:
+        if m['home_team_id'] == user_team_id:
+            opp_ids.add(m['away_team_id'])
+        elif m['away_team_id'] == user_team_id:
+            opp_ids.add(m['home_team_id'])
+
+    group_ids = set(opp_ids)
+    group_ids.add(user_team_id)
+    for m in m_rows:
+        if m['home_team_id'] in opp_ids and m['away_team_id'] not in group_ids:
+            group_ids.add(m['away_team_id'])
+        elif m['away_team_id'] in opp_ids and m['home_team_id'] not in group_ids:
+            group_ids.add(m['home_team_id'])
+
+    teams_stats = {}
+    for tid in group_ids:
+        teams_stats[tid] = {
+            "team_id": tid, "team_name": "",
+            "played": 0, "wins": 0, "draws": 0, "losses": 0,
+            "gf": 0, "ga": 0, "gd": 0, "points": 0,
+            "form": [], "is_user_team": 1 if tid == user_team_id else 0
+        }
+
+    for m in m_rows:
+        hid = m['home_team_id']
+        aid = m['away_team_id']
+        if hid in group_ids and aid in group_ids:
+            hs = m['home_score'] if m['home_score'] is not None else 0
+            aws = m['away_score'] if m['away_score'] is not None else 0
+            teams_stats[hid]["team_name"] = m['home_team_name']
+            teams_stats[aid]["team_name"] = m['away_team_name']
+            teams_stats[hid]["played"] += 1
+            teams_stats[aid]["played"] += 1
+            teams_stats[hid]["gf"] += hs
+            teams_stats[hid]["ga"] += aws
+            teams_stats[aid]["gf"] += aws
+            teams_stats[aid]["ga"] += hs
+            if hs > aws:
+                teams_stats[hid]["wins"] += 1
+                teams_stats[hid]["points"] += 3
+                teams_stats[aid]["losses"] += 1
+                teams_stats[hid]["form"].append("V")
+                teams_stats[aid]["form"].append("D")
+            elif hs < aws:
+                teams_stats[aid]["wins"] += 1
+                teams_stats[aid]["points"] += 3
+                teams_stats[hid]["losses"] += 1
+                teams_stats[aid]["form"].append("V")
+                teams_stats[hid]["form"].append("D")
+            else:
+                teams_stats[hid]["draws"] += 1
+                teams_stats[aid]["draws"] += 1
+                teams_stats[hid]["points"] += 1
+                teams_stats[aid]["points"] += 1
+                teams_stats[hid]["form"].append("E")
+                teams_stats[aid]["form"].append("E")
+
+    for tid, st in teams_stats.items():
+        st["gd"] = st["gf"] - st["ga"]
+        st["form_str"] = "-".join(st["form"][-5:])
+
+    sorted_teams = sorted(teams_stats.values(), key=lambda x: (x['points'], x['gd'], x['gf']), reverse=True)
+    comp_fullname = "CONMEBOL Libertadores (Fase de Grupos - Grupo C)"
+    cur.execute("DELETE FROM standings WHERE save_id = ? AND season_year = ? AND competition_name = ?", (save_id, season_year, comp_fullname))
+
+    for pos, t in enumerate(sorted_teams, 1):
+        cur.execute("""
+        INSERT INTO standings (
+            save_id, season_year, competition_name, position, team_id, team_name,
+            played, wins, draws, losses, goals_for, goals_against, goal_diff, points, form, is_user_team, stage_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (save_id, season_year, comp_fullname, pos, t['team_id'], t['team_name'], t['played'], t['wins'], t['draws'], t['losses'], t['gf'], t['ga'], t['gd'], t['points'], t['form_str'], t['is_user_team'], 1))
+
+    conn.commit()
+    conn.close()
+    return True
+
 def get_current_standings(save_id, season_year=None):
     """
     Retorna as tabelas de classificação e fases eliminatórias (mata-mata) das competições relevantes na temporada ativa.
     """
     try:
         sync_live_standings_from_json(save_id, season_year)
+    except Exception:
+        pass
+
+    try:
+        auto_sync_libertadores_group_standings(save_id, season_year)
     except Exception:
         pass
 
@@ -4710,8 +4824,34 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
     h2h_data["opponent_team_name"] = opp_name
     opp_crest = fcm_resolver.get_crest_image_path_or_url(opponent_id)
 
-    # 2. Detecção Real: É Mata-Mata (Copa) ou Pontos Corridos (Liga)?
-    is_cup = any(kw in comp_name.lower() for kw in ["copa", "cup", "mata", "libertadores", "supercopa", "semifinal", "final", "quartas", "oitavas"])
+    # 2. Detecção Real: É Mata-Mata (Copa) ou Pontos Corridos (Liga / Fase de Grupos)?
+    is_libertadores = any(kw in comp_name.lower() for kw in ["libertadores", "conmebol libertadores"])
+    is_libertadores_group = False
+    lib_round_num = 1
+
+    if is_libertadores:
+        cur.execute("""
+        SELECT count(*) FROM matches
+        WHERE save_id = ? AND (season_year = ? OR season_year = ?)
+          AND (competition_name LIKE '%Libertadores%' OR competition_name LIKE '%CONMEBOL%')
+          AND (home_team_id = ? OR away_team_id = ?)
+        """, (save_id, season_year, format_brazilian_season(season_year), user_team_id, user_team_id))
+        cnt_row = cur.fetchone()
+        lib_played = cnt_row[0] if cnt_row else 0
+
+        cur.execute("""
+        SELECT stage_name FROM knockout_stages
+        WHERE save_id = ? AND season_year = ? AND (home_team_id = ? OR away_team_id = ?)
+        ORDER BY id DESC LIMIT 1
+        """, (save_id, season_year, opponent_id, opponent_id))
+        ko_check = cur.fetchone()
+        has_ko = ko_check and any(kw in str(ko_check["stage_name"]).lower() for kw in ["oitavas", "quartas", "semifinal", "final", "playoff"])
+
+        if lib_played < 6 and not has_ko:
+            is_libertadores_group = True
+            lib_round_num = lib_played + 1
+
+    is_cup = not is_libertadores_group and any(kw in comp_name.lower() for kw in ["copa", "cup", "mata", "supercopa", "semifinal", "final", "quartas", "oitavas"])
     
     stage_name = "Rodada de Pontos Corridos"
     agg_info = None
@@ -4720,7 +4860,12 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
     is_first_leg = False
     is_second_leg = False
 
-    if is_cup:
+    if is_libertadores_group:
+        stage_name = f"Fase de Grupos • {lib_round_num}ª Rodada"
+        agg_info = f"{lib_round_num}ª Rodada da Fase de Grupos"
+        metric_advantage = "Disputa pela Liderança do Grupo"
+        metric_status = "Fase de Grupos (3 Pts em Jogo)"
+    elif is_cup:
         # Verificar se já houve partidas concluídas entre os dois clubes nesta competição e temporada
         cur.execute("""
         SELECT id, match_date, home_team_name, away_team_name, home_score, away_score, home_team_id, away_team_id
@@ -4743,7 +4888,7 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
         """, (save_id, season_year, format_brazilian_season(season_year), raw_comp, f"%{comp_name}%", opponent_id, opponent_id, opponent_id))
         all_tie_fixtures = cur.fetchall()
 
-        is_two_legged = len(all_tie_fixtures) >= 2 or any(kw in comp_name.lower() for kw in ["copa do brasil", "libertadores", "semifinal"])
+        is_two_legged = len(all_tie_fixtures) >= 2 or any(kw in comp_name.lower() for kw in ["copa do brasil", "semifinal"])
 
         # Buscar dados de knockout_stages se existirem
         cur.execute("""
@@ -5174,7 +5319,16 @@ def get_match_scout_dossier(save_id="carreira_ativa", opponent_id=None, season_y
         )
 
     # 5. Textos Fatuais Dinâmicos & Cenário Completo
-    if is_cup:
+    if is_libertadores_group:
+        mando_txt = f"O {user_team_name} atua em casa, no Conselheiro Galvão" if is_home else f"O {user_team_name} atua fora de casa contra o {opp_name}"
+        stakes_summary = (
+            f"Duelo decisivo pela {comp_name} (Fase de Grupos • {lib_round_num}ª Rodada). {mando_txt}, enfrentando o tradicional {opp_name} em confronto direto valendo 3 pontos na briga pela classificação e liderança isolada do Grupo.\n\n"
+            f"📊 Momento das Equipes: O {user_team_name} vive {user_trend.lower()} com impressionantes {u_aprov}% de aproveitamento recente ({u_gf_recent} gols feitos, {u_ga_recent} sofridos). Já o {opp_name} se encontra em {opp_trend.lower()} ({o_aprov}% de aproveitamento, {o_ga_recent} gols sofridos).\n\n"
+            f"📜 Retrospecto: {last_h2h_summary}\n\n"
+            f"🏟️ {venue_weight_text}"
+        )
+        metric_advantage = "Disputa por 3 Pts"
+    elif is_cup:
         if is_first_leg:
             mando_ida = f"fora de casa, no estádio do {opp_name}" if not is_home else f"em casa, no Conselheiro Galvão"
             mando_volta = f"no Conselheiro Galvão no jogo de volta" if not is_home else f"no estádio do {opp_name} no jogo de volta"

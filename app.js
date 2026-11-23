@@ -9899,17 +9899,26 @@ function setBoardroomChoices(choicesArray) {
 async function openBoardroomDialogue(customType) {
   const modal = document.getElementById("boardroomDialogueModal");
   if (!modal) return;
+  modal.classList.add("active");
+
+  const stream = document.getElementById("dialogueStream");
+  if (stream) {
+    stream.innerHTML = `<div style="text-align: center; padding: 2.5rem 1rem; color: #94a3b8;"><div style="font-size: 1.8rem; margin-bottom: 0.5rem;">🏛️</div>Conectando ao Conselho Deliberativo...</div>`;
+  }
   
   if (!cachedSponsorshipDashboard) {
     await loadSponsorshipDashboardData();
   }
   const data = cachedSponsorshipDashboard;
-  if (!data || !data.context) return;
+  if (!data || !data.context) {
+    if (stream) {
+      stream.innerHTML = `<div style="text-align: center; padding: 2rem; color: #ef4444;">Não foi possível carregar as informações do Conselho no momento.<br><br><button type="button" class="btn-secondary btn-sm" onclick="openBoardroomDialogue()">Tentar Novamente</button></div>`;
+    }
+    return;
+  }
   const ctx = data.context;
 
-  const stream = document.getElementById("dialogueStream");
   if (stream) stream.innerHTML = "";
-  modal.classList.add("active");
 
   const titleEl = document.getElementById("bmDialogueTitle");
 
@@ -9965,6 +9974,22 @@ function startClosedSessionDialogue(data) {
               { text: "Combinado, presidente. Vamos focar nos próximos jogos!", action: () => closeBoardroomDialogueModal() }
             ]);
           }, 450);
+        }
+      },
+      {
+        text: "Gostaria de examinar a mesa de patrocínios, contratos e valores vigentes.",
+        tag: "Mesa de Contratos",
+        action: () => {
+          closeBoardroomDialogueModal();
+          openSponsorshipMeetingModal(false, "MASTER", false);
+        }
+      },
+      {
+        text: "Preciso solicitar uma verba orçamentária extraordinária ao Conselho.",
+        tag: "Solicitar Verba Extra",
+        action: () => {
+          closeBoardroomDialogueModal();
+          openExtraFundsRequestModal();
         }
       },
       {
@@ -10074,14 +10099,12 @@ window.closeBoardroomDialogueModal = closeBoardroomDialogueModal;
 
 // --- MODAL 1: REUNIÃO EXECUTIVA DE PATROCÍNIOS, TV & MESA DE RESCISÃO ---
 async function openSponsorshipMeetingModal(checkCalendar = true, initialTab = "MASTER", allowNegotiation = false) {
+  if (checkCalendar) {
+    return openBoardroomDialogue();
+  }
   const data = await loadSponsorshipDashboardData(allowNegotiation);
   if (!data || !data.context) return;
   const ctx = data.context;
-
-  // Se o usuário clicou no botão de reunião no Painel do Momento e a janela estiver fechada, avisa com elegância mas permite ver a mesa!
-  if (checkCalendar && !ctx.window_open) {
-    showToast(`🏛️ Conselho Deliberativo (${ctx.in_game_date}): Janela ordinária fechada. Exibindo contratos vigentes e premiações.`, "warning");
-  }
 
   const modal = document.getElementById("modalSponsorshipMeeting");
   if (!modal) return;

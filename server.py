@@ -1156,7 +1156,7 @@ class CareerVaultHandler(http.server.SimpleHTTPRequestHandler):
             # 8.5 API Sponsorships, TV Rights, Prizes & Board Budget Governance
             if path == "/api/sponsorships/dashboard":
                 import sponsorship_engine
-                allow_neg = (params.get("allow_negotiation", ["false"])[0].lower() == "true")
+                allow_neg = (query.get("allow_negotiation", ["false"])[0].lower() == "true")
                 spons_data = sponsorship_engine.get_full_sponsorship_dashboard(save_id, allow_negotiation=allow_neg)
                 return self.send_json(spons_data)
 
